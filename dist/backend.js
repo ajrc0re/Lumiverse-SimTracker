@@ -10015,7 +10015,7 @@ spindle.on("MESSAGE_SENT", (payload) => {
       return;
     const commandResult = await handleSlashCommand(message, ctx);
     if (commandResult) {
-      spindle.sendToFrontend(commandResult);
+      spindle.sendToFrontend(commandResult, activeUserId || undefined);
       await trackEvent("sst.command.result", {
         command: commandResult.payload.command,
         ok: commandResult.payload.ok,
@@ -10160,7 +10160,7 @@ async function generateTrackerWithSecondaryLLM(chatId, targetMessageId) {
     return;
   }
   secondaryGenerationInProgress = true;
-  spindle.sendToFrontend({ type: "secondary_generation_started" });
+  spindle.sendToFrontend({ type: "secondary_generation_started" }, activeUserId || undefined);
   try {
     const messages = await spindle.chat.getMessages(chatId);
     if (!messages.length)
@@ -10237,7 +10237,7 @@ Based on the above conversation${previousTrackerData ? " and the previous tracke
     const generatedText = typeof resultObj.content === "string" ? resultObj.content : "";
     if (!generatedText) {
       spindle.log.warn("Secondary LLM returned empty response");
-      spindle.sendToFrontend({ type: "secondary_generation_error", message: "Empty response from LLM" });
+      spindle.sendToFrontend({ type: "secondary_generation_error", message: "Empty response from LLM" }, activeUserId || undefined);
       return;
     }
     let sanitized = generatedText.trim();
@@ -10248,7 +10248,7 @@ Based on the above conversation${previousTrackerData ? " and the previous tracke
     const parsed = parseTrackerPayload(sanitized);
     if (!parsed) {
       spindle.log.warn("Secondary LLM response could not be parsed as valid tracker data");
-      spindle.sendToFrontend({ type: "secondary_generation_error", message: "LLM response was not valid tracker data" });
+      spindle.sendToFrontend({ type: "secondary_generation_error", message: "LLM response was not valid tracker data" }, activeUserId || undefined);
       return;
     }
     const trackerBlock = formatTrackerPayload(parsed, config.trackerFormat, config.codeBlockIdentifier);
@@ -10267,11 +10267,11 @@ ${trackerBlock}`;
       type: "secondary_generation_complete",
       messageId: targetMessageId,
       content: updatedContent
-    });
+    }, activeUserId || undefined);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     spindle.log.error(`Secondary LLM generation failed: ${message}`);
-    spindle.sendToFrontend({ type: "secondary_generation_error", message });
+    spindle.sendToFrontend({ type: "secondary_generation_error", message }, activeUserId || undefined);
     await trackEvent("sst.secondary_generation.failed", { error: message }, { level: "error" });
   } finally {
     secondaryGenerationInProgress = false;
@@ -10355,7 +10355,7 @@ spindle.permissions.onChanged(({ permission, granted, allGranted }) => {
     permission,
     granted,
     allGranted
-  });
+  }, activeUserId || undefined);
 });
 spindle.permissions.onDenied(({ permission, operation }) => {
   spindle.log.warn(`Permission "${permission}" denied for operation: ${operation}`);
@@ -10379,7 +10379,7 @@ async function sendConfigState() {
     requestedPermissions: spindle.manifest.permissions || [],
     seededPresets: runtime.seededPresets,
     ephemeralPoolStatus: await getEphemeralPoolStatusSafe()
-  });
+  }, activeUserId || undefined);
 }
 async function handleImportPresetFile(payload) {
   const text = typeof payload.text === "string" ? payload.text : "";
@@ -10389,7 +10389,7 @@ async function handleImportPresetFile(payload) {
       type: "import_result",
       ok: false,
       message: "Import failed (empty file)."
-    });
+    }, activeUserId || undefined);
     return;
   }
   if (hasPermission("ephemeral_storage")) {
@@ -10418,7 +10418,7 @@ async function handleImportPresetFile(payload) {
       type: "import_result",
       ok: false,
       message: "Import failed (invalid JSON)."
-    });
+    }, activeUserId || undefined);
     await trackEvent("sst.import.failed", { reason: "invalid_json", fileName }, { level: "warn" });
     return;
   }
@@ -10431,7 +10431,7 @@ async function handleImportPresetFile(payload) {
       type: "import_result",
       ok: true,
       message: `Imported inline pack: ${String(parsed.templateName || "Unnamed")}`
-    });
+    }, activeUserId || undefined);
     await trackEvent("sst.import.inline_pack", { fileName }, { level: "info" });
     return;
   }
@@ -10460,7 +10460,7 @@ async function handleImportPresetFile(payload) {
     type: "import_result",
     ok: true,
     message: `Imported preset: ${preset.templateName}`
-  });
+  }, activeUserId || undefined);
   await trackEvent("sst.import.preset", { fileName, templateId: preset.id }, { level: "info" });
 }
 spindle.onFrontendMessage(async (payload, userId) => {
@@ -10512,18 +10512,18 @@ spindle.onFrontendMessage(async (payload, userId) => {
         type: "connections_list",
         connections: [],
         error: "Generation permission not granted"
-      });
+      }, userId);
       return;
     }
     try {
-      spindle.log.info(`get_connections: requesting with userId=${activeUserId || "(none)"}`);
-      const connections = await spindle.connections.list(activeUserId || undefined);
+      spindle.log.info(`get_connections: requesting with userId=${userId || "(none)"}`);
+      const connections = await spindle.connections.list(userId || undefined);
       spindle.log.info(`get_connections: received ${connections?.length ?? 0} connection(s)`);
-      spindle.sendToFrontend({ type: "connections_list", connections: connections ?? [] });
+      spindle.sendToFrontend({ type: "connections_list", connections: connections ?? [] }, userId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       spindle.log.error(`get_connections failed: ${msg}`);
-      spindle.sendToFrontend({ type: "connections_list", connections: [], error: msg });
+      spindle.sendToFrontend({ type: "connections_list", connections: [], error: msg }, userId);
     }
     return;
   }
