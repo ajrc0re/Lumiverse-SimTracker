@@ -520,6 +520,18 @@ function registerTemplateHelpers(): void {
   helpersRegistered = true;
 
   Handlebars.registerHelper("eq", (a, b) => a === b);
+  // Variadic `or` / `and` — last argument is the Handlebars options
+  // object, so we peel it off before folding. Values use JS truthiness
+  // so `0`, `""`, `null`, `undefined`, and `false` are all falsy.
+  Handlebars.registerHelper("or", function (...args: unknown[]) {
+    const values = args.slice(0, -1);
+    return values.some((v) => !!v);
+  });
+  Handlebars.registerHelper("and", function (...args: unknown[]) {
+    const values = args.slice(0, -1);
+    return values.every((v) => !!v);
+  });
+  Handlebars.registerHelper("not", (value: unknown) => !value);
   Handlebars.registerHelper("gt", (a, b) => Number(a) > Number(b));
   Handlebars.registerHelper("gte", (a, b) => Number(a) >= Number(b));
   Handlebars.registerHelper("abs", (a) => Math.abs(Number(a) || 0));

@@ -7169,7 +7169,7 @@ var bento_style_tracker_default = {
         <div style="display:flex; align-items: center;">
             <div class="header-badges">
                 <!-- Status Dots -->
-                {{#if (eq stats.cycle_stage "pregnancy")}}
+                {{#if (or stats.preg (eq stats.cycle_stage "pregnancy"))}}
                     <div class="mini-badge" style="background: var(--cy-preg); box-shadow: 0 0 6px var(--cy-preg);" title="Pregnant"></div>
                 {{else if (eq stats.cycle_stage "ovulation")}}
                     <div class="mini-badge" style="background: var(--cy-ovu); box-shadow: 0 0 6px var(--cy-ovu);" title="Ovulating"></div>
@@ -7203,10 +7203,10 @@ var bento_style_tracker_default = {
             <!-- Status Row (Pregnancy/Cycle | Reaction) -->
             <div class="status-row">
                 <!-- Slot 1: Pregnancy/Cycle -->
-                {{#if (eq stats.cycle_stage "pregnancy")}}
+                {{#if (or stats.preg (eq stats.cycle_stage "pregnancy"))}}
                     <div class="status-pill" style="color:var(--cy-preg); background:var(--bg-preg);">
                         <svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-                        <span>Pregnant ({{stats.days_preg}}d)</span>
+                        <span>Pregnant{{#if (gt stats.days_preg 0)}} ({{stats.days_preg}}d){{/if}}</span>
                     </div>
                 {{else if (eq stats.cycle_stage "ovulation")}}
                     <div class="status-pill" style="color:var(--cy-ovu); background:var(--bg-ovu);">
