@@ -44,6 +44,14 @@ const CONFIG_PATH = "preferences.json";
 let config: TrackerConfig = { ...DEFAULT_CONFIG };
 let lastSimStats = "{}";
 let activeUserId: string | null = null;
+/**
+ * Last chat id the extension saw activity on. The interceptor signature
+ * (`context: unknown`) doesn't contractually expose the chat id, so we
+ * mirror it from `GENERATION_STARTED` (which does carry it) and from
+ * any other event that surfaces a chat id. Used as a fallback when the
+ * interceptor context can't be parsed.
+ */
+let activeChatId: string | null = null;
 
 type TrackerHistoryEntry = { messageId: string; payload: string };
 
@@ -902,7 +910,10 @@ spindle.on("MESSAGE_SENT", (payload: unknown) => {
     const message = ctx.content;
     if (typeof message !== "string") return;
 
-    if (ctx.chatId) void rehydrateChatTrackerHistory(ctx.chatId);
+    if (ctx.chatId) {
+      activeChatId = ctx.chatId;
+      void rehydrateChatTrackerHistory(ctx.chatId);
+    }
 
     const commandResult = await handleSlashCommand(message, ctx);
     if (commandResult) {
@@ -931,6 +942,7 @@ spindle.on("MESSAGE_SENT", (payload: unknown) => {
 spindle.on("MESSAGE_EDITED", (payload: unknown) => {
   void (async () => {
     const ctx = readMessageContext(payload);
+    if (ctx.chatId) activeChatId = ctx.chatId;
     if (typeof ctx.content !== "string") return;
     const sim = extractTrackerPayloadFromMessage(ctx.content);
     if (sim) {
@@ -943,6 +955,69 @@ spindle.on("MESSAGE_EDITED", (payload: unknown) => {
     // Edit removed the tracker (e.g. swipe to a variant without one) — drop
     // the side-channel entry so stale data doesn't leak into generation.
     forgetChatTracker(ctx.chatId, ctx.messageId);
+  })();
+});
+
+spindle.on("MESSAGE_SWIPED", (payload: unknown) => {
+  void (async () => {
+    if (!payload || typeof payload !== "object") return;
+    const obj = payload as Record<string, unknown>;
+
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
+    if (chatId) activeChatId = chatId;
+    const message = obj.message && typeof obj.message === "object"
+      ? (obj.message as Record<string, unknown>)
+      : null;
+    if (!chatId || !message) return;
+
+    const messageId = typeof message.id === "string" ? message.id : null;
+    if (!messageId) return;
+
+    const action = typeof obj.action === "string" ? obj.action : "";
+    const activeSwipeId = typeof message.swipe_id === "number" ? message.swipe_id : 0;
+
+    // Determine which swipe's content is authoritative for this event.
+    //   - added     : the new swipe, which is `swipes[swipe_id]` (usually the
+    //                 one just created). `content` mirrors it.
+    //   - updated   : the edited swipe. If the edited slot is the active one,
+    //                 `content` reflects it; otherwise we still prefer the
+    //                 active slot because that's what downstream generation
+    //                 will actually see.
+    //   - deleted   : `content` is the post-deletion active swipe.
+    //   - navigated : `content` is the destination swipe.
+    // In every case `message.content` (= `swipes[swipe_id]`) is the right
+    // source, so we don't need to special-case per action.
+    const activeContent = typeof message.content === "string"
+      ? message.content
+      : Array.isArray(message.swipes) && typeof message.swipes[activeSwipeId] === "string"
+        ? (message.swipes[activeSwipeId] as string)
+        : "";
+
+    const payloadText = extractTrackerPayloadFromMessage(activeContent);
+    if (payloadText) {
+      // Re-sync the side-channel to the currently active swipe's tracker.
+      // This is essential so that when the user cycles between swipe
+      // variants, subsequent generations (main or secondary) reference the
+      // tracker data that actually matches the on-screen narrative rather
+      // than whichever variant was last recorded.
+      recordChatTracker(chatId, messageId, payloadText);
+      lastSimStats = payloadText;
+      pushMacroValues();
+    } else {
+      // The active swipe has no tracker tag. Drop the side-channel entry
+      // for this message so it isn't used as "prior state" for the next
+      // generation. This also correctly handles the `added` case where a
+      // brand-new swipe slot starts empty pending generation — by clearing
+      // M(n)'s stale entry we guarantee the new generation references the
+      // previous message's tracker, not the previous swipe's.
+      forgetChatTracker(chatId, messageId);
+    }
+
+    await trackEvent(
+      "sst.swipe.synced",
+      { action, swipeId: typeof obj.swipeId === "number" ? obj.swipeId : null },
+      { chatId },
+    );
   })();
 });
 
@@ -969,6 +1044,7 @@ spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown) => {
 
     const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
     const messageId = typeof obj.messageId === "string" ? obj.messageId : null;
+    if (chatId) activeChatId = chatId;
 
     lastSimStats = content;
     recordChatTracker(chatId, messageId, content);
@@ -1228,10 +1304,41 @@ async function generateTrackerWithSecondaryLLM(chatId: string, targetMessageId: 
   }
 }
 
+// `GENERATION_STARTED` fires immediately before the interceptor runs and
+// reliably carries the active chat id in its typed payload. Mirror it into
+// `activeChatId` so the interceptor can fall back on it when its `context`
+// argument (typed as `unknown` in the SDK) doesn't surface one. Also use
+// this as the trigger to prime the side-channel for chats the extension
+// hasn't observed activity on yet (e.g. first generation after reload).
+spindle.on("GENERATION_STARTED", (payload: unknown) => {
+  void (async () => {
+    if (!payload || typeof payload !== "object") return;
+    const obj = payload as Record<string, unknown>;
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
+    if (!chatId) return;
+    activeChatId = chatId;
+    await rehydrateChatTrackerHistory(chatId);
+  })();
+});
+
+spindle.on("CHAT_CHANGED", (payload: unknown) => {
+  if (!payload || typeof payload !== "object") return;
+  const obj = payload as Record<string, unknown>;
+  const chatId = typeof obj.chatId === "string"
+    ? obj.chatId
+    : typeof obj.chat_id === "string"
+      ? obj.chat_id
+      : null;
+  if (chatId) activeChatId = chatId;
+});
+
 spindle.on("GENERATION_ENDED", (payload: unknown) => {
   void (async () => {
     const ctx = readMessageContext(payload);
-    if (ctx.chatId) void rehydrateChatTrackerHistory(ctx.chatId);
+    if (ctx.chatId) {
+      activeChatId = ctx.chatId;
+      void rehydrateChatTrackerHistory(ctx.chatId);
+    }
 
     if (!config.useSecondaryLLM || secondaryGenerationInProgress) return;
     if (!hasPermission("generation") || !hasPermission("chat_mutation")) return;
@@ -1376,6 +1483,55 @@ function stripOldTrackerBlocksGlobal<T extends { content: string }>(
   });
 }
 
+/**
+ * Best-effort resolution of the chat id associated with the current
+ * interceptor invocation. The SDK types the `context` parameter as
+ * `unknown`, so we probe a few common shapes and then fall back on
+ * `activeChatId` (populated from `GENERATION_STARTED` and friends).
+ */
+function resolveInterceptorChatId(context: unknown): string | null {
+  if (context && typeof context === "object") {
+    const obj = context as Record<string, unknown>;
+    const candidates: unknown[] = [
+      obj.chatId,
+      obj.chat_id,
+      (obj.chat as Record<string, unknown> | undefined)?.id,
+      (obj.generation as Record<string, unknown> | undefined)?.chatId,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 0) return c;
+    }
+  }
+  return activeChatId;
+}
+
+/**
+ * Returns true if any message in the list still contains a tracker tag
+ * or fence block for the current identifier.
+ */
+function messagesContainTracker(messages: Array<{ content: string }>): boolean {
+  for (const msg of messages) {
+    if (!msg || typeof msg.content !== "string") continue;
+    if (extractTrackerPayloadFromMessage(msg.content)) return true;
+  }
+  return false;
+}
+
+/**
+ * Build the injection block that gets appended to the last assistant
+ * message when the assembled context is missing tracker history. Emits
+ * the same tag format the main LLM is instructed to produce, so the
+ * model sees the block as a continuation of its own previous output
+ * rather than as an out-of-band instruction.
+ */
+function buildTrackerInjectionBlock(entries: TrackerHistoryEntry[]): string {
+  const tagName = sanitizeTagName(config.trackerTagName);
+  const identifier = sanitizeIdentifier(config.codeBlockIdentifier);
+  return entries
+    .map((entry) => `<${tagName} type="${identifier}">\n${entry.payload}\n</${tagName}>`)
+    .join("\n\n");
+}
+
 let interceptorRegistered = false;
 
 function tryRegisterInterceptor(): void {
@@ -1383,12 +1539,73 @@ function tryRegisterInterceptor(): void {
   if (!hasPermission("interceptor")) return;
 
   try {
-    spindle.registerInterceptor(async (messages: any[]) => {
+    spindle.registerInterceptor(async (messages: any[], context: unknown) => {
       const keepNewest = config.retainTrackerCount;
       if (keepNewest < 0) return messages;
       if (!Array.isArray(messages) || messages.length === 0) return messages;
 
-      return stripOldTrackerBlocksGlobal(messages, config.codeBlockIdentifier, keepNewest);
+      // 1. Honour the global retention limit on any trackers that survived
+      //    into canonical storage (the `removeFromMessage: false` path).
+      const retained = stripOldTrackerBlocksGlobal(messages, config.codeBlockIdentifier, keepNewest);
+
+      // If the user explicitly set `retainTrackerCount` to 0 they want a
+      // clean context — skip injection entirely.
+      if (keepNewest === 0) return retained;
+
+      // 2. If the assembled messages already contain tracker blocks, we're
+      //    done. The main LLM can reference them directly.
+      if (messagesContainTracker(retained)) return retained;
+
+      // 3. Otherwise the messages have no tracker data — almost always
+      //    because the frontend's tag interceptor has `removeFromMessage:
+      //    true` stripping trackers out of canonical message content.
+      //    Re-inject the most recent history entries from the side-channel
+      //    so the main LLM can still see "the last tracker state" and
+      //    generate the next one as a continuation.
+      const chatId = resolveInterceptorChatId(context);
+      if (!chatId) return retained;
+
+      // Ensure the side-channel is primed. Rehydration is idempotent and
+      // a no-op after the first call for a given chat.
+      await rehydrateChatTrackerHistory(chatId);
+
+      const injectCount = Math.max(1, Math.min(10, keepNewest));
+      const history = getRecentChatTrackers(chatId, injectCount);
+      if (history.length === 0) return retained;
+
+      const block = buildTrackerInjectionBlock(history);
+
+      // Prefer appending to the last assistant message in the array so the
+      // tracker appears exactly where the LLM would normally have emitted
+      // it in its previous turn. Fall back to synthesising a trailing
+      // system message if there's no assistant message yet (first-turn
+      // generation, re-greeting, etc.).
+      let lastAssistantIdx = -1;
+      for (let i = retained.length - 1; i >= 0; i -= 1) {
+        const m = retained[i];
+        if (m && m.role === "assistant" && typeof m.content === "string") {
+          lastAssistantIdx = i;
+          break;
+        }
+      }
+
+      if (lastAssistantIdx >= 0) {
+        const injected = retained.slice();
+        const target = injected[lastAssistantIdx];
+        const base = typeof target.content === "string" ? target.content.trimEnd() : "";
+        injected[lastAssistantIdx] = {
+          ...target,
+          content: base ? `${base}\n\n${block}` : block,
+        };
+        return injected;
+      }
+
+      // Insert a synthetic system message near the end of the conversation
+      // so the LLM still picks up the prior tracker state.
+      const injected = retained.slice();
+      const insertAt = Math.max(0, injected.length - 1);
+      injected.splice(insertAt, 0, { role: "system", content: block });
+      return injected;
     }, 90);
     interceptorRegistered = true;
     spindle.log.info("Interceptor registered");

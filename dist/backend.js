@@ -9379,6 +9379,7 @@ var CONFIG_PATH = "preferences.json";
 var config = { ...DEFAULT_CONFIG };
 var lastSimStats = "{}";
 var activeUserId = null;
+var activeChatId = null;
 var chatTrackerHistory = new Map;
 var rehydratedChats = new Set;
 var runtime = {
@@ -10028,8 +10029,10 @@ spindle.on("MESSAGE_SENT", (payload) => {
     const message = ctx.content;
     if (typeof message !== "string")
       return;
-    if (ctx.chatId)
+    if (ctx.chatId) {
+      activeChatId = ctx.chatId;
       rehydrateChatTrackerHistory(ctx.chatId);
+    }
     const commandResult = await handleSlashCommand(message, ctx);
     if (commandResult) {
       spindle.sendToFrontend(commandResult, activeUserId || undefined);
@@ -10051,6 +10054,8 @@ spindle.on("MESSAGE_SENT", (payload) => {
 spindle.on("MESSAGE_EDITED", (payload) => {
   (async () => {
     const ctx = readMessageContext(payload);
+    if (ctx.chatId)
+      activeChatId = ctx.chatId;
     if (typeof ctx.content !== "string")
       return;
     const sim = extractTrackerPayloadFromMessage(ctx.content);
@@ -10062,6 +10067,34 @@ spindle.on("MESSAGE_EDITED", (payload) => {
       return;
     }
     forgetChatTracker(ctx.chatId, ctx.messageId);
+  })();
+});
+spindle.on("MESSAGE_SWIPED", (payload) => {
+  (async () => {
+    if (!payload || typeof payload !== "object")
+      return;
+    const obj = payload;
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
+    if (chatId)
+      activeChatId = chatId;
+    const message = obj.message && typeof obj.message === "object" ? obj.message : null;
+    if (!chatId || !message)
+      return;
+    const messageId = typeof message.id === "string" ? message.id : null;
+    if (!messageId)
+      return;
+    const action = typeof obj.action === "string" ? obj.action : "";
+    const activeSwipeId = typeof message.swipe_id === "number" ? message.swipe_id : 0;
+    const activeContent = typeof message.content === "string" ? message.content : Array.isArray(message.swipes) && typeof message.swipes[activeSwipeId] === "string" ? message.swipes[activeSwipeId] : "";
+    const payloadText = extractTrackerPayloadFromMessage(activeContent);
+    if (payloadText) {
+      recordChatTracker(chatId, messageId, payloadText);
+      lastSimStats = payloadText;
+      pushMacroValues();
+    } else {
+      forgetChatTracker(chatId, messageId);
+    }
+    await trackEvent("sst.swipe.synced", { action, swipeId: typeof obj.swipeId === "number" ? obj.swipeId : null }, { chatId });
   })();
 });
 spindle.on("MESSAGE_TAG_INTERCEPTED", (payload) => {
@@ -10084,6 +10117,8 @@ spindle.on("MESSAGE_TAG_INTERCEPTED", (payload) => {
       return;
     const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
     const messageId = typeof obj.messageId === "string" ? obj.messageId : null;
+    if (chatId)
+      activeChatId = chatId;
     lastSimStats = content;
     recordChatTracker(chatId, messageId, content);
     pushMacroValues();
@@ -10325,11 +10360,33 @@ ${trackerBlock}`;
     secondaryGenerationInProgress = false;
   }
 }
+spindle.on("GENERATION_STARTED", (payload) => {
+  (async () => {
+    if (!payload || typeof payload !== "object")
+      return;
+    const obj = payload;
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
+    if (!chatId)
+      return;
+    activeChatId = chatId;
+    await rehydrateChatTrackerHistory(chatId);
+  })();
+});
+spindle.on("CHAT_CHANGED", (payload) => {
+  if (!payload || typeof payload !== "object")
+    return;
+  const obj = payload;
+  const chatId = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
+  if (chatId)
+    activeChatId = chatId;
+});
 spindle.on("GENERATION_ENDED", (payload) => {
   (async () => {
     const ctx = readMessageContext(payload);
-    if (ctx.chatId)
+    if (ctx.chatId) {
+      activeChatId = ctx.chatId;
       rehydrateChatTrackerHistory(ctx.chatId);
+    }
     if (!config.useSecondaryLLM || secondaryGenerationInProgress)
       return;
     if (!hasPermission("generation") || !hasPermission("chat_mutation"))
@@ -10454,6 +10511,40 @@ function stripOldTrackerBlocksGlobal(messages, identifier, keepNewest) {
     return { ...msg, content: cleaned };
   });
 }
+function resolveInterceptorChatId(context) {
+  if (context && typeof context === "object") {
+    const obj = context;
+    const candidates = [
+      obj.chatId,
+      obj.chat_id,
+      obj.chat?.id,
+      obj.generation?.chatId
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 0)
+        return c;
+    }
+  }
+  return activeChatId;
+}
+function messagesContainTracker(messages) {
+  for (const msg of messages) {
+    if (!msg || typeof msg.content !== "string")
+      continue;
+    if (extractTrackerPayloadFromMessage(msg.content))
+      return true;
+  }
+  return false;
+}
+function buildTrackerInjectionBlock(entries) {
+  const tagName = sanitizeTagName(config.trackerTagName);
+  const identifier = sanitizeIdentifier(config.codeBlockIdentifier);
+  return entries.map((entry) => `<${tagName} type="${identifier}">
+${entry.payload}
+</${tagName}>`).join(`
+
+`);
+}
 var interceptorRegistered = false;
 function tryRegisterInterceptor() {
   if (interceptorRegistered)
@@ -10461,13 +10552,50 @@ function tryRegisterInterceptor() {
   if (!hasPermission("interceptor"))
     return;
   try {
-    spindle.registerInterceptor(async (messages) => {
+    spindle.registerInterceptor(async (messages, context) => {
       const keepNewest = config.retainTrackerCount;
       if (keepNewest < 0)
         return messages;
       if (!Array.isArray(messages) || messages.length === 0)
         return messages;
-      return stripOldTrackerBlocksGlobal(messages, config.codeBlockIdentifier, keepNewest);
+      const retained = stripOldTrackerBlocksGlobal(messages, config.codeBlockIdentifier, keepNewest);
+      if (keepNewest === 0)
+        return retained;
+      if (messagesContainTracker(retained))
+        return retained;
+      const chatId = resolveInterceptorChatId(context);
+      if (!chatId)
+        return retained;
+      await rehydrateChatTrackerHistory(chatId);
+      const injectCount = Math.max(1, Math.min(10, keepNewest));
+      const history = getRecentChatTrackers(chatId, injectCount);
+      if (history.length === 0)
+        return retained;
+      const block = buildTrackerInjectionBlock(history);
+      let lastAssistantIdx = -1;
+      for (let i = retained.length - 1;i >= 0; i -= 1) {
+        const m = retained[i];
+        if (m && m.role === "assistant" && typeof m.content === "string") {
+          lastAssistantIdx = i;
+          break;
+        }
+      }
+      if (lastAssistantIdx >= 0) {
+        const injected2 = retained.slice();
+        const target = injected2[lastAssistantIdx];
+        const base = typeof target.content === "string" ? target.content.trimEnd() : "";
+        injected2[lastAssistantIdx] = {
+          ...target,
+          content: base ? `${base}
+
+${block}` : block
+        };
+        return injected2;
+      }
+      const injected = retained.slice();
+      const insertAt = Math.max(0, injected.length - 1);
+      injected.splice(insertAt, 0, { role: "system", content: block });
+      return injected;
     }, 90);
     interceptorRegistered = true;
     spindle.log.info("Interceptor registered");
