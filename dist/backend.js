@@ -10531,6 +10531,8 @@ function messagesContainTracker(messages) {
   for (const msg of messages) {
     if (!msg || typeof msg.content !== "string")
       continue;
+    if (msg.role === "system")
+      continue;
     if (extractTrackerPayloadFromMessage(msg.content))
       return true;
   }

@@ -1506,12 +1506,18 @@ function resolveInterceptorChatId(context: unknown): string | null {
 }
 
 /**
- * Returns true if any message in the list still contains a tracker tag
- * or fence block for the current identifier.
+ * Returns true if any user or assistant message in the list still contains
+ * a tracker tag or fence block for the current identifier. System messages
+ * are deliberately excluded: the `sim_tracker` macro expands into the
+ * system prompt with a literal tracker-tag format example (`<tracker
+ * type="sim">{...}</tracker>`), and that example would otherwise be
+ * mistaken for real tracker data and suppress re-injection from the
+ * side-channel.
  */
-function messagesContainTracker(messages: Array<{ content: string }>): boolean {
+function messagesContainTracker(messages: Array<{ role?: string; content: string }>): boolean {
   for (const msg of messages) {
     if (!msg || typeof msg.content !== "string") continue;
+    if (msg.role === "system") continue;
     if (extractTrackerPayloadFromMessage(msg.content)) return true;
   }
   return false;
