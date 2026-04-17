@@ -200,7 +200,6 @@ function processLegacyMarkers(
 
 export function createInlineTemplateProcessor(deps: InlineProcessorDeps): InlineProcessor {
   const artifactsByMessage = new Map<string, Element[]>();
-  let suppressObserver = 0;
 
   const clearMessage = (messageId: string): void => {
     const list = artifactsByMessage.get(messageId);
@@ -214,29 +213,24 @@ export function createInlineTemplateProcessor(deps: InlineProcessorDeps): Inline
   const processMessage = (messageId: string): void => {
     if (!messageId) return;
     const config = deps.getConfig();
-    suppressObserver += 1;
-    try {
-      clearMessage(messageId);
-      if (!config.enableInlineTemplates) return;
+    clearMessage(messageId);
+    if (!config.enableInlineTemplates) return;
 
-      const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
-      if (!messageNode) return;
+    const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!messageNode) return;
 
-      const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
-      const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
+    const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
+    const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
 
-      const preset = deps.getPreset();
-      const messageArtifacts: Element[] = [];
-      for (const root of roots) {
-        processTagElements(root, config, preset, messageArtifacts);
-        processLegacyMarkers(root, config, preset, messageArtifacts);
-      }
+    const preset = deps.getPreset();
+    const messageArtifacts: Element[] = [];
+    for (const root of roots) {
+      processTagElements(root, config, preset, messageArtifacts);
+      processLegacyMarkers(root, config, preset, messageArtifacts);
+    }
 
-      if (messageArtifacts.length > 0) {
-        artifactsByMessage.set(messageId, messageArtifacts);
-      }
-    } finally {
-      suppressObserver -= 1;
+    if (messageArtifacts.length > 0) {
+      artifactsByMessage.set(messageId, messageArtifacts);
     }
   };
 
@@ -270,7 +264,14 @@ export function createInlineTemplateProcessor(deps: InlineProcessorDeps): Inline
     let scheduled = false;
     const flush = () => {
       scheduled = false;
-      for (const id of pending) processMessage(id);
+      for (const id of pending) {
+        // Observer-driven reprocessing is only for messages we haven't rendered yet.
+        // Lifecycle events (edits, swipes, re-gens) explicitly call processMessage to force re-render.
+        // This breaks the echo loop where MutationObserver sees our own DOM writes async and
+        // would otherwise wipe our container on the next flush.
+        if (artifactsByMessage.has(id)) continue;
+        processMessage(id);
+      }
       pending.clear();
     };
     const schedule = () => {
@@ -278,13 +279,23 @@ export function createInlineTemplateProcessor(deps: InlineProcessorDeps): Inline
       scheduled = true;
       queueMicrotask(flush);
     };
+    const isOurNode = (node: Node): boolean =>
+      node instanceof Element && node.classList.contains("sst-inline-render");
     const observer = new MutationObserver((mutations) => {
-      if (suppressObserver > 0) return;
       for (const m of mutations) {
+        if (m.target instanceof Element && m.target.closest?.(".sst-inline-render")) continue;
         if (m.type === "childList") {
+          let added = 0;
           for (const node of Array.from(m.addedNodes)) {
+            if (isOurNode(node)) continue;
+            added += 1;
             for (const id of collectMessageIdsInNode(node)) pending.add(id);
           }
+          let removed = 0;
+          for (const node of Array.from(m.removedNodes)) {
+            if (!isOurNode(node)) removed += 1;
+          }
+          if (added === 0 && removed === 0) continue;
           if (m.target instanceof Element && m.target.closest?.("[data-message-id]")) {
             const host = m.target.closest("[data-message-id]");
             const id = host?.getAttribute("data-message-id");

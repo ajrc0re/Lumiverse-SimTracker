@@ -1204,13 +1204,44 @@ export function setup(ctx: SpindleFrontendContext) {
     runInlinePass(context.messageId);
   };
 
+  const renderTrackersFromDOM = () => {
+    const messageNodes = Array.from(document.querySelectorAll("[data-message-id]"));
+    for (const msgNode of messageNodes) {
+      const msgId = msgNode.getAttribute("data-message-id");
+      if (!msgId) continue;
+      const preSel = `pre[data-code-lang="${config.codeBlockIdentifier}"]`;
+      const preBlock = msgNode.querySelector(preSel);
+      const raw = preBlock?.textContent?.trim() || "";
+      if (raw) handleTrackerPayload(raw, raw, msgId);
+    }
+  };
+
+  const resetChatState = () => {
+    previousTrackerData = null;
+    latestTrackerMessageId = null;
+    latestTrackerRaw = null;
+    latestTrackerSourceContent = null;
+    latestContent = null;
+    trackerMessageIds.clear();
+    for (const mount of trackerMessageMounts.values()) mount.remove();
+    trackerMessageMounts.clear();
+    clearSideTrackerRender();
+    inlineProcessor.destroy();
+  };
+
   const generationUnsub = ctx.events.on("GENERATION_ENDED", onEvent);
   const messageUnsub = ctx.events.on("MESSAGE_SENT", onEvent);
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
   const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", () => {
-    inlineProcessor.processAll();
+    resetChatState();
+    renderEmpty("When a message includes a tracker tag, cards will appear here.");
+    // Wait two frames for Lumiverse to finish painting the new chat's messages before scanning.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      renderTrackersFromDOM();
+      inlineProcessor.processAll();
+    }));
   });
   const stopInlineObserver = inlineProcessor.observeDocument();
 

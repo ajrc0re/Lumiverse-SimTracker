@@ -14091,7 +14091,6 @@ function processLegacyMarkers(root, config, preset, artifacts) {
 }
 function createInlineTemplateProcessor(deps) {
   const artifactsByMessage = new Map;
-  let suppressObserver = 0;
   const clearMessage = (messageId) => {
     const list = artifactsByMessage.get(messageId);
     if (!list)
@@ -14106,27 +14105,22 @@ function createInlineTemplateProcessor(deps) {
     if (!messageId)
       return;
     const config = deps.getConfig();
-    suppressObserver += 1;
-    try {
-      clearMessage(messageId);
-      if (!config.enableInlineTemplates)
-        return;
-      const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
-      if (!messageNode)
-        return;
-      const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
-      const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
-      const preset = deps.getPreset();
-      const messageArtifacts = [];
-      for (const root of roots) {
-        processTagElements(root, config, preset, messageArtifacts);
-        processLegacyMarkers(root, config, preset, messageArtifacts);
-      }
-      if (messageArtifacts.length > 0) {
-        artifactsByMessage.set(messageId, messageArtifacts);
-      }
-    } finally {
-      suppressObserver -= 1;
+    clearMessage(messageId);
+    if (!config.enableInlineTemplates)
+      return;
+    const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!messageNode)
+      return;
+    const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
+    const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
+    const preset = deps.getPreset();
+    const messageArtifacts = [];
+    for (const root of roots) {
+      processTagElements(root, config, preset, messageArtifacts);
+      processLegacyMarkers(root, config, preset, messageArtifacts);
+    }
+    if (messageArtifacts.length > 0) {
+      artifactsByMessage.set(messageId, messageArtifacts);
     }
   };
   const processAll = () => {
@@ -14161,8 +14155,11 @@ function createInlineTemplateProcessor(deps) {
     let scheduled = false;
     const flush = () => {
       scheduled = false;
-      for (const id of pending)
+      for (const id of pending) {
+        if (artifactsByMessage.has(id))
+          continue;
         processMessage(id);
+      }
       pending.clear();
     };
     const schedule = () => {
@@ -14171,15 +14168,27 @@ function createInlineTemplateProcessor(deps) {
       scheduled = true;
       queueMicrotask(flush);
     };
+    const isOurNode = (node) => node instanceof Element && node.classList.contains("sst-inline-render");
     const observer = new MutationObserver((mutations) => {
-      if (suppressObserver > 0)
-        return;
       for (const m of mutations) {
+        if (m.target instanceof Element && m.target.closest?.(".sst-inline-render"))
+          continue;
         if (m.type === "childList") {
+          let added = 0;
           for (const node of Array.from(m.addedNodes)) {
+            if (isOurNode(node))
+              continue;
+            added += 1;
             for (const id of collectMessageIdsInNode(node))
               pending.add(id);
           }
+          let removed = 0;
+          for (const node of Array.from(m.removedNodes)) {
+            if (!isOurNode(node))
+              removed += 1;
+          }
+          if (added === 0 && removed === 0)
+            continue;
           if (m.target instanceof Element && m.target.closest?.("[data-message-id]")) {
             const host = m.target.closest("[data-message-id]");
             const id = host?.getAttribute("data-message-id");
@@ -15261,13 +15270,44 @@ function setup(ctx) {
       return;
     runInlinePass(context.messageId);
   };
+  const renderTrackersFromDOM = () => {
+    const messageNodes = Array.from(document.querySelectorAll("[data-message-id]"));
+    for (const msgNode of messageNodes) {
+      const msgId = msgNode.getAttribute("data-message-id");
+      if (!msgId)
+        continue;
+      const preSel = `pre[data-code-lang="${config.codeBlockIdentifier}"]`;
+      const preBlock = msgNode.querySelector(preSel);
+      const raw = preBlock?.textContent?.trim() || "";
+      if (raw)
+        handleTrackerPayload(raw, raw, msgId);
+    }
+  };
+  const resetChatState = () => {
+    previousTrackerData = null;
+    latestTrackerMessageId = null;
+    latestTrackerRaw = null;
+    latestTrackerSourceContent = null;
+    latestContent = null;
+    trackerMessageIds.clear();
+    for (const mount of trackerMessageMounts.values())
+      mount.remove();
+    trackerMessageMounts.clear();
+    clearSideTrackerRender();
+    inlineProcessor.destroy();
+  };
   const generationUnsub = ctx.events.on("GENERATION_ENDED", onEvent);
   const messageUnsub = ctx.events.on("MESSAGE_SENT", onEvent);
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
   const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", () => {
-    inlineProcessor.processAll();
+    resetChatState();
+    renderEmpty("When a message includes a tracker tag, cards will appear here.");
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      renderTrackersFromDOM();
+      inlineProcessor.processAll();
+    }));
   });
   const stopInlineObserver = inlineProcessor.observeDocument();
   const permissionUnsub = ctx.events.on("PERMISSION_CHANGED", (detail) => {
