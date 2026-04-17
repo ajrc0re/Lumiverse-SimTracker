@@ -1179,6 +1179,14 @@ export function setup(ctx: SpindleFrontendContext) {
       setLLMStatus(msg, "error");
       return;
     }
+    if (obj?.type === "tracker_history_latest") {
+      const entry = obj.entry as { messageId?: unknown; payload?: unknown } | null;
+      if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
+        const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
+        handleTrackerPayload(entry.payload, entry.payload, msgId);
+      }
+      return;
+    }
     if (obj?.type === "permission_changed") {
       const allGranted = Array.isArray(obj.allGranted)
         ? obj.allGranted.filter((p): p is string => typeof p === "string")
@@ -1242,7 +1250,23 @@ export function setup(ctx: SpindleFrontendContext) {
     else inlineProcessor.processAll();
   };
 
+  const rehydratedChatIds = new Set<string>();
+  const extractChatId = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== "object") return null;
+    const obj = payload as Record<string, unknown>;
+    const direct = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
+    if (direct) return direct;
+    const nested = obj.message as Record<string, unknown> | undefined;
+    return typeof nested?.chatId === "string" ? nested.chatId : typeof nested?.chat_id === "string" ? nested.chat_id : null;
+  };
+  const maybeRequestTrackerRehydrate = (chatId: string | null) => {
+    if (!chatId || rehydratedChatIds.has(chatId)) return;
+    rehydratedChatIds.add(chatId);
+    ctx.sendToBackend({ type: "get_latest_tracker", chatId });
+  };
+
   const onEvent = (payload: unknown) => {
+    maybeRequestTrackerRehydrate(extractChatId(payload));
     const context = readMessageContext(payload);
     if (!context) return;
     if (context.isUser === true) return;
@@ -1312,9 +1336,19 @@ export function setup(ctx: SpindleFrontendContext) {
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
-  const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", () => {
+  const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", (payload: unknown) => {
     resetChatState();
     renderEmpty("When a message includes a tracker tag, cards will appear here.");
+    const obj = (payload && typeof payload === "object") ? payload as Record<string, unknown> : {};
+    const chatId = typeof obj.chatId === "string"
+      ? obj.chatId
+      : typeof obj.chat_id === "string"
+        ? obj.chat_id
+        : null;
+    if (chatId) {
+      rehydratedChatIds.add(chatId);
+      ctx.sendToBackend({ type: "get_latest_tracker", chatId });
+    }
     // Wait two frames for Lumiverse to finish painting the new chat's messages before scanning.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       renderTrackersFromDOM();

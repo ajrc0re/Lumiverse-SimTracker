@@ -1923,6 +1923,24 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
     return;
   }
 
+  if (message.type === "get_latest_tracker") {
+    const chatId = typeof message.chatId === "string" ? message.chatId : null;
+    if (!chatId) {
+      spindle.sendToFrontend({ type: "tracker_history_latest", chatId: null, entry: null }, userId);
+      return;
+    }
+    activeChatId = chatId;
+    await rehydrateChatTrackerHistory(chatId);
+    const history = getChatTrackerHistory(chatId);
+    const entry = history.length > 0 ? history[history.length - 1] : null;
+    spindle.sendToFrontend({
+      type: "tracker_history_latest",
+      chatId,
+      entry: entry ? { messageId: entry.messageId, payload: entry.payload } : null,
+    }, userId);
+    return;
+  }
+
   if (message.type === "remove_inline_pack") {
     const index = typeof message.index === "number" ? message.index : -1;
     if (index >= 0 && index < config.inlinePacks.length) {

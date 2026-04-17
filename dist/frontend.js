@@ -15267,6 +15267,14 @@ function setup(ctx) {
       setLLMStatus(msg, "error");
       return;
     }
+    if (obj?.type === "tracker_history_latest") {
+      const entry = obj.entry;
+      if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
+        const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
+        handleTrackerPayload(entry.payload, entry.payload, msgId);
+      }
+      return;
+    }
     if (obj?.type === "permission_changed") {
       const allGranted = Array.isArray(obj.allGranted) ? obj.allGranted.filter((p) => typeof p === "string") : grantedPermissions;
       grantedPermissions = allGranted;
@@ -15318,7 +15326,25 @@ function setup(ctx) {
     else
       inlineProcessor.processAll();
   };
+  const rehydratedChatIds = new Set;
+  const extractChatId = (payload) => {
+    if (!payload || typeof payload !== "object")
+      return null;
+    const obj = payload;
+    const direct = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
+    if (direct)
+      return direct;
+    const nested = obj.message;
+    return typeof nested?.chatId === "string" ? nested.chatId : typeof nested?.chat_id === "string" ? nested.chat_id : null;
+  };
+  const maybeRequestTrackerRehydrate = (chatId) => {
+    if (!chatId || rehydratedChatIds.has(chatId))
+      return;
+    rehydratedChatIds.add(chatId);
+    ctx.sendToBackend({ type: "get_latest_tracker", chatId });
+  };
   const onEvent = (payload) => {
+    maybeRequestTrackerRehydrate(extractChatId(payload));
     const context = readMessageContext(payload);
     if (!context)
       return;
@@ -15387,9 +15413,15 @@ function setup(ctx) {
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
-  const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", () => {
+  const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", (payload) => {
     resetChatState();
     renderEmpty("When a message includes a tracker tag, cards will appear here.");
+    const obj = payload && typeof payload === "object" ? payload : {};
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
+    if (chatId) {
+      rehydratedChatIds.add(chatId);
+      ctx.sendToBackend({ type: "get_latest_tracker", chatId });
+    }
     requestAnimationFrame(() => requestAnimationFrame(() => {
       renderTrackersFromDOM();
       inlineProcessor.processAll();

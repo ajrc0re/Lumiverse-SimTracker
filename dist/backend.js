@@ -9606,6 +9606,11 @@ function forgetChatTracker(chatId, messageId) {
   if (idx >= 0)
     history.splice(idx, 1);
 }
+function getChatTrackerHistory(chatId) {
+  if (!chatId)
+    return [];
+  return chatTrackerHistory.get(chatId) || [];
+}
 async function rehydrateChatTrackerHistory(chatId) {
   if (!chatId || rehydratedChats.has(chatId))
     return;
@@ -10888,6 +10893,23 @@ spindle.onFrontendMessage(async (payload, userId) => {
     if (chatId && messageId) {
       await generateTrackerWithSecondaryLLM(chatId, messageId);
     }
+    return;
+  }
+  if (message.type === "get_latest_tracker") {
+    const chatId = typeof message.chatId === "string" ? message.chatId : null;
+    if (!chatId) {
+      spindle.sendToFrontend({ type: "tracker_history_latest", chatId: null, entry: null }, userId);
+      return;
+    }
+    activeChatId = chatId;
+    await rehydrateChatTrackerHistory(chatId);
+    const history = getChatTrackerHistory(chatId);
+    const entry = history.length > 0 ? history[history.length - 1] : null;
+    spindle.sendToFrontend({
+      type: "tracker_history_latest",
+      chatId,
+      entry: entry ? { messageId: entry.messageId, payload: entry.payload } : null
+    }, userId);
     return;
   }
   if (message.type === "remove_inline_pack") {
