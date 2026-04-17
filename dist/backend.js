@@ -10890,6 +10890,31 @@ spindle.onFrontendMessage(async (payload, userId) => {
     }
     return;
   }
+  if (message.type === "remove_inline_pack") {
+    const index = typeof message.index === "number" ? message.index : -1;
+    if (index >= 0 && index < config.inlinePacks.length) {
+      const next = config.inlinePacks.slice();
+      next.splice(index, 1);
+      config = { ...config, inlinePacks: next };
+      await saveConfig();
+      pushMacroValues();
+      await sendConfigState();
+    }
+    return;
+  }
+  if (message.type === "toggle_inline_pack") {
+    const index = typeof message.index === "number" ? message.index : -1;
+    const enabled = typeof message.enabled === "boolean" ? message.enabled : true;
+    if (index >= 0 && index < config.inlinePacks.length) {
+      const next = config.inlinePacks.slice();
+      next[index] = { ...next[index], enabled };
+      config = { ...config, inlinePacks: next };
+      await saveConfig();
+      pushMacroValues();
+      await sendConfigState();
+    }
+    return;
+  }
   if (message.type === "import_preset_file") {
     await handleImportPresetFile(message);
   }

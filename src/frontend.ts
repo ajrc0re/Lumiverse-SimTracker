@@ -85,6 +85,14 @@ const PANEL_HTML = `
       </div>
       <div id="sst-lumi-capabilities" class="sst-lumi-capabilities">Capabilities: loading...</div>
     </div>
+    <details id="sst-lumi-packs-section" class="sst-lumi-packs-section">
+      <summary class="sst-lumi-packs-summary">Inline Display Packs <span id="sst-lumi-packs-count" class="sst-lumi-packs-count">(0)</span></summary>
+      <div class="sst-lumi-packs-controls">
+        <div id="sst-lumi-packs-list" class="sst-lumi-packs-list"></div>
+        <button id="sst-lumi-import-pack" type="button" class="sst-lumi-pack-import">Import Inline Pack</button>
+        <div class="sst-lumi-pack-hint">Packs apply globally whenever "Enable inline displays" is on, independent of the selected template.</div>
+      </div>
+    </details>
     <details id="sst-lumi-llm-section" class="sst-lumi-llm-section">
       <summary class="sst-lumi-llm-summary">Secondary LLM Generation</summary>
       <div class="sst-lumi-llm-controls">
@@ -125,6 +133,23 @@ const PANEL_CSS = `
   .sst-lumi-command { margin: 10px 12px 12px; padding: 10px; border: 1px solid var(--lumiverse-border); border-radius: 10px; background: var(--lumiverse-fill-subtle); display: grid; gap: 8px; }
   .sst-lumi-command textarea { width: 100%; min-height: 96px; resize: vertical; font-size: 11px; border: 1px solid var(--lumiverse-border); border-radius: 8px; background: var(--lumiverse-fill); color: var(--lumiverse-text); padding: 8px; }
   .sst-lumi-command button { width: fit-content; font-size: 11px; padding: 5px 10px; border: 1px solid var(--lumiverse-border); border-radius: 8px; background: var(--lumiverse-fill-subtle); color: var(--lumiverse-text); cursor: pointer; }
+  .sst-lumi-packs-section { border-bottom: 1px solid var(--lumiverse-border); }
+  .sst-lumi-packs-summary { padding: 10px 12px; font-size: 12px; cursor: pointer; color: var(--lumiverse-text); user-select: none; }
+  .sst-lumi-packs-summary:hover { background: var(--lumiverse-fill-subtle); }
+  .sst-lumi-packs-count { color: var(--lumiverse-text-muted); font-size: 11px; margin-left: 4px; }
+  .sst-lumi-packs-controls { padding: 0 12px 10px; display: grid; gap: 8px; }
+  .sst-lumi-packs-list { display: grid; gap: 6px; }
+  .sst-lumi-packs-list:empty::before { content: "No packs imported. Click below to import one."; font-size: 11px; color: var(--lumiverse-text-muted); font-style: italic; }
+  .sst-lumi-pack-row { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--lumiverse-border); border-radius: 8px; background: var(--lumiverse-fill-subtle); }
+  .sst-lumi-pack-row.sst-pack-disabled { opacity: 0.55; }
+  .sst-lumi-pack-info { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+  .sst-lumi-pack-name { font-size: 12px; color: var(--lumiverse-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sst-lumi-pack-meta { font-size: 10px; color: var(--lumiverse-text-muted); }
+  .sst-lumi-pack-toggle { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--lumiverse-text-muted); cursor: pointer; }
+  .sst-lumi-pack-remove { font-size: 11px; padding: 3px 7px; border: 1px solid var(--lumiverse-border); border-radius: 6px; background: var(--lumiverse-fill); color: var(--lumiverse-text); cursor: pointer; }
+  .sst-lumi-pack-remove:hover { color: #ff6b6b; border-color: #ff6b6b; }
+  .sst-lumi-pack-import { font-size: 11px; padding: 5px 10px; border: 1px solid var(--lumiverse-border); border-radius: 8px; background: var(--lumiverse-fill-subtle); color: var(--lumiverse-text); cursor: pointer; width: fit-content; }
+  .sst-lumi-pack-hint { font-size: 10px; color: var(--lumiverse-text-muted); font-style: italic; }
   .sst-lumi-llm-section { border-bottom: 1px solid var(--lumiverse-border); }
   .sst-lumi-llm-summary { padding: 10px 12px; font-size: 12px; cursor: pointer; color: var(--lumiverse-text); user-select: none; }
   .sst-lumi-llm-summary:hover { background: var(--lumiverse-fill-subtle); }
@@ -882,6 +907,59 @@ export function setup(ctx: SpindleFrontendContext) {
     if (llmTemp) llmTemp.value = String(config.secondaryLLMTemperature);
     if (llmStrip) llmStrip.checked = config.secondaryLLMStripHTML;
     populateConnectionDropdown();
+    renderInlinePacksList();
+  };
+
+  const renderInlinePacksList = () => {
+    const list = byId<HTMLElement>("sst-lumi-packs-list");
+    const countLabel = byId<HTMLElement>("sst-lumi-packs-count");
+    if (!list) return;
+    list.innerHTML = "";
+    const packs = config.inlinePacks;
+    if (countLabel) countLabel.textContent = `(${packs.length})`;
+    for (let i = 0; i < packs.length; i += 1) {
+      const pack = packs[i] as Record<string, unknown>;
+      const enabled = pack.enabled !== false;
+      const name = typeof pack.templateName === "string" && pack.templateName.trim() ? pack.templateName : "Unnamed pack";
+      const author = typeof pack.templateAuthor === "string" && pack.templateAuthor.trim() ? pack.templateAuthor : "Unknown";
+      const templateCount = Array.isArray(pack.inlineTemplates) ? pack.inlineTemplates.length : 0;
+
+      const row = document.createElement("div");
+      row.className = `sst-lumi-pack-row${enabled ? "" : " sst-pack-disabled"}`;
+
+      const info = document.createElement("div");
+      info.className = "sst-lumi-pack-info";
+      const nameEl = document.createElement("div");
+      nameEl.className = "sst-lumi-pack-name";
+      nameEl.textContent = name;
+      const metaEl = document.createElement("div");
+      metaEl.className = "sst-lumi-pack-meta";
+      metaEl.textContent = `by ${author} · ${templateCount} template${templateCount === 1 ? "" : "s"}`;
+      info.append(nameEl, metaEl);
+
+      const toggleLabel = document.createElement("label");
+      toggleLabel.className = "sst-lumi-pack-toggle";
+      const toggleInput = document.createElement("input");
+      toggleInput.type = "checkbox";
+      toggleInput.checked = enabled;
+      toggleInput.addEventListener("change", () => {
+        ctx.sendToBackend({ type: "toggle_inline_pack", index: i, enabled: toggleInput.checked });
+      });
+      const toggleText = document.createElement("span");
+      toggleText.textContent = "Enabled";
+      toggleLabel.append(toggleInput, toggleText);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "sst-lumi-pack-remove";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => {
+        ctx.sendToBackend({ type: "remove_inline_pack", index: i });
+      });
+
+      row.append(info, toggleLabel, removeBtn);
+      list.appendChild(row);
+    }
   };
 
   const injectIntoPanelBody = (html: string) => {
@@ -1322,8 +1400,7 @@ export function setup(ctx: SpindleFrontendContext) {
     setStatus("Preset exported");
   });
 
-  const importButton = byId<HTMLElement>("sst-lumi-import");
-  importButton?.addEventListener("click", async () => {
+  const pickAndImport = async (statusPrefix: string) => {
     try {
       const files = await ctx.uploads.pickFile({
         accept: ["application/json", ".json"],
@@ -1338,10 +1415,20 @@ export function setup(ctx: SpindleFrontendContext) {
         fileName: file.name,
         text,
       });
-      setStatus(`Importing ${file.name}...`);
+      setStatus(`${statusPrefix} ${file.name}...`);
     } catch {
       setStatus("Import cancelled");
     }
+  };
+
+  const importPackButton = byId<HTMLElement>("sst-lumi-import-pack");
+  importPackButton?.addEventListener("click", () => {
+    void pickAndImport("Importing pack");
+  });
+
+  const importButton = byId<HTMLElement>("sst-lumi-import");
+  importButton?.addEventListener("click", () => {
+    void pickAndImport("Importing");
   });
 
   const llmRefreshBtn = byId<HTMLElement>("sst-lumi-llm-refresh");
