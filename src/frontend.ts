@@ -1209,6 +1209,10 @@ export function setup(ctx: SpindleFrontendContext) {
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
+  const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", () => {
+    inlineProcessor.processAll();
+  });
+  const stopInlineObserver = inlineProcessor.observeDocument();
 
   const permissionUnsub = ctx.events.on("PERMISSION_CHANGED", (detail: unknown) => {
     if (!detail || typeof detail !== "object") return;
@@ -1349,6 +1353,8 @@ export function setup(ctx: SpindleFrontendContext) {
     messageEditedUnsub();
     messageSwipedUnsub();
     messageRenderedUnsub();
+    chatChangedUnsub();
+    stopInlineObserver();
     permissionUnsub();
     if (removeHideStyle) removeHideStyle();
     if (removeTagInterceptor) removeTagInterceptor();

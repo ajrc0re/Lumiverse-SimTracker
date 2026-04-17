@@ -14091,6 +14091,7 @@ function processLegacyMarkers(root, config, preset, artifacts) {
 }
 function createInlineTemplateProcessor(deps) {
   const artifactsByMessage = new Map;
+  let suppressObserver = 0;
   const clearMessage = (messageId) => {
     const list = artifactsByMessage.get(messageId);
     if (!list)
@@ -14105,22 +14106,27 @@ function createInlineTemplateProcessor(deps) {
     if (!messageId)
       return;
     const config = deps.getConfig();
-    clearMessage(messageId);
-    if (!config.enableInlineTemplates)
-      return;
-    const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
-    if (!messageNode)
-      return;
-    const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
-    const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
-    const preset = deps.getPreset();
-    const messageArtifacts = [];
-    for (const root of roots) {
-      processTagElements(root, config, preset, messageArtifacts);
-      processLegacyMarkers(root, config, preset, messageArtifacts);
-    }
-    if (messageArtifacts.length > 0) {
-      artifactsByMessage.set(messageId, messageArtifacts);
+    suppressObserver += 1;
+    try {
+      clearMessage(messageId);
+      if (!config.enableInlineTemplates)
+        return;
+      const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (!messageNode)
+        return;
+      const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
+      const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
+      const preset = deps.getPreset();
+      const messageArtifacts = [];
+      for (const root of roots) {
+        processTagElements(root, config, preset, messageArtifacts);
+        processLegacyMarkers(root, config, preset, messageArtifacts);
+      }
+      if (messageArtifacts.length > 0) {
+        artifactsByMessage.set(messageId, messageArtifacts);
+      }
+    } finally {
+      suppressObserver -= 1;
     }
   };
   const processAll = () => {
@@ -14131,12 +14137,78 @@ function createInlineTemplateProcessor(deps) {
         processMessage(id);
     }
   };
+  const collectMessageIdsInNode = (node) => {
+    const ids = [];
+    if (!(node instanceof Element))
+      return ids;
+    if (node.hasAttribute("data-message-id")) {
+      const id = node.getAttribute("data-message-id");
+      if (id)
+        ids.push(id);
+    }
+    const nested = node.querySelectorAll?.("[data-message-id]");
+    if (nested) {
+      for (let i = 0;i < nested.length; i += 1) {
+        const id = nested[i].getAttribute("data-message-id");
+        if (id)
+          ids.push(id);
+      }
+    }
+    return ids;
+  };
+  const observeDocument = () => {
+    const pending = new Set;
+    let scheduled = false;
+    const flush = () => {
+      scheduled = false;
+      for (const id of pending)
+        processMessage(id);
+      pending.clear();
+    };
+    const schedule = () => {
+      if (scheduled)
+        return;
+      scheduled = true;
+      queueMicrotask(flush);
+    };
+    const observer = new MutationObserver((mutations) => {
+      if (suppressObserver > 0)
+        return;
+      for (const m of mutations) {
+        if (m.type === "childList") {
+          for (const node of Array.from(m.addedNodes)) {
+            for (const id of collectMessageIdsInNode(node))
+              pending.add(id);
+          }
+          if (m.target instanceof Element && m.target.closest?.("[data-message-id]")) {
+            const host = m.target.closest("[data-message-id]");
+            const id = host?.getAttribute("data-message-id");
+            if (id)
+              pending.add(id);
+          }
+        } else if (m.type === "characterData" && m.target.parentNode instanceof Element) {
+          const host = m.target.parentNode.closest("[data-message-id]");
+          const id = host?.getAttribute("data-message-id");
+          if (id)
+            pending.add(id);
+        }
+      }
+      if (pending.size > 0)
+        schedule();
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    return () => observer.disconnect();
+  };
   const destroy = () => {
     for (const id of Array.from(artifactsByMessage.keys()))
       clearMessage(id);
     artifactsByMessage.clear();
   };
-  return { processMessage, processAll, clearMessage, destroy };
+  return { processMessage, processAll, clearMessage, observeDocument, destroy };
 }
 
 // src/frontend.ts
@@ -15194,6 +15266,10 @@ function setup(ctx) {
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
+  const chatChangedUnsub = ctx.events.on("CHAT_CHANGED", () => {
+    inlineProcessor.processAll();
+  });
+  const stopInlineObserver = inlineProcessor.observeDocument();
   const permissionUnsub = ctx.events.on("PERMISSION_CHANGED", (detail) => {
     if (!detail || typeof detail !== "object")
       return;
@@ -15319,6 +15395,8 @@ function setup(ctx) {
     messageEditedUnsub();
     messageSwipedUnsub();
     messageRenderedUnsub();
+    chatChangedUnsub();
+    stopInlineObserver();
     permissionUnsub();
     if (removeHideStyle)
       removeHideStyle();
