@@ -647,6 +647,46 @@ const executeTemplateLogic = (data, templateType) => {
 };
 
 /**
+ * Deep value access for nested stat paths (e.g., "stats.relationships.affection")
+ * @param {Object} obj
+ * @param {String} path - Dot-separated path
+ * @returns {*} Value at path or undefined
+ */
+const getDeepValue = (obj, path) => {
+  const parts = path.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current && typeof current === 'object' && !Array.isArray(current)) {
+      current = current[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+};
+
+/**
+ * Recursively discover all numeric leaf paths in an object
+ * @param {Object} obj
+ * @param {String} prefix
+ * @returns {String[]} Array of dot-separated paths
+ */
+const findNumericPaths = (obj, prefix = '') => {
+  const paths = [];
+  if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (typeof value === 'number') {
+        paths.push(path);
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        paths.push(...findNumericPaths(value, path));
+      }
+    }
+  }
+  return paths;
+};
+
+/**
  * Calculate stat changes by comparing current and previous character data
  * @param {Array} currentCharacters - Current character list
  * @param {String} previousSimData - Previous sim block data (raw string)
@@ -701,24 +741,15 @@ const calculateStatChanges = (currentCharacters, previousSimData) => {
         return;
       }
 
-      // Calculate numeric stat differences
+      // Calculate numeric stat differences (deep diff to support nested stats like RPG data)
       const charChanges = {};
-
-      // List of stats to track changes for (covers both dating sim and disposition templates)
-      const numericStats = [
-        'affection', 'desire', 'trust', 'contempt',  // Dating sim stats
-        'affinity', 'health'  // Disposition stats
-      ];
-
-      numericStats.forEach(stat => {
-        const currentValue = currentChar[stat];
-        const previousValue = previousChar[stat];
-
-        // Only calculate change if both values exist and are numeric
+      for (const path of findNumericPaths(previousChar)) {
+        const currentValue = getDeepValue(currentChar, path);
+        const previousValue = getDeepValue(previousChar, path);
         if (typeof currentValue === 'number' && typeof previousValue === 'number') {
-          charChanges[stat + 'Change'] = currentValue - previousValue;
+          charChanges[`${path}Change`] = currentValue - previousValue;
         }
-      });
+      }
 
       // Handle connection affinity changes (for disposition template)
       if (currentChar.connections && Array.isArray(currentChar.connections)) {
@@ -1577,12 +1608,18 @@ const renderTracker = (mesId, get_settings, compiledWrapperTemplate, compiledCar
             }
             const bgColor = stats.bg || get_settings("defaultBgColor");
             const changes = statChanges[name] || {};
+
+            const isNestedStats = stats && typeof stats === 'object' && typeof stats.stats === 'object' && stats.stats !== null;
+            const templateStats = isNestedStats ? { ...stats, ...stats.stats } : { ...stats };
+            if (isNestedStats) delete templateStats.stats;
+
             return {
+              name: name,
               characterName: name,
               currentDate: currentDate,
               currentTime: currentTime,
               stats: {
-                ...stats,
+                ...templateStats,
                 ...changes,
                 internal_thought:
                   stats.internal_thought ||
@@ -1628,12 +1665,18 @@ const renderTracker = (mesId, get_settings, compiledWrapperTemplate, compiledCar
             }
             const bgColor = stats.bg || get_settings("defaultBgColor");
             const changes = statChanges[name] || {};
+
+            const isNestedStats = stats && typeof stats === 'object' && typeof stats.stats === 'object' && stats.stats !== null;
+            const templateStats = isNestedStats ? { ...stats, ...stats.stats } : { ...stats };
+            if (isNestedStats) delete templateStats.stats;
+
             let cardData = {
+              name: name,
               characterName: name,
               currentDate: currentDate,
               currentTime: currentTime,
               stats: {
-                ...stats,
+                ...templateStats,
                 ...changes,
                 internal_thought:
                   stats.internal_thought ||
@@ -1918,12 +1961,18 @@ const renderTrackerWithoutSim = (mesId, get_settings, compiledWrapperTemplate, c
             }
             const bgColor = stats.bg || get_settings("defaultBgColor");
             const changes = statChanges[name] || {};
+
+            const isNestedStats = stats && typeof stats === 'object' && typeof stats.stats === 'object' && stats.stats !== null;
+            const templateStats = isNestedStats ? { ...stats, ...stats.stats } : { ...stats };
+            if (isNestedStats) delete templateStats.stats;
+
             return {
+              name: name,
               characterName: name,
               currentDate: currentDate,
               currentTime: currentTime,
               stats: {
-                ...stats,
+                ...templateStats,
                 ...changes,
                 internal_thought:
                   stats.internal_thought ||
@@ -1969,12 +2018,18 @@ const renderTrackerWithoutSim = (mesId, get_settings, compiledWrapperTemplate, c
             }
             const bgColor = stats.bg || get_settings("defaultBgColor");
             const changes = statChanges[name] || {};
+
+            const isNestedStats = stats && typeof stats === 'object' && typeof stats.stats === 'object' && stats.stats !== null;
+            const templateStats = isNestedStats ? { ...stats, ...stats.stats } : { ...stats };
+            if (isNestedStats) delete templateStats.stats;
+
             let cardData = {
+              name: name,
               characterName: name,
               currentDate: currentDate,
               currentTime: currentTime,
               stats: {
-                ...stats,
+                ...templateStats,
                 ...changes,
                 internal_thought:
                   stats.internal_thought ||

@@ -50,6 +50,30 @@ Handlebars.registerHelper("gte", function (a, b) {
   return a >= b;
 });
 
+Handlebars.registerHelper("lt", function (a, b) {
+  return a < b;
+});
+
+Handlebars.registerHelper("lte", function (a, b) {
+  return a <= b;
+});
+
+Handlebars.registerHelper("or", function () {
+  const args = Array.prototype.slice.call(arguments);
+  const values = args.slice(0, -1);
+  return values.some(Boolean);
+});
+
+Handlebars.registerHelper("and", function () {
+  const args = Array.prototype.slice.call(arguments);
+  const values = args.slice(0, -1);
+  return values.every(Boolean);
+});
+
+Handlebars.registerHelper("not", function (value) {
+  return !value;
+});
+
 Handlebars.registerHelper("abs", function (a) {
   if (typeof a !== "number") {
     return 0;

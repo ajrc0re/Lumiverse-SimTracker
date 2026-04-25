@@ -5523,15 +5523,14 @@ var bento_style_tracker_default = {
 
     /* BODY */
     .bento-body-wrapper {
-        display: grid;
-        grid-template-rows: 0fr;
-        transition: grid-template-rows 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-        will-change: grid-template-rows;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        will-change: max-height;
     }
-    .bento-card input.toggle:checked ~ .bento-body-wrapper { grid-template-rows: 1fr; }
+    .bento-card input.toggle:checked ~ .bento-body-wrapper { max-height: 2000px; }
 
     .bento-inner {
-        overflow: hidden;
         padding: 0 24px 24px 24px;
         opacity: 0;
         transform: translate3d(0, -10px, 0);
@@ -7791,6 +7790,656 @@ STATS (in stats object):
   },
   trackerDesc: "tactical combat interface tracking target disposition, vitality, and objectives in military HUD style."
 };
+// tracker-card-templates/rpg-sidebar-preset.json
+var rpg_sidebar_preset_default = {
+  templateName: "Omni-Tracker: RPG Edition",
+  templateAuthor: "Prolix OCs",
+  templatePosition: "RIGHT",
+  tabsType: "toggle",
+  htmlTemplate: `<!-- TEMPLATE NAME: Omni-Tracker: RPG Edition -->
+<!-- AUTHOR: Prolix OCs -->
+<!-- POSITION: RIGHT -->
+<!-- TABS_TYPE: toggle -->
+
+<!-- CARD_TEMPLATE_START -->
+<style>
+    /* =========================================
+       1. CORE VARIABLES & THEME
+       ========================================= */
+    .sim-tracker-container {
+        --sst-font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --sst-bg-deep: #050505;
+        
+        /* Glass System */
+        --sst-glass-panel: rgba(22, 22, 28, 0.92);
+        --sst-glass-sidebar: rgba(10, 10, 15, 0.85);
+        --sst-glass-border: rgba(255, 255, 255, 0.08);
+        --sst-blur-amt: 50px;
+        
+        /* Colors */
+        --sst-txt-main: #e0e0e0;
+        --sst-txt-muted: #888;
+        --sst-txt-accent: #fff;
+        
+        /* RPG Colors */
+        --sst-hp-col: #ff3b30;
+        --sst-mp-col: #00d2ff; /* Mana */
+        --sst-stam-col: #32d74b; /* Stamina/Ready */
+        --sst-cd-col: #ff453a; /* Cooldown */
+        
+        /* Buffs/Debuffs */
+        --sst-buff-pos: #32d74b;
+        --sst-buff-neg: #bf5af2;
+        
+        /* Attributes */
+        --sst-attr-bg: rgba(255,255,255,0.03);
+        
+        /* Gradients for Matrix */
+        --sst-grad-aff: linear-gradient(90deg, #ff9a9e 0%, #fbc2eb 100%);
+        --sst-grad-des: linear-gradient(90deg, #8ec5fc 0%, #e0c3fc 100%);
+        --sst-grad-tru: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
+        --sst-grad-con: linear-gradient(90deg, #cfd9df 0%, #a8a8a8 100%);
+    }
+
+    .sim-tracker-container, .sim-tracker-container * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .sim-tracker-container {
+        position: fixed; top: 0; right: 0; bottom: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 1000;
+        font-family: var(--sst-font-stack);
+        color: var(--sst-txt-main);
+    }
+
+    .sim-tracker-container svg { display: block; width: 100%; height: 100%; }
+
+    /* =========================================
+       2. TABS (Fixed Right)
+       ========================================= */
+    .sim-tracker-tabs {
+        position: fixed; top: 0; right: 0; bottom: 0;
+        width: 80px;
+        background: var(--sst-glass-sidebar);
+        backdrop-filter: blur(var(--sst-blur-amt));
+        border-left: 1px solid var(--sst-glass-border);
+        z-index: 200; /* High z-index to stay on top */
+        display: flex; flex-direction: column; align-items: center;
+        padding-top: 40px; gap: 20px;
+        box-shadow: -5px 0 30px rgba(0,0,0,0.5);
+        pointer-events: auto;
+    }
+
+    .sim-tracker-tab {
+        width: 50px; height: 50px; 
+        position: relative;
+        border-radius: 14px; background: rgba(255,255,255,0.05);
+        border: 1px solid transparent; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; transition: all 0.3s ease; color: #666;
+    }
+
+    .sim-tracker-tab:hover { background: rgba(255,255,255,0.15); transform: scale(1.05); }
+    
+    .sim-tracker-tab.active {
+        background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4);
+        color: #fff; box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+
+    .signal { position: absolute; bottom: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #101015; }
+    .sig-danger { background: var(--sst-hp-col); }
+    .sig-ok { background: var(--sst-stam-col); }
+
+    /* =========================================
+       3. CARDS (Slide Logic)
+       ========================================= */
+    .sim-tracker-card {
+        position: fixed; top: 0; bottom: 0; right: 80px; /* Flush with tabs */
+        width: 420px;
+        max-width: calc(100vw - 80px);
+        background: var(--sst-glass-panel);
+        border-left: 1px solid var(--sst-glass-border);
+        backdrop-filter: blur(40px);
+        display: flex; flex-direction: column; gap: 16px;
+        padding: 30px 24px; overflow-y: auto;
+        
+        /* Animation States */
+        transform: translateX(100%); opacity: 0; visibility: hidden;
+        transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease, visibility 0.4s;
+        z-index: 5;
+        pointer-events: auto;
+    }
+
+    .sim-tracker-card.active {
+        transform: translateX(0); opacity: 1; visibility: visible;
+        z-index: 30;
+    }
+
+    .sim-tracker-card.sliding-out {
+        transform: translateX(50%); opacity: 0; visibility: hidden;
+    }
+
+
+    /* =========================================
+       4. WIDGETS & MODULES
+       ========================================= */
+    .widget {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--sst-glass-border);
+        border-radius: 16px; padding: 16px;
+        display: flex; flex-direction: column; gap: 12px;
+        flex-shrink: 0;
+    }
+    .w-header { 
+        font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.5px; 
+        color: var(--sst-txt-muted); font-weight: 700; display: flex; justify-content: space-between;
+    }
+
+    /* --- HEADER & ATTRIBUTES --- */
+    .header-row { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+    .av-lg {
+        width: 64px; height: 64px; border-radius: 50%; background: #222;
+        border: 2px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;
+        font-size: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .char-name h1 { font-size: 1.5rem; font-weight: 800; color: #fff; line-height: 1; }
+    .char-name .class-lvl { font-size: 0.8rem; color: var(--sst-txt-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+    /* D&D Attributes Grid */
+    .attr-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+    .attr-box {
+        background: var(--sst-attr-bg); border-radius: 8px; padding: 6px 2px;
+        display: flex; flex-direction: column; align-items: center;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .attr-label { font-size: 0.55rem; font-weight: 700; color: #666; letter-spacing: 1px; }
+    .attr-val { font-size: 0.9rem; font-weight: 700; color: #fff; margin: 2px 0; }
+    .attr-mod { font-size: 0.6rem; color: var(--sst-stam-col); }
+    .attr-mod.neg { color: var(--sst-hp-col); }
+
+    /* --- VITALS & COMBAT --- */
+    .vitals-row { display: flex; gap: 10px; align-items: flex-end; }
+    .hp-numeric { font-size: 0.9rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .hp-numeric span { color: var(--sst-txt-muted); font-size: 0.75rem; }
+    
+    .bar-track { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative; }
+    .bar-fill { height: 100%; background: var(--sst-hp-col); width: var(--pct); box-shadow: 0 0 10px var(--sst-hp-col); transition: width 0.3s ease; }
+
+    /* Target & Stance */
+    .combat-card { 
+        background: rgba(0,0,0,0.3); border-radius: 12px; padding: 10px; 
+        display: flex; justify-content: space-between; align-items: center;
+        border-left: 3px solid #ff453a; /* Enemy Red */
+    }
+    .target-info span { font-size: 0.65rem; text-transform: uppercase; color: #888; display: block; }
+    .target-info b { font-size: 0.9rem; color: #fff; }
+    .stance-badge { 
+        font-size: 0.6rem; padding: 4px 8px; border-radius: 6px; 
+        background: rgba(255,255,255,0.1); text-transform: uppercase; font-weight: 700;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    /* Buffs Row */
+    .buff-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+    .buff-pill {
+        display: flex; align-items: center; gap: 6px; padding: 4px 8px; 
+        background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);
+        font-size: 0.7rem; cursor: help; position: relative;
+    }
+    .buff-pill.pos { color: var(--sst-buff-pos); border-color: rgba(50,215,75,0.2); }
+    .buff-pill.neg { color: var(--sst-buff-neg); border-color: rgba(191,90,242,0.2); }
+    
+    /* --- ABILITIES / SPELLS --- */
+    .spell-list { display: flex; flex-direction: column; gap: 8px; }
+    .spell-row { 
+        display: flex; align-items: center; gap: 10px; padding: 8px; 
+        background: rgba(255,255,255,0.02); border-radius: 8px; 
+    }
+    .spell-icon { width: 32px; height: 32px; background: #222; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .spell-details { flex-grow: 1; }
+    .spell-name { font-size: 0.85rem; font-weight: 600; color: #ddd; }
+    .spell-cost { font-size: 0.65rem; color: var(--sst-mp-col); }
+    
+    .spell-status { font-size: 0.65rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+    .st-rdy { color: var(--sst-stam-col); background: rgba(50,215,75,0.1); }
+    .st-cd { color: var(--sst-cd-col); background: rgba(255,69,58,0.1); }
+    .st-oom { color: var(--sst-mp-col); background: rgba(10,132,255,0.1); }
+
+    /* --- RELATIONSHIP MATRIX (4 Stats) --- */
+    .rel-grid { display: flex; flex-direction: column; gap: 12px; }
+    .stat-line { display: grid; grid-template-columns: 20px 1fr 30px; align-items: center; gap: 10px; }
+    .stat-track { height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; position: relative; overflow: hidden; }
+    .stat-fill { position: absolute; top:0; left:0; width: 100%; height: 100%; clip-path: inset(0 calc(100% - var(--v)) 0 0); transition: clip-path 0.5s ease; }
+    .gf-1 { background: var(--sst-grad-aff); } .gf-2 { background: var(--sst-grad-des); }
+    .gf-3 { background: var(--sst-grad-tru); } .gf-4 { background: var(--sst-grad-con); }
+
+    /* --- INVENTORY (Capacity) --- */
+    .inv-header-meta { font-size: 0.65rem; color: #666; }
+    .inv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .inv-slot {
+        aspect-ratio: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px; position: relative; display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem;
+    }
+    .inv-slot.filled { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); cursor: help; }
+    .inv-qty { position: absolute; bottom: 2px; right: 2px; font-size: 0.6rem; color: #fff; text-shadow: 0 1px 2px #000; }
+</style>
+
+<div class="sim-tracker-container">
+
+    <!-- TABS -->
+    <div class="sim-tracker-tabs">
+        {{#each characters}}
+        <div class="sim-tracker-tab" data-character="{{@index}}">
+            {{initials name}}
+            <div class="signal {{#if (lt stats.hp.current (divide stats.hp.max 4))}}sig-danger{{else}}sig-ok{{/if}}"></div>
+        </div>
+        {{/each}}
+    </div>
+
+    <!-- CARDS -->
+    {{#each characters}}
+    <div class="sim-tracker-card" data-character="{{@index}}">
+        
+        <!-- 1. IDENTITY & ATTRIBUTES -->
+        <div class="header-row">
+            <div class="av-lg">{{initials name}}</div>
+            <div class="char-name">
+                <h1>{{name}}</h1>
+                <div class="class-lvl">{{stats.class}} • Level {{stats.level}}</div>
+            </div>
+        </div>
+
+        <!-- DnD Attributes -->
+        <div class="attr-grid">
+            <div class="attr-box">
+                <span class="attr-label">STR</span>
+                <span class="attr-val">{{stats.attributes.str}}</span>
+                <span class="attr-mod {{#if (lt stats.attributes.str 10)}}neg{{/if}}">{{stats.attributes.str_mod}}</span>
+            </div>
+            <div class="attr-box">
+                <span class="attr-label">DEX</span>
+                <span class="attr-val">{{stats.attributes.dex}}</span>
+                <span class="attr-mod {{#if (lt stats.attributes.dex 10)}}neg{{/if}}">{{stats.attributes.dex_mod}}</span>
+            </div>
+            <div class="attr-box">
+                <span class="attr-label">CON</span>
+                <span class="attr-val">{{stats.attributes.con}}</span>
+                <span class="attr-mod {{#if (lt stats.attributes.con 10)}}neg{{/if}}">{{stats.attributes.con_mod}}</span>
+            </div>
+            <div class="attr-box">
+                <span class="attr-label">INT</span>
+                <span class="attr-val">{{stats.attributes.int}}</span>
+                <span class="attr-mod {{#if (lt stats.attributes.int 10)}}neg{{/if}}">{{stats.attributes.int_mod}}</span>
+            </div>
+            <div class="attr-box">
+                <span class="attr-label">WIS</span>
+                <span class="attr-val">{{stats.attributes.wis}}</span>
+                <span class="attr-mod {{#if (lt stats.attributes.wis 10)}}neg{{/if}}">{{stats.attributes.wis_mod}}</span>
+            </div>
+            <div class="attr-box">
+                <span class="attr-label">CHA</span>
+                <span class="attr-val">{{stats.attributes.cha}}</span>
+                <span class="attr-mod {{#if (lt stats.attributes.cha 10)}}neg{{/if}}">{{stats.attributes.cha_mod}}</span>
+            </div>
+        </div>
+
+        <!-- 2. COMBAT STATUS -->
+        <div class="widget">
+            <div class="w-header"><span>Combat Status</span></div>
+            
+            <!-- Health (Numeric) -->
+            <div>
+                <div class="hp-numeric">{{stats.hp.current}} / {{stats.hp.max}} <span>HP</span></div>
+                <div class="bar-track">
+                    <div class="bar-fill" style="--pct: {{divideRoundUp (multiply stats.hp.current 100) stats.hp.max}}%"></div>
+                </div>
+            </div>
+
+            <!-- Target & Stance -->
+            <div class="combat-card">
+                <div class="target-info">
+                    <span>Targeting</span>
+                    <b style="color:#ff6b6b">{{stats.combat.target}}</b>
+                </div>
+                <div class="stance-badge">{{stats.combat.stance}}</div>
+            </div>
+
+            <!-- Buffs -->
+            <div class="buff-row">
+                {{#each stats.combat.buffs}}
+                <div class="buff-pill {{type}}" title="Source: {{origin}}">{{name}}</div>
+                {{/each}}
+            </div>
+        </div>
+
+        <!-- 3. ABILITIES -->
+        <div class="widget">
+            <div class="w-header"><span>Spellbook</span> <span>{{stats.resources.current}}/{{stats.resources.max}} {{stats.resources.name}}</span></div>
+            <div class="spell-list">
+                {{#each stats.abilities}}
+                <div class="spell-row">
+                    <div class="spell-icon">✨</div>
+                    <div class="spell-details">
+                        <div class="spell-name">{{name}}</div>
+                        <div class="spell-cost">{{cost}}</div>
+                    </div>
+                    <div class="spell-status">{{status}}</div>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        <!-- 4. RELATIONSHIP MATRIX -->
+        <div class="widget">
+            <div class="w-header"><span>Social Links</span></div>
+            <div class="rel-grid">
+                <!-- Affection -->
+                <div class="stat-line">
+                    <svg class="icon" viewBox="0 0 24 24" fill="#ff9a9e"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <div class="stat-track"><div class="stat-fill gf-1" style="--v: {{stats.relationships.affection}}%"></div></div>
+                    <div style="font-size:0.7rem">{{stats.relationships.affection}}%</div>
+                </div>
+                <!-- Desire -->
+                <div class="stat-line">
+                     <svg class="icon" viewBox="0 0 24 24" fill="url(#g1-{{@index}})">
+                        <defs><linearGradient id="g1-{{@index}}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#f093fb"/><stop offset="1" stop-color="#f5576c"/></linearGradient></defs>
+                        <path fill="url(#g1-{{@index}})" d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z"/>
+                    </svg>
+                    <div class="stat-track"><div class="stat-fill gf-2" style="--v: {{stats.relationships.desire}}%"></div></div>
+                    <div style="font-size:0.7rem">{{stats.relationships.desire}}%</div>
+                </div>
+                <!-- Trust -->
+                <div class="stat-line">
+                    <svg class="icon" viewBox="0 0 24 24" fill="#89f7fe"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+                    <div class="stat-track"><div class="stat-fill gf-3" style="--v: {{stats.relationships.trust}}%"></div></div>
+                    <div style="font-size:0.7rem">{{stats.relationships.trust}}%</div>
+                </div>
+                <!-- Contempt -->
+                <div class="stat-line">
+                    <svg class="icon" viewBox="0 0 24 24" fill="#888"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 11H7v-2h10v2z"/></svg>
+                    <div class="stat-track"><div class="stat-fill gf-4" style="--v: {{stats.relationships.contempt}}%"></div></div>
+                    <div style="font-size:0.7rem">{{stats.relationships.contempt}}%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. INVENTORY -->
+        <div class="widget">
+            <div class="w-header"><span>Bag</span> <span class="inv-header-meta"></span></div>
+            <div class="inv-grid">
+                {{#each stats.inventory}}
+                <div class="inv-slot filled" title="{{name}}">{{icon}}<span class="inv-qty">x{{qty}}</span></div>
+                {{/each}}
+                <!-- Fillers if needed, can add logic for empty slots -->
+            </div>
+        </div>
+
+    </div>
+    {{/each}}
+
+</div>
+<!-- CARD_TEMPLATE_END -->
+`,
+  sysPrompt: `## RPG MODE (D&D 5e Style)
+
+**Objective**: Act as a Dungeon Master/Game Engine. Track character stats, inventory, and relationships based on the narrative.
+**Time Tracking**: Analyze context for time passing. Update turn counters in combat.
+
+### Output Rules
+1. **Order**: Narrative → Tracker → Sim codeblock (NEVER omit sim codeblock)
+2. **Consistency**: Tracker reflects the *current* state after the latest action.
+
+### Character Stats
+Each character has:
+- **Class/Level**: e.g., "Cleric • Level 4"
+- **Attributes**: STR, DEX, CON, INT, WIS, CHA (Score 1-20). Modifiers are calculated automatically or can be explicitly set.
+- **HP**: Current and Max.
+- **MP/Resources**: e.g., "12/30 MP" or "3/3 Slots".
+
+### Combat & Status
+- **Target**: Who they are focusing on.
+- **Stance**: e.g., Defensive, Aggressive, Stealth.
+- **Buffs/Debuffs**: List active effects (Name, Origin, Type: pos/neg).
+- **Abilities**: List key spells/skills with status (Ready, Cooldown (turns), Low Resource).
+
+### Relationship Matrix (0-100%)
+- **Affection**: Romantic/Platonic love.
+- **Desire**: Physical attraction.
+- **Trust**: Faith in {{user}}.
+- **Contempt**: Dislike/Hatred (High contempt blocks other stats).
+
+### Inventory
+- **Bag**: List items and quantities. Max slots defined by context (default 10).
+
+### JSON Structure (Example)
+\`\`\`json
+{
+  "worldData": {
+    "location": "Dark Forest",
+    "time": "Night",
+    "turn": 4
+  },
+  "characters": [
+    {
+      "name": "Elara",
+      "stats": {
+        "class": "Cleric",
+        "level": 4,
+        "attributes": { 
+          "str": 8, "str_mod": "-1",
+          "dex": 12, "dex_mod": "+1",
+          "con": 14, "con_mod": "+2",
+          "int": 10, "int_mod": "0",
+          "wis": 18, "wis_mod": "+4",
+          "cha": 16, "cha_mod": "+3"
+        },
+        "hp": { "current": 24, "max": 48 },
+        "resources": { "name": "MP", "current": 12, "max": 30 },
+        "combat": {
+          "target": "Goblin Warlord",
+          "stance": "Defensive",
+          "buffs": [
+            { "name": "Bless", "origin": "Self", "type": "pos" },
+            { "name": "Poison", "origin": "Goblin Shaman", "type": "neg" }
+          ]
+        },
+        "abilities": [
+          { "name": "Cure Wounds", "cost": "8 MP", "status": "Ready" },
+          { "name": "Shield of Faith", "cost": "5 MP", "status": "2 Turns" }
+        ],
+        "relationships": {
+          "affection": 85,
+          "desire": 60,
+          "trust": 92,
+          "contempt": 5
+        },
+        "inventory": [
+          { "name": "Potion", "qty": 3, "icon": "💊" },
+          { "name": "Rations", "qty": 1, "icon": "🥖" }
+        ]
+      }
+    }
+  ]
+}
+\`\`\`
+`,
+  customFields: [
+    {
+      key: "stats.class",
+      description: "Character class (e.g., Cleric, Fighter)"
+    },
+    {
+      key: "stats.level",
+      description: "Character level (1-20)"
+    },
+    {
+      key: "stats.hp.current",
+      description: "Current Health Points"
+    },
+    {
+      key: "stats.hp.max",
+      description: "Maximum Health Points"
+    },
+    {
+      key: "stats.resources.name",
+      description: "Resource name (e.g., MP, Slots, Ki)"
+    },
+    {
+      key: "stats.resources.current",
+      description: "Current resource value"
+    },
+    {
+      key: "stats.resources.max",
+      description: "Maximum resource value"
+    },
+    {
+      key: "stats.combat.target",
+      description: "Current combat target"
+    },
+    {
+      key: "stats.combat.stance",
+      description: "Combat stance (e.g., Defensive, Aggressive)"
+    },
+    {
+      key: "stats.combat.buffs",
+      description: "Active buffs and debuffs",
+      type: "array",
+      itemSchema: [
+        {
+          key: "name",
+          type: "string",
+          description: "Effect name"
+        },
+        {
+          key: "origin",
+          type: "string",
+          description: "Source of the effect"
+        },
+        {
+          key: "type",
+          type: "string",
+          description: "pos or neg"
+        }
+      ]
+    },
+    {
+      key: "stats.abilities",
+      description: "Character abilities/spells",
+      type: "array",
+      itemSchema: [
+        {
+          key: "name",
+          type: "string",
+          description: "Ability name"
+        },
+        {
+          key: "cost",
+          type: "string",
+          description: "Resource cost"
+        },
+        {
+          key: "status",
+          type: "string",
+          description: "Ready, Cooldown, or Low Resource"
+        }
+      ]
+    },
+    {
+      key: "stats.attributes.str",
+      description: "Strength score (1-20)"
+    },
+    {
+      key: "stats.attributes.str_mod",
+      description: "Strength modifier (e.g., +2, -1)"
+    },
+    {
+      key: "stats.attributes.dex",
+      description: "Dexterity score (1-20)"
+    },
+    {
+      key: "stats.attributes.dex_mod",
+      description: "Dexterity modifier"
+    },
+    {
+      key: "stats.attributes.con",
+      description: "Constitution score (1-20)"
+    },
+    {
+      key: "stats.attributes.con_mod",
+      description: "Constitution modifier"
+    },
+    {
+      key: "stats.attributes.int",
+      description: "Intelligence score (1-20)"
+    },
+    {
+      key: "stats.attributes.int_mod",
+      description: "Intelligence modifier"
+    },
+    {
+      key: "stats.attributes.wis",
+      description: "Wisdom score (1-20)"
+    },
+    {
+      key: "stats.attributes.wis_mod",
+      description: "Wisdom modifier"
+    },
+    {
+      key: "stats.attributes.cha",
+      description: "Charisma score (1-20)"
+    },
+    {
+      key: "stats.attributes.cha_mod",
+      description: "Charisma modifier"
+    },
+    {
+      key: "stats.relationships.affection",
+      description: "Affection level (0-100)"
+    },
+    {
+      key: "stats.relationships.desire",
+      description: "Desire level (0-100)"
+    },
+    {
+      key: "stats.relationships.trust",
+      description: "Trust level (0-100)"
+    },
+    {
+      key: "stats.relationships.contempt",
+      description: "Contempt level (0-100)"
+    },
+    {
+      key: "stats.inventory",
+      description: "Character inventory items",
+      type: "array",
+      itemSchema: [
+        {
+          key: "name",
+          type: "string",
+          description: "Item name"
+        },
+        {
+          key: "qty",
+          type: "number",
+          description: "Quantity"
+        },
+        {
+          key: "icon",
+          type: "string",
+          description: "Emoji icon for the item"
+        }
+      ]
+    }
+  ],
+  extSettings: {
+    codeBlockIdentifier: "rpg",
+    defaultBgColor: "#1e3c72",
+    showThoughtBubble: true,
+    hideSimBlocks: true,
+    templateFile: "rpg-sidebar.html"
+  },
+  trackerDesc: "D&D 5e style RPG tracker with stats, combat, and inventory."
+};
 
 // src/templatePresets.ts
 var PRESETS = [
@@ -7805,6 +8454,10 @@ var PRESETS = [
   {
     id: "tactical-hud-sidebar-tabs",
     ...tactical_hud_sidebar_tabs_default
+  },
+  {
+    id: "rpg-sidebar-preset",
+    ...rpg_sidebar_preset_default
   }
 ];
 function getTemplatePresets() {
@@ -14603,6 +15256,32 @@ function normalizeCharacters(data) {
   }
   return out;
 }
+function getDeepValue(obj, path) {
+  const parts = path.split(".");
+  let current = obj;
+  for (const part of parts) {
+    if (current && typeof current === "object" && !Array.isArray(current)) {
+      current = current[part];
+    } else {
+      return;
+    }
+  }
+  return current;
+}
+function findNumericPaths(obj, prefix = "") {
+  const paths = [];
+  if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (typeof value === "number") {
+        paths.push(path);
+      } else if (value && typeof value === "object" && !Array.isArray(value)) {
+        paths.push(...findNumericPaths(value, path));
+      }
+    }
+  }
+  return paths;
+}
 function calculateStatChanges(currentCharacters, previous) {
   const changes = {};
   if (!previous) {
@@ -14619,7 +15298,6 @@ function calculateStatChanges(currentCharacters, previous) {
     if (name)
       prevByName.set(name, char);
   }
-  const numericStats = ["ap", "dp", "tp", "cp", "affection", "desire", "trust", "contempt", "affinity", "health"];
   for (const current of currentCharacters) {
     const name = typeof current.name === "string" ? current.name : "Character";
     const prev = prevByName.get(name);
@@ -14628,11 +15306,11 @@ function calculateStatChanges(currentCharacters, previous) {
       continue;
     }
     const out = {};
-    for (const stat of numericStats) {
-      const cur = current[stat];
-      const old = prev[stat];
-      if (typeof cur === "number" && typeof old === "number") {
-        out[`${stat}Change`] = cur - old;
+    for (const path of findNumericPaths(prev)) {
+      const curVal = getDeepValue(current, path);
+      const prevVal = getDeepValue(prev, path);
+      if (typeof curVal === "number" && typeof prevVal === "number") {
+        out[`${path}Change`] = curVal - prevVal;
       }
     }
     changes[name] = out;
@@ -14655,6 +15333,8 @@ function registerTemplateHelpers() {
   import_handlebars2.default.registerHelper("not", (value) => !value);
   import_handlebars2.default.registerHelper("gt", (a, b) => Number(a) > Number(b));
   import_handlebars2.default.registerHelper("gte", (a, b) => Number(a) >= Number(b));
+  import_handlebars2.default.registerHelper("lt", (a, b) => Number(a) < Number(b));
+  import_handlebars2.default.registerHelper("lte", (a, b) => Number(a) <= Number(b));
   import_handlebars2.default.registerHelper("abs", (a) => Math.abs(Number(a) || 0));
   import_handlebars2.default.registerHelper("multiply", (a, b) => (Number(a) || 0) * (Number(b) || 0));
   import_handlebars2.default.registerHelper("subtract", (a, b) => (Number(a) || 0) - (Number(b) || 0));
@@ -14716,12 +15396,18 @@ function buildTemplateData(data, preset, previousData) {
     const stats = character;
     const name = typeof stats.name === "string" ? stats.name : "Character";
     const bgColor = typeof stats.bg === "string" ? stats.bg : "#6a5acd";
+    const isNestedStats = stats && typeof stats === "object" && typeof stats.stats === "object" && stats.stats !== null;
+    const templateStats = isNestedStats ? { ...stats, ...stats.stats } : { ...stats };
+    if (isNestedStats) {
+      delete templateStats.stats;
+    }
     return {
+      name,
       characterName: name,
       currentDate,
       currentTime,
       stats: {
-        ...stats,
+        ...templateStats,
         ...statChanges[name] || {},
         internal_thought: stats.internal_thought || stats.thought || "No thought recorded.",
         relationshipStatus: stats.relationshipStatus || "Unknown Status",
@@ -15478,14 +16164,19 @@ function setup(ctx) {
   const templateSelect = byId("sst-lumi-template");
   templateSelect?.addEventListener("change", () => {
     config = { ...config, templateId: templateSelect.value || DEFAULT_CONFIG.templateId };
-    applyThemeClass(getPresetById(config, config.templateId));
+    const preset = getPresetById(config, config.templateId);
+    applyThemeClass(preset);
+    const identifierInput = byId("sst-lumi-identifier");
+    if (identifierInput && preset.extSettings?.codeBlockIdentifier) {
+      identifierInput.value = String(preset.extSettings.codeBlockIdentifier);
+    }
     if (latestContent) {
       handleContent(latestContent);
     } else if (latestTrackerRaw) {
       handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw);
     }
     inlineProcessor.processAll();
-    setStatus(`Previewing template: ${getPresetById(config, config.templateId).templateName}`);
+    setStatus(`Previewing template: ${preset.templateName}`);
   });
   saveButton?.addEventListener("click", () => {
     const templateSelectLocal = byId("sst-lumi-template");

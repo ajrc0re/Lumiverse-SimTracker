@@ -1,6 +1,7 @@
 import bentoStyleTracker from "../tracker-card-templates/bento-style-tracker.json";
 import datingCardTemplate from "../tracker-card-templates/dating-card-template.json";
 import tacticalHudSidebarTabs from "../tracker-card-templates/tactical-hud-sidebar-tabs.json";
+import rpgSidebarPreset from "../tracker-card-templates/rpg-sidebar-preset.json";
 
 export type TemplateField = {
   key: string;
@@ -36,6 +37,10 @@ const PRESETS: TemplatePreset[] = [
   {
     id: "tactical-hud-sidebar-tabs",
     ...tacticalHudSidebarTabs,
+  },
+  {
+    id: "rpg-sidebar-preset",
+    ...rpgSidebarPreset,
   },
 ];
 

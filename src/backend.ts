@@ -1146,6 +1146,7 @@ const promptMap: Record<string, string> = {
   "bento-style-tracker": getTemplatePresetById("bento-style-tracker").sysPrompt || "",
   "dating-card-template": getTemplatePresetById("dating-card-template").sysPrompt || "",
   "tactical-hud-sidebar-tabs": getTemplatePresetById("tactical-hud-sidebar-tabs").sysPrompt || "",
+  "rpg-sidebar-preset": getTemplatePresetById("rpg-sidebar-preset").sysPrompt || "",
 };
 
 /**

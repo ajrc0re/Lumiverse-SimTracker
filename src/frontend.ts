@@ -425,6 +425,34 @@ function normalizeCharacters(data: TrackerData): Array<Record<string, unknown>> 
   return out;
 }
 
+function getDeepValue(obj: unknown, path: string): unknown {
+  const parts = path.split(".");
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current && typeof current === "object" && !Array.isArray(current)) {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}
+
+function findNumericPaths(obj: unknown, prefix = ""): string[] {
+  const paths: string[] = [];
+  if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (typeof value === "number") {
+        paths.push(path);
+      } else if (value && typeof value === "object" && !Array.isArray(value)) {
+        paths.push(...findNumericPaths(value, path));
+      }
+    }
+  }
+  return paths;
+}
+
 function calculateStatChanges(currentCharacters: Array<Record<string, unknown>>, previous: TrackerData | null): Record<string, Record<string, unknown>> {
   const changes: Record<string, Record<string, unknown>> = {};
   if (!previous) {
@@ -442,8 +470,6 @@ function calculateStatChanges(currentCharacters: Array<Record<string, unknown>>,
     if (name) prevByName.set(name, char);
   }
 
-  const numericStats = ["ap", "dp", "tp", "cp", "affection", "desire", "trust", "contempt", "affinity", "health"];
-
   for (const current of currentCharacters) {
     const name = typeof current.name === "string" ? current.name : "Character";
     const prev = prevByName.get(name);
@@ -453,11 +479,11 @@ function calculateStatChanges(currentCharacters: Array<Record<string, unknown>>,
     }
 
     const out: Record<string, unknown> = {};
-    for (const stat of numericStats) {
-      const cur = current[stat];
-      const old = prev[stat];
-      if (typeof cur === "number" && typeof old === "number") {
-        out[`${stat}Change`] = cur - old;
+    for (const path of findNumericPaths(prev)) {
+      const curVal = getDeepValue(current, path);
+      const prevVal = getDeepValue(prev, path);
+      if (typeof curVal === "number" && typeof prevVal === "number") {
+        out[`${path}Change`] = curVal - prevVal;
       }
     }
     changes[name] = out;
@@ -484,6 +510,8 @@ function registerTemplateHelpers(): void {
   Handlebars.registerHelper("not", (value: unknown) => !value);
   Handlebars.registerHelper("gt", (a, b) => Number(a) > Number(b));
   Handlebars.registerHelper("gte", (a, b) => Number(a) >= Number(b));
+  Handlebars.registerHelper("lt", (a, b) => Number(a) < Number(b));
+  Handlebars.registerHelper("lte", (a, b) => Number(a) <= Number(b));
   Handlebars.registerHelper("abs", (a) => Math.abs(Number(a) || 0));
   Handlebars.registerHelper("multiply", (a, b) => (Number(a) || 0) * (Number(b) || 0));
   Handlebars.registerHelper("subtract", (a, b) => (Number(a) || 0) - (Number(b) || 0));
@@ -565,12 +593,26 @@ function buildTemplateData(
     const stats = character as CharacterStats;
     const name = typeof stats.name === "string" ? stats.name : "Character";
     const bgColor = typeof stats.bg === "string" ? stats.bg : "#6a5acd";
+
+    const isNestedStats =
+      stats && typeof stats === "object" && typeof stats.stats === "object" && stats.stats !== null;
+
+    const templateStats: CharacterStats = isNestedStats
+      ? { ...stats, ...(stats.stats as CharacterStats) }
+      : { ...stats };
+
+    // Remove the nested stats reference to avoid shadowing / confusion
+    if (isNestedStats) {
+      delete templateStats.stats;
+    }
+
     return {
+      name,
       characterName: name,
       currentDate,
       currentTime,
       stats: {
-        ...stats,
+        ...templateStats,
         ...(statChanges[name] || {}),
         internal_thought: stats.internal_thought || stats.thought || "No thought recorded.",
         relationshipStatus: stats.relationshipStatus || "Unknown Status",
@@ -1404,14 +1446,19 @@ export function setup(ctx: SpindleFrontendContext) {
   const templateSelect = byId<HTMLSelectElement>("sst-lumi-template");
   templateSelect?.addEventListener("change", () => {
     config = { ...config, templateId: templateSelect.value || DEFAULT_CONFIG.templateId };
-    applyThemeClass(getPresetById(config, config.templateId));
+    const preset = getPresetById(config, config.templateId);
+    applyThemeClass(preset);
+    const identifierInput = byId<HTMLInputElement>("sst-lumi-identifier");
+    if (identifierInput && preset.extSettings?.codeBlockIdentifier) {
+      identifierInput.value = String(preset.extSettings.codeBlockIdentifier);
+    }
     if (latestContent) {
       handleContent(latestContent);
     } else if (latestTrackerRaw) {
       handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw);
     }
     inlineProcessor.processAll();
-    setStatus(`Previewing template: ${getPresetById(config, config.templateId).templateName}`);
+    setStatus(`Previewing template: ${preset.templateName}`);
   });
 
   saveButton?.addEventListener("click", () => {
