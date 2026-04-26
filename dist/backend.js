@@ -12476,6 +12476,7 @@ async function refreshTrackerPrompt() {
   try {
     const result = await spindle.macros.resolve(rawBase, {
       chatId: activeChatId ?? undefined,
+      userId: activeUserId ?? undefined,
       commit: false
     });
     if (result.diagnostics.length > 0) {
