@@ -11601,7 +11601,6 @@ var lastSimStats = "{}";
 var activeUserId = null;
 var loadedConfigUserId = null;
 var activeChatId = null;
-var resolvedTrackerPrompt = "";
 var chatTrackerHistory = new Map;
 var rehydratedChats = new Set;
 var runtime = {
@@ -12243,7 +12242,6 @@ async function loadConfig() {
     config = { ...DEFAULT_CONFIG };
   }
   loadedConfigUserId = userId;
-  await refreshTrackerPrompt();
   pushMacroValues();
 }
 async function ensureConfigForUser(userId) {
@@ -12467,34 +12465,12 @@ ${body.trim()}
   out = out.replace(textRe, `${safeTag} tag`);
   return out;
 }
-async function refreshTrackerPrompt() {
-  const rawBase = getActivePreset().sysPrompt || "";
-  if (!rawBase) {
-    resolvedTrackerPrompt = "";
-    return;
-  }
-  try {
-    const result = await spindle.macros.resolve(rawBase, {
-      chatId: activeChatId ?? undefined,
-      userId: activeUserId ?? undefined,
-      commit: false
-    });
-    if (result.diagnostics.length > 0) {
-      const messages = result.diagnostics.map((d) => d.message).join("; ");
-      spindle.log.warn(`Tracker prompt macro resolution diagnostics: ${messages}`);
-    }
-    resolvedTrackerPrompt = result.text;
-  } catch (err) {
-    spindle.log.warn(`Failed to resolve tracker prompt macros: ${err instanceof Error ? err.message : String(err)}`);
-    resolvedTrackerPrompt = rawBase;
-  }
-}
 function pushMacroValues() {
   const fmt = buildExampleTrackerBlock(config.trackerFormat, config.codeBlockIdentifier);
   spindle.updateMacroValue("sim_format", fmt);
   const tag = sanitizeTagName(config.trackerTagName);
   const id = sanitizeIdentifier(config.codeBlockIdentifier);
-  const rawBase = resolvedTrackerPrompt || getActivePreset().sysPrompt || "";
+  const rawBase = getActivePreset().sysPrompt || "";
   const base = sanitizeSysPromptForWireFormat(rawBase, tag, id);
   const directive = [
     "IMPORTANT OUTPUT FORMAT:",
@@ -12721,8 +12697,6 @@ spindle.on("CHAT_CHANGED", (payload, userId) => {
     const chatId = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
     if (chatId)
       activeChatId = chatId;
-    await refreshTrackerPrompt();
-    pushMacroValues();
   })();
 });
 spindle.on("GENERATION_ENDED", (payload, userId) => {
@@ -13049,7 +13023,6 @@ async function handleImportPresetFile(payload) {
   if (Array.isArray(parsed.inlineTemplates) && parsed.inlineTemplates.length > 0) {
     config = { ...config, inlinePacks: [...config.inlinePacks, parsed] };
     await saveConfig();
-    await refreshTrackerPrompt();
     pushMacroValues();
     await sendConfigState();
     spindle.sendToFrontend({
@@ -13079,7 +13052,6 @@ async function handleImportPresetFile(payload) {
     templateId: preset.id
   };
   await saveConfig();
-  await refreshTrackerPrompt();
   pushMacroValues();
   await sendConfigState();
   spindle.sendToFrontend({
@@ -13119,7 +13091,6 @@ spindle.onFrontendMessage(async (payload, userId) => {
       secondaryLLMStripHTML: sanitizeBool(incoming?.secondaryLLMStripHTML ?? config.secondaryLLMStripHTML, config.secondaryLLMStripHTML)
     };
     await saveConfig();
-    await refreshTrackerPrompt();
     pushMacroValues();
     await trackEvent("sst.config.updated", {
       trackerTagName: config.trackerTagName,
