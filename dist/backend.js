@@ -10284,13 +10284,18 @@ var pulse_thread_tracker_default = {
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 12px;
         margin-bottom: 16px;
-        align-items: start;
+        align-items: stretch;
     }
 
     .pt-bio-column {
-        display: grid;
+        display: flex;
+        flex-direction: column;
         gap: 12px;
-        align-content: start;
+    }
+
+    .pt-bio-column &gt; .pt-bio-zone {
+        flex: 1 1 0;
+        min-height: 0;
     }
 
     .pt-bio-zone {
