@@ -53,6 +53,7 @@ let loadedConfigUserId: string | null = null;
  * interceptor context can't be parsed.
  */
 let activeChatId: string | null = null;
+let resolvedTrackerPrompt = "";
 
 type TrackerHistoryEntry = { messageId: string; payload: string };
 
@@ -898,6 +899,7 @@ async function loadConfig(): Promise<void> {
     config = { ...DEFAULT_CONFIG };
   }
   loadedConfigUserId = userId;
+  await refreshTrackerPrompt();
   pushMacroValues();
 }
 
@@ -1218,6 +1220,35 @@ function sanitizeSysPromptForWireFormat(base: string, tagName: string, identifie
 }
 
 /**
+ * Re-resolve any {{macro}} placeholders in the active preset's sysPrompt
+ * using the Lumiverse macro engine, then cache the result so
+ * pushMacroValues() can inject a fully-resolved string into the
+ * sim_tracker macro. Called on extension start and whenever the template
+ * changes (swap, import, etc.).
+ */
+async function refreshTrackerPrompt(): Promise<void> {
+  const rawBase = getActivePreset().sysPrompt || "";
+  if (!rawBase) {
+    resolvedTrackerPrompt = "";
+    return;
+  }
+  try {
+    const result = await spindle.macros.resolve(rawBase, {
+      chatId: activeChatId ?? undefined,
+      commit: false,
+    });
+    if (result.diagnostics.length > 0) {
+      const messages = result.diagnostics.map((d) => d.message).join("; ");
+      spindle.log.warn(`Tracker prompt macro resolution diagnostics: ${messages}`);
+    }
+    resolvedTrackerPrompt = result.text;
+  } catch (err) {
+    spindle.log.warn(`Failed to resolve tracker prompt macros: ${err instanceof Error ? err.message : String(err)}`);
+    resolvedTrackerPrompt = rawBase;
+  }
+}
+
+/**
  * Push current macro values to the host so prompt assembly can resolve
  * them instantly without an RPC roundtrip to the worker.
  */
@@ -1232,7 +1263,7 @@ function pushMacroValues(): void {
   // ignored anything outside the bundled defaults.
   const tag = sanitizeTagName(config.trackerTagName);
   const id = sanitizeIdentifier(config.codeBlockIdentifier);
-  const rawBase = getActivePreset().sysPrompt || "";
+  const rawBase = resolvedTrackerPrompt || getActivePreset().sysPrompt || "";
   const base = sanitizeSysPromptForWireFormat(rawBase, tag, id);
   const directive = [
     "IMPORTANT OUTPUT FORMAT:",
@@ -1471,6 +1502,8 @@ spindle.on("CHAT_CHANGED", (payload: unknown, userId?: string) => {
         ? obj.chat_id
         : null;
     if (chatId) activeChatId = chatId;
+    await refreshTrackerPrompt();
+    pushMacroValues();
   })();
 });
 
@@ -1882,6 +1915,7 @@ async function handleImportPresetFile(payload: Record<string, unknown>): Promise
   if (Array.isArray(parsed.inlineTemplates) && parsed.inlineTemplates.length > 0) {
     config = { ...config, inlinePacks: [...config.inlinePacks, parsed] };
     await saveConfig();
+    await refreshTrackerPrompt();
     pushMacroValues();
     await sendConfigState();
     spindle.sendToFrontend({
@@ -1915,6 +1949,7 @@ async function handleImportPresetFile(payload: Record<string, unknown>): Promise
     templateId: preset.id,
   };
   await saveConfig();
+  await refreshTrackerPrompt();
   pushMacroValues();
   await sendConfigState();
   spindle.sendToFrontend({
@@ -1956,6 +1991,7 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
       secondaryLLMStripHTML: sanitizeBool(incoming?.secondaryLLMStripHTML ?? config.secondaryLLMStripHTML, config.secondaryLLMStripHTML),
     };
     await saveConfig();
+    await refreshTrackerPrompt();
     pushMacroValues();
     await trackEvent("sst.config.updated", {
       trackerTagName: config.trackerTagName,
