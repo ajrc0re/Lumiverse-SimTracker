@@ -237,13 +237,13 @@ function wombFillHeight(value: unknown): number {
 
 function analFillTop(value: unknown): number {
   const pct = clampPercent(value);
-  // Inner cavity spans y≈24 (top) to y≈88 (bottom) → height 64
-  return 88 - (pct / 100) * 64;
+  // Inner cavity spans y≈15 (top) to y≈105 (bottom) → height 90
+  return 105 - (pct / 100) * 90;
 }
 
 function analFillHeight(value: unknown): number {
   const pct = clampPercent(value);
-  return (pct / 100) * 64;
+  return (pct / 100) * 90;
 }
 
 function semenFillTop(value: unknown): number {

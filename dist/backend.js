@@ -10540,12 +10540,12 @@ var pulse_thread_tracker_default = {
 
     .pt-anal-outline {
         fill: none;
-        stroke: color-mix(in srgb, #e67e22 70%, white 30%);
+        stroke: color-mix(in srgb, #d946ef 70%, white 30%);
         stroke-width: 5;
         stroke-linecap: round;
         stroke-linejoin: round;
         opacity: 0.95;
-        filter: drop-shadow(0 0 5px color-mix(in srgb, #e67e22 35%, transparent));
+        filter: drop-shadow(0 0 5px color-mix(in srgb, #d946ef 35%, transparent));
     }
 
     .pt-anal-inner {
@@ -10554,17 +10554,25 @@ var pulse_thread_tracker_default = {
         stroke-width: 1.5;
     }
 
+    .pt-anal-rugae {
+        fill: none;
+        stroke: rgba(255,255,255,0.08);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+    }
+
     .pt-anal-sphincter {
         fill: none;
-        stroke: color-mix(in srgb, #e67e22 60%, rgba(255,255,255,0.2) 40%);
-        stroke-width: 2.5;
+        stroke: color-mix(in srgb, #d946ef 60%, rgba(255,255,255,0.2) 40%);
+        stroke-width: 3.5;
         stroke-linecap: round;
     }
 
     .pt-prostate {
-        fill: color-mix(in srgb, #e67e22 35%, rgba(255,255,255,0.1));
-        stroke: color-mix(in srgb, #e67e22 55%, rgba(255,255,255,0.15));
-        stroke-width: 1;
+        fill: color-mix(in srgb, #f472b6 35%, rgba(255,255,255,0.1));
+        stroke: color-mix(in srgb, #f472b6 60%, rgba(255,255,255,0.15));
+        stroke-width: 1.5;
+        transform-origin: 26px 80px;
     }
 
     .pt-prostate.glow {
@@ -10572,8 +10580,8 @@ var pulse_thread_tracker_default = {
     }
 
     @keyframes prostatePulse {
-        0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 2px rgba(230,126,34,0.4)); }
-        50% { transform: scale(1.15); opacity: 0.85; filter: drop-shadow(0 0 6px rgba(230,126,34,0.7)); }
+        0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 2px rgba(244,114,182,0.4)); }
+        50% { transform: scale(1.15); opacity: 0.85; filter: drop-shadow(0 0 8px rgba(244,114,182,0.7)); }
     }
 
     .pt-anal-liquid {
@@ -10602,7 +10610,7 @@ var pulse_thread_tracker_default = {
         width: 0%;
         border-radius: inherit;
         transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
-        background: linear-gradient(90deg, #f1c40f, #e67e22);
+        background: linear-gradient(90deg, #9333ea, #d946ef);
     }
 
     /* --- MALE: Semen / Refractory Penis --- */
@@ -11381,23 +11389,36 @@ var pulse_thread_tracker_default = {
                     {{#if (hasAnalTracking stats)}}
                     &lt;div class=&quot;pt-bio-zone&quot;&gt;
                         &lt;div class=&quot;pt-anal-vessel&quot;&gt;
-                            &lt;svg class=&quot;pt-anal-svg&quot; viewBox=&quot;0 0 100 100&quot; aria-hidden=&quot;true&quot; focusable=&quot;false&quot;&gt;
+                            &lt;svg class=&quot;pt-anal-svg&quot; viewBox=&quot;0 0 100 120&quot; aria-hidden=&quot;true&quot; focusable=&quot;false&quot;&gt;
                                 &lt;defs&gt;
                                     &lt;clipPath id=&quot;pt-anal-clip-{{@index}}&quot;&gt;
-                                        &lt;path d=&quot;M44 18 C40 24 38 34 38 44 C38 54 36 64 34 74 C32 82 40 88 50 88 C60 88 68 82 66 74 C64 64 62 54 62 44 C62 34 60 24 56 18 C56 14 44 14 44 18 Z&quot; /&gt;
+                                        &lt;path d=&quot;M 40 15 C 20 30, 20 80, 45 105 C 48 108, 52 108, 55 105 C 80 80, 80 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
                                     &lt;/clipPath&gt;
                                     &lt;linearGradient id=&quot;pt-anal-depth-{{@index}}&quot; x1=&quot;0.5&quot; y1=&quot;0&quot; x2=&quot;0.5&quot; y2=&quot;1&quot;&gt;
-                                        &lt;stop offset=&quot;0%&quot; stop-color=&quot;#7a4a2a&quot; stop-opacity=&quot;0.85&quot; /&gt;
-                                        &lt;stop offset=&quot;100%&quot; stop-color=&quot;#3a2010&quot; stop-opacity=&quot;0.95&quot; /&gt;
+                                        &lt;stop offset=&quot;0%&quot; stop-color=&quot;#4a044e&quot; stop-opacity=&quot;0.85&quot; /&gt;
+                                        &lt;stop offset=&quot;100%&quot; stop-color=&quot;#170123&quot; stop-opacity=&quot;0.95&quot; /&gt;
                                     &lt;/linearGradient&gt;
                                 &lt;/defs&gt;
-                                &lt;path class=&quot;pt-anal-outline&quot; d=&quot;M44 18 C40 24 38 34 38 44 C38 54 36 64 34 74 C32 82 40 88 50 88 C60 88 68 82 66 74 C64 64 62 54 62 44 C62 34 60 24 56 18 C56 14 44 14 44 18 Z&quot; /&gt;
-                                &lt;ellipse class=&quot;pt-anal-sphincter&quot; cx=&quot;50&quot; cy=&quot;16&quot; rx=&quot;7&quot; ry=&quot;2.5&quot; /&gt;
-                                &lt;path class=&quot;pt-prostate {{#if (gt stats.prostate_stimulation_pct 50)}}glow{{/if}}&quot; d=&quot;M46 38 C42 40 42 46 46 48 C50 46 50 40 46 38 Z&quot; /&gt;
-                                &lt;path class=&quot;pt-anal-inner&quot; style=&quot;fill:url(#pt-anal-depth-{{@index}})&quot; d=&quot;M44 18 C40 24 38 34 38 44 C38 54 36 64 34 74 C32 82 40 88 50 88 C60 88 68 82 66 74 C64 64 62 54 62 44 C62 34 60 24 56 18 C56 14 44 14 44 18 Z&quot; /&gt;
+                                &lt;!-- Outer glow / Outline --&gt;
+                                &lt;path class=&quot;pt-anal-outline&quot; d=&quot;M 40 15 C 20 30, 20 80, 45 105 C 48 108, 52 108, 55 105 C 80 80, 80 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
+                                
+                                &lt;!-- Sphincter (bottom base) --&gt;
+                                &lt;ellipse class=&quot;pt-anal-sphincter&quot; cx=&quot;50&quot; cy=&quot;107&quot; rx=&quot;12&quot; ry=&quot;3.5&quot; /&gt;
+                                
+                                &lt;!-- Prostate (anterior wall, offset left) --&gt;
+                                &lt;path class=&quot;pt-prostate {{#if (gt stats.prostate_stimulation_pct 50)}}glow{{/if}}&quot; d=&quot;M 32 65 C 18 68, 15 90, 38 95 C 32 85, 30 75, 32 65 Z&quot; /&gt;
+                                
+                                &lt;!-- Inner cavity with depth gradient --&gt;
+                                &lt;path class=&quot;pt-anal-inner&quot; style=&quot;fill:url(#pt-anal-depth-{{@index}})&quot; d=&quot;M 40 15 C 20 30, 20 80, 45 105 C 48 108, 52 108, 55 105 C 80 80, 80 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
+                                
+                                &lt;!-- Muscular Rugae --&gt;
+                                &lt;path class=&quot;pt-anal-rugae&quot; d=&quot;M 28 35 Q 50 45 72 35 M 24 55 Q 50 68 76 55 M 28 75 Q 50 85 72 75 M 36 92 Q 50 98 64 92&quot; /&gt;
+                                
+                                &lt;!-- Semen Liquid --&gt;
                                 &lt;g clip-path=&quot;url(#pt-anal-clip-{{@index}})&quot;&gt;
                                     &lt;rect class=&quot;pt-anal-liquid&quot; x=&quot;0&quot; y=&quot;{{analFillTop stats.anal_fullness_pct}}&quot; width=&quot;100&quot; height=&quot;{{analFillHeight stats.anal_fullness_pct}}&quot; /&gt;
-                                    &lt;path class=&quot;pt-anal-surface&quot; d=&quot;M33 {{analFillTop stats.anal_fullness_pct}} C40 {{add (analFillTop stats.anal_fullness_pct) 3}} 60 {{add (analFillTop stats.anal_fullness_pct) 3}} 67 {{analFillTop stats.anal_fullness_pct}}&quot; /&gt;
+                                    &lt;!-- Surface wave --&gt;
+                                    &lt;path class=&quot;pt-anal-surface&quot; d=&quot;M 10 {{analFillTop stats.anal_fullness_pct}} C 30 {{add (analFillTop stats.anal_fullness_pct) 4}} 70 {{add (analFillTop stats.anal_fullness_pct) 4}} 90 {{analFillTop stats.anal_fullness_pct}}&quot; /&gt;
                                 &lt;/g&gt;
                             &lt;/svg&gt;
                         &lt;/div&gt;
