@@ -10279,7 +10279,7 @@ var pulse_thread_tracker_default = {
 
     .pt-bio-zone {
         display: grid;
-        grid-template-columns: 92px minmax(0, 1fr);
+        grid-template-columns: 120px minmax(0, 1fr);
         align-items: center;
         gap: 14px;
         padding: 14px 16px;
@@ -10369,8 +10369,8 @@ var pulse_thread_tracker_default = {
     }
 
     .pt-womb-vessel {
-        width: 96px;
-        height: 112px;
+        width: 120px;
+        height: 140px;
         padding: 8px;
         border-radius: 24px 24px 28px 28px;
         background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
@@ -11140,8 +11140,8 @@ var pulse_thread_tracker_default = {
                                 &lt;circle class=&quot;pt-womb-ovary&quot; cx=&quot;76&quot; cy=&quot;30&quot; r=&quot;6&quot; /&gt;
                                 &lt;path class=&quot;pt-womb-inner&quot; d=&quot;M50 24 C62 24 72 34 72 46 C72 57 66 66 58 74 C54 78 52 83 50 88 C48 83 46 78 42 74 C34 66 28 57 28 46 C28 34 38 24 50 24 Z&quot; /&gt;
                                 &lt;g clip-path=&quot;url(#pt-womb-clip-{{@index}})&quot;&gt;
-                                    &lt;rect class=&quot;pt-womb-liquid&quot; x=&quot;0&quot; y=&quot;{{subtract 100 (clampPercent stats.womb_fullness_pct)}}&quot; width=&quot;100&quot; height=&quot;{{clampPercent stats.womb_fullness_pct}}&quot; /&gt;
-                                    &lt;path class=&quot;pt-womb-surface&quot; d=&quot;M33 {{subtract 100 (clampPercent stats.womb_fullness_pct)}} C40 {{subtract 103 (clampPercent stats.womb_fullness_pct)}} 60 {{subtract 103 (clampPercent stats.womb_fullness_pct)}} 67 {{subtract 100 (clampPercent stats.womb_fullness_pct)}}&quot; /&gt;
+                                    &lt;rect class=&quot;pt-womb-liquid&quot; x=&quot;0&quot; y=&quot;{{wombFillTop stats.womb_fullness_pct}}&quot; width=&quot;100&quot; height=&quot;{{wombFillHeight stats.womb_fullness_pct}}&quot; /&gt;
+                                    &lt;path class=&quot;pt-womb-surface&quot; d=&quot;M33 {{wombFillTop stats.womb_fullness_pct}} C40 {{add (wombFillTop stats.womb_fullness_pct) 3}} 60 {{add (wombFillTop stats.womb_fullness_pct) 3}} 67 {{wombFillTop stats.womb_fullness_pct}}&quot; /&gt;
                                 &lt;/g&gt;
                             &lt;/svg&gt;
                         &lt;/div&gt;

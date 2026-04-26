@@ -180,6 +180,17 @@ function semenPercent(stats: unknown): number {
   return percentOf(record.semen_ml, record.semen_capacity_ml);
 }
 
+function wombFillTop(value: unknown): number {
+  const pct = clampPercent(value);
+  // Inner cavity spans y≈24 (top) to y≈88 (bottom) → height 64
+  return 88 - (pct / 100) * 64;
+}
+
+function wombFillHeight(value: unknown): number {
+  const pct = clampPercent(value);
+  return (pct / 100) * 64;
+}
+
 function byId<T extends Element>(id: string): T | null {
   const scoped = panelRoot?.querySelector(`#${id}`) as T | null;
   if (scoped) return scoped;
@@ -650,6 +661,8 @@ function registerTemplateHelpers(): void {
   Handlebars.registerHelper("maleFertilityLabel", maleFertilityLabel);
   Handlebars.registerHelper("maleFertilityPercent", maleFertilityPercent);
   Handlebars.registerHelper("semenPercent", semenPercent);
+  Handlebars.registerHelper("wombFillTop", wombFillTop);
+  Handlebars.registerHelper("wombFillHeight", wombFillHeight);
   // Variadic `or` / `and` — last argument is the Handlebars options
   // object, so we peel it off before folding. Values use JS truthiness
   // so `0`, `""`, `null`, `undefined`, and `false` are all falsy.
