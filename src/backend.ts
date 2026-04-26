@@ -44,6 +44,7 @@ const CONFIG_PATH = "preferences.json";
 let config: TrackerConfig = { ...DEFAULT_CONFIG };
 let lastSimStats = "{}";
 let activeUserId: string | null = null;
+let loadedConfigUserId: string | null = null;
 /**
  * Last chat id the extension saw activity on. The interceptor signature
  * (`context: unknown`) doesn't contractually expose the chat id, so we
@@ -873,8 +874,9 @@ function stripOldTrackerBlocks(content: string, identifier: string, keepNewest: 
 }
 
 async function loadConfig(): Promise<void> {
+  const userId = activeUserId;
   try {
-    const parsed = await spindle.userStorage.getJson<Partial<TrackerConfig>>(CONFIG_PATH, { fallback: { ...DEFAULT_CONFIG }, userId: activeUserId || undefined });
+    const parsed = await spindle.userStorage.getJson<Partial<TrackerConfig>>(CONFIG_PATH, { fallback: { ...DEFAULT_CONFIG }, userId: userId || undefined });
     config = {
       trackerTagName: sanitizeTagName(parsed.trackerTagName),
       codeBlockIdentifier: sanitizeIdentifier(parsed.codeBlockIdentifier),
@@ -895,7 +897,15 @@ async function loadConfig(): Promise<void> {
   } catch {
     config = { ...DEFAULT_CONFIG };
   }
+  loadedConfigUserId = userId;
   pushMacroValues();
+}
+
+async function ensureConfigForUser(userId?: string | null): Promise<void> {
+  if (!userId) return;
+  if (activeUserId === userId && loadedConfigUserId === userId) return;
+  activeUserId = userId;
+  await loadConfig();
 }
 
 async function loadSeededTemplatePresets(): Promise<void> {
@@ -967,10 +977,18 @@ async function loadSeededTemplatePresets(): Promise<void> {
 
 async function saveConfig(): Promise<void> {
   await spindle.userStorage.setJson(CONFIG_PATH, config, { indent: 2, userId: activeUserId || undefined });
+  if (activeUserId) {
+    try {
+      await spindle.userStorage.setJson(CONFIG_PATH, config, { indent: 2 });
+    } catch {
+      // The user-scoped write above is authoritative; the unscoped copy is only a startup fallback.
+    }
+  }
 }
 
-spindle.on("MESSAGE_SENT", (payload: unknown) => {
+spindle.on("MESSAGE_SENT", (payload: unknown, userId?: string) => {
   void (async () => {
+    await ensureConfigForUser(userId);
     const ctx = readMessageContext(payload);
     const message = ctx.content;
     if (typeof message !== "string") return;
@@ -1004,8 +1022,9 @@ spindle.on("MESSAGE_SENT", (payload: unknown) => {
   })();
 });
 
-spindle.on("MESSAGE_EDITED", (payload: unknown) => {
+spindle.on("MESSAGE_EDITED", (payload: unknown, userId?: string) => {
   void (async () => {
+    await ensureConfigForUser(userId);
     const ctx = readMessageContext(payload);
     if (ctx.chatId) activeChatId = ctx.chatId;
     if (typeof ctx.content !== "string") return;
@@ -1023,8 +1042,9 @@ spindle.on("MESSAGE_EDITED", (payload: unknown) => {
   })();
 });
 
-spindle.on("MESSAGE_SWIPED", (payload: unknown) => {
+spindle.on("MESSAGE_SWIPED", (payload: unknown, userId?: string) => {
   void (async () => {
+    await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object") return;
     const obj = payload as Record<string, unknown>;
 
@@ -1086,8 +1106,9 @@ spindle.on("MESSAGE_SWIPED", (payload: unknown) => {
   })();
 });
 
-spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown) => {
+spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown, userId?: string) => {
   void (async () => {
+    await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object") return;
     const obj = payload as Record<string, unknown>;
     const tagName = typeof obj.tagName === "string" ? sanitizeTagName(obj.tagName) : "";
@@ -1427,8 +1448,9 @@ async function generateTrackerWithSecondaryLLM(chatId: string, targetMessageId: 
 // argument (typed as `unknown` in the SDK) doesn't surface one. Also use
 // this as the trigger to prime the side-channel for chats the extension
 // hasn't observed activity on yet (e.g. first generation after reload).
-spindle.on("GENERATION_STARTED", (payload: unknown) => {
+spindle.on("GENERATION_STARTED", (payload: unknown, userId?: string) => {
   void (async () => {
+    await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object") return;
     const obj = payload as Record<string, unknown>;
     const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
@@ -1438,19 +1460,23 @@ spindle.on("GENERATION_STARTED", (payload: unknown) => {
   })();
 });
 
-spindle.on("CHAT_CHANGED", (payload: unknown) => {
-  if (!payload || typeof payload !== "object") return;
-  const obj = payload as Record<string, unknown>;
-  const chatId = typeof obj.chatId === "string"
-    ? obj.chatId
-    : typeof obj.chat_id === "string"
-      ? obj.chat_id
-      : null;
-  if (chatId) activeChatId = chatId;
+spindle.on("CHAT_CHANGED", (payload: unknown, userId?: string) => {
+  void (async () => {
+    await ensureConfigForUser(userId);
+    if (!payload || typeof payload !== "object") return;
+    const obj = payload as Record<string, unknown>;
+    const chatId = typeof obj.chatId === "string"
+      ? obj.chatId
+      : typeof obj.chat_id === "string"
+        ? obj.chat_id
+        : null;
+    if (chatId) activeChatId = chatId;
+  })();
 });
 
-spindle.on("GENERATION_ENDED", (payload: unknown) => {
+spindle.on("GENERATION_ENDED", (payload: unknown, userId?: string) => {
   void (async () => {
+    await ensureConfigForUser(userId);
     const ctx = readMessageContext(payload);
     if (ctx.chatId) {
       activeChatId = ctx.chatId;

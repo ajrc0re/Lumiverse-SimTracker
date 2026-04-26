@@ -11300,6 +11300,7 @@ var CONFIG_PATH = "preferences.json";
 var config = { ...DEFAULT_CONFIG };
 var lastSimStats = "{}";
 var activeUserId = null;
+var loadedConfigUserId = null;
 var activeChatId = null;
 var chatTrackerHistory = new Map;
 var rehydratedChats = new Set;
@@ -11918,8 +11919,9 @@ async function handleSlashCommand(content, ctx) {
   });
 }
 async function loadConfig() {
+  const userId = activeUserId;
   try {
-    const parsed = await spindle.userStorage.getJson(CONFIG_PATH, { fallback: { ...DEFAULT_CONFIG }, userId: activeUserId || undefined });
+    const parsed = await spindle.userStorage.getJson(CONFIG_PATH, { fallback: { ...DEFAULT_CONFIG }, userId: userId || undefined });
     config = {
       trackerTagName: sanitizeTagName(parsed.trackerTagName),
       codeBlockIdentifier: sanitizeIdentifier(parsed.codeBlockIdentifier),
@@ -11940,7 +11942,16 @@ async function loadConfig() {
   } catch {
     config = { ...DEFAULT_CONFIG };
   }
+  loadedConfigUserId = userId;
   pushMacroValues();
+}
+async function ensureConfigForUser(userId) {
+  if (!userId)
+    return;
+  if (activeUserId === userId && loadedConfigUserId === userId)
+    return;
+  activeUserId = userId;
+  await loadConfig();
 }
 async function loadSeededTemplatePresets() {
   const seeded = [];
@@ -12002,9 +12013,15 @@ async function loadSeededTemplatePresets() {
 }
 async function saveConfig() {
   await spindle.userStorage.setJson(CONFIG_PATH, config, { indent: 2, userId: activeUserId || undefined });
+  if (activeUserId) {
+    try {
+      await spindle.userStorage.setJson(CONFIG_PATH, config, { indent: 2 });
+    } catch {}
+  }
 }
-spindle.on("MESSAGE_SENT", (payload) => {
+spindle.on("MESSAGE_SENT", (payload, userId) => {
   (async () => {
+    await ensureConfigForUser(userId);
     const ctx = readMessageContext(payload);
     const message = ctx.content;
     if (typeof message !== "string")
@@ -12031,8 +12048,9 @@ spindle.on("MESSAGE_SENT", (payload) => {
     }
   })();
 });
-spindle.on("MESSAGE_EDITED", (payload) => {
+spindle.on("MESSAGE_EDITED", (payload, userId) => {
   (async () => {
+    await ensureConfigForUser(userId);
     const ctx = readMessageContext(payload);
     if (ctx.chatId)
       activeChatId = ctx.chatId;
@@ -12049,8 +12067,9 @@ spindle.on("MESSAGE_EDITED", (payload) => {
     forgetChatTracker(ctx.chatId, ctx.messageId);
   })();
 });
-spindle.on("MESSAGE_SWIPED", (payload) => {
+spindle.on("MESSAGE_SWIPED", (payload, userId) => {
   (async () => {
+    await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object")
       return;
     const obj = payload;
@@ -12077,8 +12096,9 @@ spindle.on("MESSAGE_SWIPED", (payload) => {
     await trackEvent("sst.swipe.synced", { action, swipeId: typeof obj.swipeId === "number" ? obj.swipeId : null }, { chatId });
   })();
 });
-spindle.on("MESSAGE_TAG_INTERCEPTED", (payload) => {
+spindle.on("MESSAGE_TAG_INTERCEPTED", (payload, userId) => {
   (async () => {
+    await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object")
       return;
     const obj = payload;
@@ -12356,8 +12376,9 @@ ${trackerBlock}`;
     secondaryGenerationInProgress = false;
   }
 }
-spindle.on("GENERATION_STARTED", (payload) => {
+spindle.on("GENERATION_STARTED", (payload, userId) => {
   (async () => {
+    await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object")
       return;
     const obj = payload;
@@ -12368,16 +12389,20 @@ spindle.on("GENERATION_STARTED", (payload) => {
     await rehydrateChatTrackerHistory(chatId);
   })();
 });
-spindle.on("CHAT_CHANGED", (payload) => {
-  if (!payload || typeof payload !== "object")
-    return;
-  const obj = payload;
-  const chatId = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
-  if (chatId)
-    activeChatId = chatId;
-});
-spindle.on("GENERATION_ENDED", (payload) => {
+spindle.on("CHAT_CHANGED", (payload, userId) => {
   (async () => {
+    await ensureConfigForUser(userId);
+    if (!payload || typeof payload !== "object")
+      return;
+    const obj = payload;
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
+    if (chatId)
+      activeChatId = chatId;
+  })();
+});
+spindle.on("GENERATION_ENDED", (payload, userId) => {
+  (async () => {
+    await ensureConfigForUser(userId);
     const ctx = readMessageContext(payload);
     if (ctx.chatId) {
       activeChatId = ctx.chatId;

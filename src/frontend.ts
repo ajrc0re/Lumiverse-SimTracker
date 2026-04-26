@@ -818,6 +818,9 @@ export function setup(ctx: SpindleFrontendContext) {
   let latestTrackerMessageId: string | null = null;
   let latestTrackerRaw: string | null = null;
   let latestTrackerSourceContent: string | null = null;
+  let configReady = false;
+  let pendingTrackerPayload: { raw: string; sourceContent: string; messageId: string | null } | null = null;
+  let initialTrackerRehydrateRequested = false;
   const trackerMessageIds = new Set<string>();
   const trackerMessageMounts = new Map<string, Element>();
   const inlineProcessor = createInlineTemplateProcessor({
@@ -1164,6 +1167,10 @@ export function setup(ctx: SpindleFrontendContext) {
   };
 
   const handleTrackerPayload = (raw: string, sourceContent: string, messageId: string | null = null) => {
+    if (!configReady) {
+      pendingTrackerPayload = { raw, sourceContent, messageId };
+      return;
+    }
     if (messageId) {
       trackerMessageIds.add(messageId);
       latestTrackerMessageId = messageId;
@@ -1222,6 +1229,17 @@ export function setup(ctx: SpindleFrontendContext) {
 
   const persistConfig = () => {
     ctx.sendToBackend({ type: "set_config", config });
+  };
+
+  const requestInitialTrackerRehydrate = () => {
+    if (initialTrackerRehydrateRequested) return;
+    initialTrackerRehydrateRequested = true;
+    try {
+      const active = ctx.getActiveChat();
+      if (active?.chatId) maybeRequestTrackerRehydrate(active.chatId);
+    } catch {
+      // getActiveChat is best-effort; ignore if unavailable.
+    }
   };
 
   const backendUnsub = ctx.onBackendMessage((payload: unknown) => {
@@ -1319,6 +1337,7 @@ export function setup(ctx: SpindleFrontendContext) {
       secondaryLLMTemperature: typeof incoming.secondaryLLMTemperature === "number" ? incoming.secondaryLLMTemperature : DEFAULT_CONFIG.secondaryLLMTemperature,
       secondaryLLMStripHTML: typeof incoming.secondaryLLMStripHTML === "boolean" ? incoming.secondaryLLMStripHTML : DEFAULT_CONFIG.secondaryLLMStripHTML,
     };
+    configReady = true;
     syncControls();
     configTrackerTagNameHint = config.trackerTagName;
     applyHideStyle();
@@ -1330,7 +1349,12 @@ export function setup(ctx: SpindleFrontendContext) {
       handleContent(latestContent);
     } else if (latestTrackerRaw) {
       handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw);
+    } else if (pendingTrackerPayload) {
+      const pending = pendingTrackerPayload;
+      pendingTrackerPayload = null;
+      handleTrackerPayload(pending.raw, pending.sourceContent, pending.messageId);
     }
+    requestInitialTrackerRehydrate();
     inlineProcessor.processAll();
   });
 
@@ -1585,16 +1609,8 @@ export function setup(ctx: SpindleFrontendContext) {
 
   ctx.sendToBackend({ type: "get_config" });
   ctx.sendToBackend({ type: "get_connections" });
-  try {
-    const active = ctx.getActiveChat();
-    if (active?.chatId) maybeRequestTrackerRehydrate(active.chatId);
-  } catch {
-    // getActiveChat is best-effort; ignore if unavailable.
-  }
-  applyHideStyle();
-  applyTagInterceptor();
   updatePermissionGatedControls();
-  setStatus("Ready");
+  setStatus("Loading config...");
   renderEmpty("When a message includes a tracker tag, cards will appear here.");
 
   return () => {

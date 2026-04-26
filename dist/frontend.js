@@ -16825,6 +16825,9 @@ function setup(ctx) {
   let latestTrackerMessageId = null;
   let latestTrackerRaw = null;
   let latestTrackerSourceContent = null;
+  let configReady = false;
+  let pendingTrackerPayload = null;
+  let initialTrackerRehydrateRequested = false;
   const trackerMessageIds = new Set;
   const trackerMessageMounts = new Map;
   const inlineProcessor = createInlineTemplateProcessor({
@@ -17141,6 +17144,10 @@ function setup(ctx) {
     trackerMessageMounts.set(messageId, mount);
   };
   const handleTrackerPayload = (raw, sourceContent, messageId = null) => {
+    if (!configReady) {
+      pendingTrackerPayload = { raw, sourceContent, messageId };
+      return;
+    }
     if (messageId) {
       trackerMessageIds.add(messageId);
       latestTrackerMessageId = messageId;
@@ -17198,6 +17205,16 @@ function setup(ctx) {
   };
   const persistConfig = () => {
     ctx.sendToBackend({ type: "set_config", config });
+  };
+  const requestInitialTrackerRehydrate = () => {
+    if (initialTrackerRehydrateRequested)
+      return;
+    initialTrackerRehydrateRequested = true;
+    try {
+      const active = ctx.getActiveChat();
+      if (active?.chatId)
+        maybeRequestTrackerRehydrate(active.chatId);
+    } catch {}
   };
   const backendUnsub = ctx.onBackendMessage((payload) => {
     const obj = payload;
@@ -17283,6 +17300,7 @@ function setup(ctx) {
       secondaryLLMTemperature: typeof incoming.secondaryLLMTemperature === "number" ? incoming.secondaryLLMTemperature : DEFAULT_CONFIG.secondaryLLMTemperature,
       secondaryLLMStripHTML: typeof incoming.secondaryLLMStripHTML === "boolean" ? incoming.secondaryLLMStripHTML : DEFAULT_CONFIG.secondaryLLMStripHTML
     };
+    configReady = true;
     syncControls();
     configTrackerTagNameHint = config.trackerTagName;
     applyHideStyle();
@@ -17294,7 +17312,12 @@ function setup(ctx) {
       handleContent(latestContent);
     } else if (latestTrackerRaw) {
       handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw);
+    } else if (pendingTrackerPayload) {
+      const pending = pendingTrackerPayload;
+      pendingTrackerPayload = null;
+      handleTrackerPayload(pending.raw, pending.sourceContent, pending.messageId);
     }
+    requestInitialTrackerRehydrate();
     inlineProcessor.processAll();
   });
   const runInlinePass = (messageId) => {
@@ -17529,15 +17552,8 @@ function setup(ctx) {
   });
   ctx.sendToBackend({ type: "get_config" });
   ctx.sendToBackend({ type: "get_connections" });
-  try {
-    const active = ctx.getActiveChat();
-    if (active?.chatId)
-      maybeRequestTrackerRehydrate(active.chatId);
-  } catch {}
-  applyHideStyle();
-  applyTagInterceptor();
   updatePermissionGatedControls();
-  setStatus("Ready");
+  setStatus("Loading config...");
   renderEmpty("When a message includes a tracker tag, cards will appear here.");
   return () => {
     panelRoot = null;
