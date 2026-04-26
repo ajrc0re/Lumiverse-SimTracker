@@ -30,3 +30,4 @@ docs/template-guide-bundled-javascript-dead.md
 .DS_Store
 node_modules/
 AGENTS.md
+extracted/

@@ -9021,7 +9021,7 @@ var pulse_thread_tracker_default = {
     .pt-anal-outline {
         fill: none;
         stroke: color-mix(in srgb, #d946ef 70%, white 30%);
-        stroke-width: 5;
+        stroke-width: 4;
         stroke-linecap: round;
         stroke-linejoin: round;
         opacity: 0.95;
@@ -9049,10 +9049,10 @@ var pulse_thread_tracker_default = {
     }
 
     .pt-prostate {
-        fill: color-mix(in srgb, #f472b6 35%, rgba(255,255,255,0.1));
-        stroke: color-mix(in srgb, #f472b6 60%, rgba(255,255,255,0.15));
-        stroke-width: 1.5;
-        transform-origin: 26px 80px;
+        fill: color-mix(in srgb, #f472b6 45%, rgba(255,255,255,0.1));
+        stroke: color-mix(in srgb, #f472b6 70%, rgba(255,255,255,0.2));
+        stroke-width: 2;
+        transform-origin: 36px 65px;
     }
 
     .pt-prostate.glow {
@@ -9872,27 +9872,30 @@ var pulse_thread_tracker_default = {
                             &lt;svg class=&quot;pt-anal-svg&quot; viewBox=&quot;0 0 100 120&quot; aria-hidden=&quot;true&quot; focusable=&quot;false&quot;&gt;
                                 &lt;defs&gt;
                                     &lt;clipPath id=&quot;pt-anal-clip-{{@index}}&quot;&gt;
-                                        &lt;path d=&quot;M 40 15 C 20 30, 20 80, 45 105 C 48 108, 52 108, 55 105 C 80 80, 80 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
+                                        &lt;!-- Main canal path --&gt;
+                                        &lt;path d=&quot;M 40 15 C 32 30, 24 50, 28 80 C 30 95, 42 105, 45 106 C 48 107, 52 107, 55 106 C 58 105, 70 95, 72 80 C 76 50, 68 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
                                     &lt;/clipPath&gt;
                                     &lt;linearGradient id=&quot;pt-anal-depth-{{@index}}&quot; x1=&quot;0.5&quot; y1=&quot;0&quot; x2=&quot;0.5&quot; y2=&quot;1&quot;&gt;
                                         &lt;stop offset=&quot;0%&quot; stop-color=&quot;#4a044e&quot; stop-opacity=&quot;0.85&quot; /&gt;
                                         &lt;stop offset=&quot;100%&quot; stop-color=&quot;#170123&quot; stop-opacity=&quot;0.95&quot; /&gt;
                                     &lt;/linearGradient&gt;
                                 &lt;/defs&gt;
+                                
+                                &lt;!-- Prostate (anterior wall, nestled inside curve) --&gt;
+                                &lt;path class=&quot;pt-prostate {{#if (gt stats.prostate_stimulation_pct 50)}}glow{{/if}}&quot; d=&quot;M 28 65 C 18 60, 16 75, 22 85 C 28 95, 32 88, 30 75 Z&quot; /&gt;
+
                                 &lt;!-- Outer glow / Outline --&gt;
-                                &lt;path class=&quot;pt-anal-outline&quot; d=&quot;M 40 15 C 20 30, 20 80, 45 105 C 48 108, 52 108, 55 105 C 80 80, 80 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
-                                
-                                &lt;!-- Sphincter (bottom base) --&gt;
-                                &lt;ellipse class=&quot;pt-anal-sphincter&quot; cx=&quot;50&quot; cy=&quot;107&quot; rx=&quot;12&quot; ry=&quot;3.5&quot; /&gt;
-                                
-                                &lt;!-- Prostate (anterior wall, offset left) --&gt;
-                                &lt;path class=&quot;pt-prostate {{#if (gt stats.prostate_stimulation_pct 50)}}glow{{/if}}&quot; d=&quot;M 32 65 C 18 68, 15 90, 38 95 C 32 85, 30 75, 32 65 Z&quot; /&gt;
+                                &lt;path class=&quot;pt-anal-outline&quot; d=&quot;M 40 15 C 32 30, 24 50, 28 80 C 30 95, 42 105, 45 106 C 48 107, 52 107, 55 106 C 58 105, 70 95, 72 80 C 76 50, 68 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
                                 
                                 &lt;!-- Inner cavity with depth gradient --&gt;
-                                &lt;path class=&quot;pt-anal-inner&quot; style=&quot;fill:url(#pt-anal-depth-{{@index}})&quot; d=&quot;M 40 15 C 20 30, 20 80, 45 105 C 48 108, 52 108, 55 105 C 80 80, 80 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
+                                &lt;path class=&quot;pt-anal-inner&quot; style=&quot;fill:url(#pt-anal-depth-{{@index}})&quot; d=&quot;M 40 15 C 32 30, 24 50, 28 80 C 30 95, 42 105, 45 106 C 48 107, 52 107, 55 106 C 58 105, 70 95, 72 80 C 76 50, 68 30, 60 15 C 55 20, 45 20, 40 15 Z&quot; /&gt;
                                 
                                 &lt;!-- Muscular Rugae --&gt;
-                                &lt;path class=&quot;pt-anal-rugae&quot; d=&quot;M 28 35 Q 50 45 72 35 M 24 55 Q 50 68 76 55 M 28 75 Q 50 85 72 75 M 36 92 Q 50 98 64 92&quot; /&gt;
+                                &lt;path class=&quot;pt-anal-rugae&quot; d=&quot;M 32 35 Q 50 42 68 35 M 26 55 Q 50 64 74 55 M 28 75 Q 50 82 72 75 M 34 92 Q 50 96 66 92&quot; /&gt;
+                                
+                                &lt;!-- Sphincter (integrated at bottom) --&gt;
+                                &lt;path class=&quot;pt-anal-sphincter&quot; d=&quot;M 42 105 C 42 110, 58 110, 58 105&quot; /&gt;
+                                &lt;path class=&quot;pt-anal-sphincter&quot; d=&quot;M 40 106 C 40 113, 60 113, 60 106&quot; /&gt;
                                 
                                 &lt;!-- Semen Liquid --&gt;
                                 &lt;g clip-path=&quot;url(#pt-anal-clip-{{@index}})&quot;&gt;
