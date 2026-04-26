@@ -10560,6 +10560,22 @@ var pulse_thread_tracker_default = {
         gap: 8px;
     }
 
+    .pt-male-visuals.pt-futa-accent .pt-vial {
+        background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,122,162,0.05));
+        border-color: rgba(255,122,162,0.18);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 14px 26px rgba(255,92,138,0.18);
+    }
+
+    .pt-male-visuals.pt-futa-accent .pt-vial-fill {
+        background: linear-gradient(180deg, rgba(255,244,250,0.98), rgba(255,196,221,0.96) 55%, rgba(255,160,190,0.94));
+        box-shadow: 0 -8px 18px rgba(255,122,162,0.22);
+    }
+
+    .pt-male-visuals.pt-futa-accent .pt-cooldown-fill {
+        background: linear-gradient(90deg, #ff7aa2, #ffd86b);
+        box-shadow: 0 0 8px rgba(255,122,162,0.28);
+    }
+
     .pt-cooldown-track {
         width: 72px;
         height: 4px;
@@ -11148,7 +11164,7 @@ var pulse_thread_tracker_default = {
 
                 {{#if (hasRefractoryTracking stats)}}
                 &lt;div class=&quot;pt-bio-zone&quot;&gt;
-                    &lt;div class=&quot;pt-male-visuals&quot;&gt;
+                    &lt;div class=&quot;pt-male-visuals {{#if (eq stats.sex &quot;futanari&quot;)}}pt-futa-accent{{/if}}&quot;&gt;
                         &lt;div class=&quot;pt-vial&quot;&gt;
                             &lt;div class=&quot;pt-vial-chamber&quot;&gt;
                                 &lt;div class=&quot;pt-vial-fill&quot; style=&quot;height: {{semenPercent stats}}%&quot;&gt;&lt;/div&gt;
