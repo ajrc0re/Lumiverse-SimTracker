@@ -8774,7 +8774,7 @@ var pulse_thread_tracker_default = {
 
     .pt-bio-zone {
         display: grid;
-        grid-template-columns: 120px minmax(0, 1fr);
+        grid-template-columns: 140px minmax(0, 1fr);
         align-items: center;
         gap: 14px;
         padding: 14px 16px;
@@ -8808,8 +8808,8 @@ var pulse_thread_tracker_default = {
 
     /* --- FEMALE: Fertility / Womb Dial --- */
     .pt-fertility-ring {
-        width: 96px;
-        height: 96px;
+        width: 120px;
+        height: 120px;
         border-radius: 50%;
         position: relative;
         flex-shrink: 0;
@@ -8820,14 +8820,14 @@ var pulse_thread_tracker_default = {
             var(--cy-lut) 206deg 309deg,
             var(--cy-men) 309deg 360deg
         );
-        padding: 5px;
+        padding: 6px;
         box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px rgba(0,0,0,0.45);
     }
 
     .pt-fertility-ring::before {
         content: &#039;&#039;;
         position: absolute;
-        inset: 8px;
+        inset: 10px;
         border-radius: 50%;
         background:
             radial-gradient(circle at 50% 42%, rgba(255,255,255,0.08), transparent 38%),
@@ -8844,7 +8844,7 @@ var pulse_thread_tracker_default = {
 
     .pt-fertility-core {
         position: absolute;
-        inset: 22px;
+        inset: 28px;
         border-radius: 50%;
         z-index: 2;
         background:
@@ -8857,15 +8857,15 @@ var pulse_thread_tracker_default = {
     .pt-fertility-core::after {
         content: &#039;&#039;;
         position: absolute;
-        inset: 11px;
+        inset: 14px;
         border-radius: 50%;
         background: radial-gradient(circle, color-mix(in srgb, var(--cycle-accent, var(--cy-fol)) 32%, rgba(255,255,255,0.12)) 0%, transparent 70%);
         opacity: 0.9;
     }
 
     .pt-womb-vessel {
-        width: 120px;
-        height: 140px;
+        width: 140px;
+        height: 160px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -8882,11 +8882,11 @@ var pulse_thread_tracker_default = {
     .pt-womb-outline {
         fill: none;
         stroke: color-mix(in srgb, var(--cycle-accent, var(--cy-fol)) 70%, white 30%);
-        stroke-width: 4;
+        stroke-width: 5;
         stroke-linecap: round;
         stroke-linejoin: round;
         opacity: 0.95;
-        filter: drop-shadow(0 0 4px color-mix(in srgb, var(--cycle-accent, var(--cy-fol)) 35%, transparent));
+        filter: drop-shadow(0 0 5px color-mix(in srgb, var(--cycle-accent, var(--cy-fol)) 35%, transparent));
     }
 
     .pt-womb-inner {
@@ -8932,13 +8932,13 @@ var pulse_thread_tracker_default = {
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 7px;
-        height: 7px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         background: #fff;
         box-shadow: 0 0 8px currentColor;
         z-index: 4;
-        transform: translate(-50%, -50%) rotate(var(--marker-deg)) translateY(-42px);
+        transform: translate(-50%, -50%) rotate(var(--marker-deg)) translateY(-54px);
         transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
 
@@ -8953,13 +8953,13 @@ var pulse_thread_tracker_default = {
 
     .pt-fertility-label {
         position: absolute;
-        inset: 12px;
+        inset: 15px;
         border-radius: 50%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-size: 0.52rem;
+        font-size: 0.6rem;
         font-weight: 700;
         color: var(--pt-txt-dim);
         z-index: 3;
@@ -8970,14 +8970,14 @@ var pulse_thread_tracker_default = {
 
     .pt-fertility-label strong {
         color: var(--pt-txt);
-        font-size: 1.05rem;
+        font-size: 1.15rem;
         line-height: 1;
         letter-spacing: -0.5px;
     }
 
     .pt-fertility-label span {
         margin-top: 2px;
-        font-size: 0.5rem;
+        font-size: 0.55rem;
     }
 
     .pt-womb-meter,
@@ -9003,8 +9003,8 @@ var pulse_thread_tracker_default = {
 
     /* --- MALE: Anal &amp; Prostate Vessel --- */
     .pt-anal-vessel {
-        width: 120px;
-        height: 140px;
+        width: 140px;
+        height: 160px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -9021,11 +9021,11 @@ var pulse_thread_tracker_default = {
     .pt-anal-outline {
         fill: none;
         stroke: color-mix(in srgb, #e67e22 70%, white 30%);
-        stroke-width: 4;
+        stroke-width: 5;
         stroke-linecap: round;
         stroke-linejoin: round;
         opacity: 0.95;
-        filter: drop-shadow(0 0 4px color-mix(in srgb, #e67e22 35%, transparent));
+        filter: drop-shadow(0 0 5px color-mix(in srgb, #e67e22 35%, transparent));
     }
 
     .pt-anal-inner {
@@ -9088,8 +9088,8 @@ var pulse_thread_tracker_default = {
     /* --- MALE: Semen / Refractory Penis --- */
     .pt-penis-container {
         position: relative;
-        width: 110px;
-        height: 140px;
+        width: 120px;
+        height: 150px;
         display: flex;
         align-items: center;
         justify-content: center;
