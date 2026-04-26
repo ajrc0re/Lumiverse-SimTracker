@@ -138,10 +138,17 @@ function hasFemaleBiology(stats: unknown): boolean {
   return (
     ["female", "futanari", "futa", "both", "intersex", "hermaphrodite"].includes(sex) ||
     record.preg === true ||
+    record.conceived === true ||
     Number(record.cycle_day) > 0 ||
     Number(record.womb_fullness_pct) > 0 ||
     ["pregnancy", "ovulation", "menstruation", "follicular", "luteal"].includes(stage)
   );
+}
+
+function isConceived(stats: unknown): boolean {
+  if (!stats || typeof stats !== "object" || Array.isArray(stats)) return false;
+  const record = stats as Record<string, unknown>;
+  return record.conceived === true && record.preg !== true;
 }
 
 function clampPercent(value: unknown): number {
@@ -656,6 +663,7 @@ function registerTemplateHelpers(): void {
   Handlebars.registerHelper("hasRefractoryTracking", hasMaleBiology);
   Handlebars.registerHelper("hasMaleBiology", hasMaleBiology);
   Handlebars.registerHelper("hasFemaleBiology", hasFemaleBiology);
+  Handlebars.registerHelper("isConceived", isConceived);
   Handlebars.registerHelper("clampPercent", clampPercent);
   Handlebars.registerHelper("percentOf", percentOf);
   Handlebars.registerHelper("maleFertilityLabel", maleFertilityLabel);

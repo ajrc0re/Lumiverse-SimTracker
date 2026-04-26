@@ -69,6 +69,25 @@ type TrackerHistoryEntry = { messageId: string; payload: string };
 const chatTrackerHistory = new Map<string, TrackerHistoryEntry[]>();
 const rehydratedChats = new Set<string>();
 
+/**
+ * Tracks which (chatId, characterName) pairs have already received a
+ * conception notice so we don't spam the same directive repeatedly.
+ * Cleared when the character is explicitly marked `conceived: true` or
+ * `preg: true` in a subsequent tracker payload.
+ */
+const conceptionNotified = new Set<string>();
+
+/**
+ * Conception-gate config.  Threshold is the minimum womb fullness % that
+ * triggers the coin-flip (or auto-pass at 100 %).  Only applies when
+ * cycle_stage is "ovulation" and the character is not already conceived
+ * or pregnant.
+ */
+const CONCEPTION_CONFIG = {
+  threshold: 80,
+  autoAt: 100,
+};
+
 type MessageContext = {
   chatId: string | null;
   messageId: string | null;
@@ -394,6 +413,91 @@ function getRecentChatTrackers(
     : history.slice();
   if (filtered.length <= limit) return filtered;
   return filtered.slice(filtered.length - limit);
+}
+
+type CharacterStats = Record<string, unknown>;
+
+function getCharactersFromPayload(payload: Record<string, unknown>): CharacterStats[] {
+  const chars = payload.characters;
+  if (!Array.isArray(chars)) return [];
+  return chars.filter((c): c is CharacterStats => c && typeof c === "object" && !Array.isArray(c));
+}
+
+function isFemaleOrFuta(stats: CharacterStats): boolean {
+  const sex = String(stats.sex || "").toLowerCase();
+  return ["female", "futanari", "futa", "both", "intersex", "hermaphrodite"].includes(sex);
+}
+
+function isOvulating(stats: CharacterStats): boolean {
+  const stage = String(stats.cycle_stage || "").toLowerCase();
+  const stageId = Number(stats.cycle_stage_id || 0);
+  return stage === "ovulation" || stageId === 3;
+}
+
+function isAlreadyConceivedOrPregnant(stats: CharacterStats): boolean {
+  return stats.preg === true || stats.conceived === true || stats.conception_date === true;
+}
+
+function coinFlip(): boolean {
+  return Math.random() < 0.5;
+}
+
+/**
+ * Inspect the most recent tracker payload for a chat and decide whether
+ * any female character should receive a conception nudge.  Returns an
+ * array of character names that triggered this turn.
+ *
+ * Rules:
+ *   - Character must be female/futa, ovulating, not already conceived/pregnant.
+ *   - womb_fullness_pct must be > threshold (default 80).
+ *   - If fullness == autoAt (default 100) the nudge is automatic.
+ *   - If threshold < fullness < autoAt, a coin flip decides.
+ *   - Once a (chatId, name) pair has been notified, it won't be notified
+ *     again until the character is explicitly marked conceived/pregnant
+ *     in a tracker payload (which clears the flag).
+ */
+function checkConceptionTriggers(chatId: string | null, payload: Record<string, unknown>): string[] {
+  if (!chatId) return [];
+  const characters = getCharactersFromPayload(payload);
+  const triggered: string[] = [];
+
+  for (const stats of characters) {
+    if (!isFemaleOrFuta(stats)) continue;
+    if (!isOvulating(stats)) continue;
+    if (isAlreadyConceivedOrPregnant(stats)) {
+      // Clear any stale notification lock since she's now officially flagged
+      const key = `${chatId}::${stats.name}`;
+      if (conceptionNotified.has(key)) conceptionNotified.delete(key);
+      continue;
+    }
+
+    const fullness = Number(stats.womb_fullness_pct);
+    if (!Number.isFinite(fullness) || fullness <= CONCEPTION_CONFIG.threshold) continue;
+
+    const key = `${chatId}::${stats.name}`;
+    if (conceptionNotified.has(key)) continue;
+
+    const shouldTrigger = fullness >= CONCEPTION_CONFIG.autoAt || coinFlip();
+    if (shouldTrigger) {
+      conceptionNotified.add(key);
+      triggered.push(String(stats.name || "Unknown"));
+    }
+  }
+
+  return triggered;
+}
+
+/**
+ * Build a concise system-message directive that tells the LLM which
+ * characters have had their seed take root.  The LLM is expected to
+ * respond by setting `conceived: true` (and optionally `conception_date`)
+ * on the next tracker emission.
+ */
+function buildConceptionDirective(names: string[]): string {
+  if (names.length === 0) return "";
+  const subject = names.length === 1 ? names[0] : names.join(", ");
+  const verb = names.length === 1 ? "has" : "have";
+  return `CONCEPTION DIRECTIVE: ${subject} ${verb} conceived. Update the next tracker to mark ${names.length === 1 ? "her" : "them"} as "conceived": true (and set "conception_date" to today's date). Do NOT set "preg": true yet; that transition happens later.`;
 }
 
 function parseTrackerPayload(raw: string): Record<string, unknown> | null {
@@ -1724,6 +1828,15 @@ function tryRegisterInterceptor(): void {
 
       const block = buildTrackerInjectionBlock(history);
 
+      // ── Conception gate ───────────────────────────────────────────────
+      // Check the very latest tracker for characters that are ovulating
+      // with high womb fullness. If the coin-flip (or auto-at-100%)
+      // condition is met, inject a directive telling the LLM to mark
+      // them as conceived on the next tracker emission.
+      const latestPayload = parseTrackerPayload(history[history.length - 1].payload);
+      const conceptionNames = latestPayload ? checkConceptionTriggers(chatId, latestPayload) : [];
+      const conceptionDirective = buildConceptionDirective(conceptionNames);
+
       // Prefer appending to the last assistant message in the array so the
       // tracker appears exactly where the LLM would normally have emitted
       // it in its previous turn. Fall back to synthesising a trailing
@@ -1746,6 +1859,9 @@ function tryRegisterInterceptor(): void {
           ...target,
           content: base ? `${base}\n\n${block}` : block,
         };
+        if (conceptionDirective) {
+          injected.splice(injected.length - 1, 0, { role: "system", content: conceptionDirective });
+        }
         return injected;
       }
 
@@ -1754,6 +1870,9 @@ function tryRegisterInterceptor(): void {
       const injected = retained.slice();
       const insertAt = Math.max(0, injected.length - 1);
       injected.splice(insertAt, 0, { role: "system", content: block });
+      if (conceptionDirective) {
+        injected.splice(insertAt + 1, 0, { role: "system", content: conceptionDirective });
+      }
       return injected;
     }, 90);
     interceptorRegistered = true;
