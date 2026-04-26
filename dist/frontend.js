@@ -8490,19 +8490,19 @@ var pulse_thread_tracker_default = {
   templateName: "Pulse Thread Tracker",
   templateAuthor: "Lumiverse Assistant",
   templatePosition: "BOTTOM",
-  htmlTemplate: `<!-- TEMPLATE NAME: Pulse Thread Tracker -->
-<!-- AUTHOR: Lumiverse Assistant -->
-<!-- POSITION: BOTTOM -->
-<!-- TABS_TYPE: toggle -->
-<!-- sim-tracker-tabs bottom-mounted tabbed variant -->
+  htmlTemplate: `&lt;!-- TEMPLATE NAME: Pulse Thread Tracker --&gt;
+&lt;!-- AUTHOR: Lumiverse Assistant --&gt;
+&lt;!-- POSITION: BOTTOM --&gt;
+&lt;!-- TABS_TYPE: toggle --&gt;
+&lt;!-- sim-tracker-tabs bottom-mounted tabbed variant --&gt;
 
-<!-- CARD_TEMPLATE_START -->
-<style>
+&lt;!-- CARD_TEMPLATE_START --&gt;
+&lt;style&gt;
     /* =========================================
-       PULSE THREAD TABBED: CONTAINER & VARS
+       PULSE THREAD TABBED: CONTAINER &amp; VARS
        ========================================= */
     .pulse-tabbed-root {
-        --pt-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --pt-font: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif;
         --pt-bg-deep: rgba(12, 12, 22, 0.82);
         --pt-bg-glass: rgba(30, 28, 48, 0.65);
         --pt-border: rgba(255, 255, 255, 0.10);
@@ -8619,7 +8619,7 @@ var pulse_thread_tracker_default = {
     }
 
     /* =========================================
-       CARD VIEWPORT & PAGES
+       CARD VIEWPORT &amp; PAGES
        ========================================= */
     .pt-viewport {
         padding: 14px 18px 18px 18px;
@@ -8635,12 +8635,12 @@ var pulse_thread_tracker_default = {
         to { opacity: 1; transform: translateY(0); }
     }
 
-    .pt-char-radio:nth-of-type(1):checked ~ .pt-viewport .pt-page[data-index="0"],
-    .pt-char-radio:nth-of-type(2):checked ~ .pt-viewport .pt-page[data-index="1"],
-    .pt-char-radio:nth-of-type(3):checked ~ .pt-viewport .pt-page[data-index="2"],
-    .pt-char-radio:nth-of-type(4):checked ~ .pt-viewport .pt-page[data-index="3"],
-    .pt-char-radio:nth-of-type(5):checked ~ .pt-viewport .pt-page[data-index="4"],
-    .pt-char-radio:nth-of-type(6):checked ~ .pt-viewport .pt-page[data-index="5"] {
+    .pt-char-radio:nth-of-type(1):checked ~ .pt-viewport .pt-page[data-index=&quot;0&quot;],
+    .pt-char-radio:nth-of-type(2):checked ~ .pt-viewport .pt-page[data-index=&quot;1&quot;],
+    .pt-char-radio:nth-of-type(3):checked ~ .pt-viewport .pt-page[data-index=&quot;2&quot;],
+    .pt-char-radio:nth-of-type(4):checked ~ .pt-viewport .pt-page[data-index=&quot;3&quot;],
+    .pt-char-radio:nth-of-type(5):checked ~ .pt-viewport .pt-page[data-index=&quot;4&quot;],
+    .pt-char-radio:nth-of-type(6):checked ~ .pt-viewport .pt-page[data-index=&quot;5&quot;] {
         display: block;
     }
 
@@ -8773,7 +8773,7 @@ var pulse_thread_tracker_default = {
     }
 
     .pt-fertility-ring::before {
-        content: '';
+        content: &#039;&#039;;
         position: absolute;
         inset: 4px;
         border-radius: 50%;
@@ -8846,7 +8846,7 @@ var pulse_thread_tracker_default = {
     }
 
     .pt-refractory-arc::before {
-        content: '';
+        content: &#039;&#039;;
         position: absolute;
         inset: 4px;
         border-radius: 50%;
@@ -9007,7 +9007,7 @@ var pulse_thread_tracker_default = {
     }
 
     .pt-track-fill::after {
-        content: '';
+        content: &#039;&#039;;
         position: absolute;
         top: 0;
         right: 0;
@@ -9091,117 +9091,216 @@ var pulse_thread_tracker_default = {
     .risk-low-text { color: var(--cy-fol); }
     .risk-high-text { color: var(--cy-ovu); }
     .risk-med-text { color: var(--cy-lut); }
-</style>
 
-<div class="pulse-tabbed-root sim-tracker-tabs">
-    <!-- Hidden radios -->
-    {{#each characters}}
-    <input type="radio" name="pt-char" id="pt-char-{{@index}}" class="pt-char-radio" {{#if @first}}checked{{/if}}>
-    {{/each}}
+    /* =========================================
+       ROOT COLLAPSE BAR
+       ========================================= */
+    .pt-root-toggle {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+        width: 0;
+        height: 0;
+    }
 
-    <!-- Tab bar -->
-    <div class="pt-tab-bar">
-        {{#each characters}}
-        <label class="pt-tab" for="pt-char-{{@index}}" style="{{#if bgColor}}background: {{adjustColorBrightness bgColor 15}}; border-color: {{adjustColorBrightness bgColor 30}};{{/if}}">
-            <div class="pt-tab-avatar" style="{{#if bgColor}}background: linear-gradient(145deg, {{adjustColorBrightness bgColor 60}} 0%, {{adjustColorBrightness darkerBgColor 50}} 100%);{{/if}} color: #fff;">
-                {{initials characterName}}
-            </div>
-            <div class="pt-tab-name">{{characterName}}</div>
-        </label>
-        {{/each}}
-    </div>
+    .pt-root-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.3s ease;
+    }
 
-    <!-- Viewport -->
-    <div class="pt-viewport">
-        {{#each characters}}
-        <div class="pt-page" data-index="{{@index}}" style="{{#if bgColor}}--marker-deg: {{multiply (subtract stats.cycle_day 1) 12.86}}deg; --ref-angle: {{divide (multiply stats.refractory_minutes 180) stats.refractory_total}}deg;{{/if}}">
+    .pt-root-bar::after {
+        content: &#039;&#039;;
+        position: absolute;
+        bottom: 0;
+        left: 10%;
+        width: 80%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(201, 166, 255, 0.2), transparent);
+        opacity: 0.4;
+        animation: barPulse 3s ease-in-out infinite;
+    }
 
-            <!-- Header Row -->
-            <div class="pt-card-header">
-                <div class="pt-header-avatar" style="{{#if bgColor}}background: linear-gradient(145deg, {{adjustColorBrightness bgColor 50}} 0%, {{adjustColorBrightness darkerBgColor 40}} 100%);{{/if}} color: #fff;">
-                    {{rawFirstLetter characterName}}
-                </div>
-                <div class="pt-header-info">
-                    <h3>{{characterName}}</h3>
-                    <div class="pt-header-meta">{{currentDate}} • Day {{stats.days_since_first_meeting}}</div>
-                </div>
-                <div class="pt-header-badges">
-                    <div class="pt-badge-dot {{#if (gt stats.ap 0)}}" style="background: var(--pt-aff); box-shadow: 0 0 4px var(--pt-aff);"{{else}}" style="background: rgba(255,255,255,0.1);"{{/if}}></div>
-                    <div class="pt-badge-dot {{#if (gt stats.dp 0)}}" style="background: var(--pt-des); box-shadow: 0 0 4px var(--pt-des);"{{else}}" style="background: rgba(255,255,255,0.1);"{{/if}}></div>
-                    <div class="pt-badge-dot {{#if (gt stats.tp 0)}}" style="background: var(--pt-tru); box-shadow: 0 0 4px var(--pt-tru);"{{else}}" style="background: rgba(255,255,255,0.1);"{{/if}}></div>
+    .pt-root-toggle:checked ~ .pt-root-bar {
+        border-bottom-color: rgba(255,255,255,0.06);
+    }
 
-                    <!-- Biological mini -->
-                    {{#if (eq stats.sex "female")}}
-                        {{#if (eq stats.cycle_stage "ovulation")}}
-                            <div class="pt-bio-mini" style="background: var(--cy-ovu); box-shadow: 0 0 6px var(--cy-ovu);" title="Ovulating">⚡</div>
-                        {{else if (eq stats.cycle_stage "menstruation")}}
-                            <div class="pt-bio-mini" style="background: var(--cy-men);" title="Period">●</div>
-                        {{else if (eq stats.cycle_stage "pregnancy")}}
-                            <div class="pt-bio-mini" style="background: var(--cy-preg);" title="Pregnant">★</div>
-                        {{else}}
-                            <div class="pt-bio-mini" style="background: rgba(255,255,255,0.08);" title="Normal cycle">○</div>
-                        {{/if}}
-                    {{else if (eq stats.sex "male")}}
-                        {{#if (gt stats.refractory_minutes 0)}}
-                            <div class="pt-bio-mini" style="background: var(--pt-des);" title="Refractory">🔥</div>
-                        {{else}}
-                            <div class="pt-bio-mini" style="background: var(--pt-accent);" title="Ready">✦</div>
-                        {{/if}}
-                    {{/if}}
-                </div>
-            </div>
+    .pt-root-summary {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--pt-txt-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        z-index: 1;
+    }
 
-            <!-- Monologue -->
-            <div class="pt-mono">
-                <span class="pt-mono-tag">Current Thought</span>
-                <p>"{{stats.internal_thought}}"</p>
-            </div>
+    .pt-root-summary .pt-accent-text {
+        color: var(--pt-accent);
+        font-weight: 700;
+    }
 
-            <!-- Biological -->
-            {{#if (eq stats.sex "female")}}
-            <div class="pt-bio-zone">
-                <div class="pt-fertility-ring">
-                    <div class="pt-fertility-marker {{#if (eq stats.cycle_stage "ovulation")}}ovulation-glow{{/if}}"
-                         style="color: {{#if (eq stats.cycle_stage "ovulation")}}var(--cy-ovu){{else if (eq stats.cycle_stage "menstruation")}}var(--cy-men){{else if (eq stats.cycle_stage "follicular")}}var(--cy-fol){{else if (eq stats.cycle_stage "luteal")}}var(--cy-lut){{else}}var(--cy-preg){{/if}};"></div>
-                    <div class="pt-fertility-label">Day {{stats.cycle_day}}</div>
-                </div>
-                <div class="pt-bio-text">
-                    <h4>Fertility Cycle</h4>
-                    <p>
-                        {{#if (eq stats.cycle_stage "pregnancy")}}
+    .pt-root-chevron {
+        opacity: 0.4;
+        transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        z-index: 1;
+    }
+
+    .pt-root-toggle:checked ~ .pt-root-bar .pt-root-chevron {
+        transform: rotate(180deg);
+        opacity: 1;
+    }
+
+    .pt-root-body {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+        will-change: max-height;
+    }
+
+    .pt-root-toggle:checked ~ .pt-root-body {
+        max-height: 2400px;
+    }
+
+    .pt-root-inner {
+        opacity: 0;
+        transform: translate3d(0, -10px, 0);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .pt-root-toggle:checked ~ .pt-root-body .pt-root-inner {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+        transition-delay: 0.1s;
+    }
+
+    /* Subtle page meta line */
+    .pt-page-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        font-size: 0.62rem;
+        color: var(--pt-txt-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        font-weight: 600;
+    }
+
+    .pt-page-meta .pt-dot-sep {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.15);
+    }
+&lt;/style&gt;
+
+&lt;div class=&quot;pulse-tabbed-root sim-tracker-tabs&quot;&gt;
+    &lt;input type=&quot;checkbox&quot; id=&quot;pt-root-toggle&quot; class=&quot;pt-root-toggle&quot; checked&gt;
+
+    &lt;!-- Collapse bar: global summary --&gt;
+    &lt;label for=&quot;pt-root-toggle&quot; class=&quot;pt-root-bar&quot;&gt;
+        &lt;div class=&quot;pt-root-summary&quot;&gt;
+            &lt;span class=&quot;pt-accent-text&quot;&gt;{{characters.length}} Tracking&lt;/span&gt;
+            &lt;span&gt;•&lt;/span&gt;
+            &lt;span&gt;{{currentDate}}&lt;/span&gt;
+            {{#if currentTime}}&lt;span&gt;•&lt;/span&gt;&lt;span&gt;{{currentTime}}&lt;/span&gt;{{/if}}
+        &lt;/div&gt;
+        &lt;div class=&quot;pt-root-chevron&quot;&gt;
+            &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;&gt;&lt;polyline points=&quot;6 9 12 15 18 9&quot;/&gt;&lt;/svg&gt;
+        &lt;/div&gt;
+    &lt;/label&gt;
+
+    &lt;div class=&quot;pt-root-body&quot;&gt;
+        &lt;div class=&quot;pt-root-inner&quot;&gt;
+
+            &lt;!-- Hidden radios --&gt;
+            {{#each characters}}
+            &lt;input type=&quot;radio&quot; name=&quot;pt-char&quot; id=&quot;pt-char-{{@index}}&quot; class=&quot;pt-char-radio&quot; {{#if @first}}checked{{/if}}&gt;
+            {{/each}}
+
+            &lt;!-- Tab bar --&gt;
+            &lt;div class=&quot;pt-tab-bar&quot;&gt;
+                {{#each characters}}
+                &lt;label class=&quot;pt-tab&quot; for=&quot;pt-char-{{@index}}&quot; style=&quot;{{#if bgColor}}background: {{adjustColorBrightness bgColor 15}}; border-color: {{adjustColorBrightness bgColor 30}};{{/if}}&quot;&gt;
+                    &lt;div class=&quot;pt-tab-avatar&quot; style=&quot;{{#if bgColor}}background: linear-gradient(145deg, {{adjustColorBrightness bgColor 60}} 0%, {{adjustColorBrightness darkerBgColor 50}} 100%);{{/if}} color: #fff;&quot;&gt;
+                        {{initials characterName}}
+                    &lt;/div&gt;
+                    &lt;div class=&quot;pt-tab-name&quot;&gt;{{characterName}}&lt;/div&gt;
+                &lt;/label&gt;
+                {{/each}}
+            &lt;/div&gt;
+
+            &lt;!-- Viewport --&gt;
+            &lt;div class=&quot;pt-viewport&quot;&gt;
+                {{#each characters}}
+                &lt;div class=&quot;pt-page&quot; data-index=&quot;{{@index}}&quot; style=&quot;{{#if bgColor}}--marker-deg: {{multiply (subtract stats.cycle_day 1) 12.86}}deg; --ref-angle: {{divide (multiply stats.refractory_minutes 180) stats.refractory_total}}deg;{{/if}}&quot;&gt;
+
+                    &lt;!-- Subtle meta line replacing the old big header --&gt;
+                    &lt;div class=&quot;pt-page-meta&quot;&gt;
+                        &lt;span&gt;Day {{stats.days_since_first_meeting}}&lt;/span&gt;
+                        {{#if stats.inactive}}&lt;span class=&quot;pt-dot-sep&quot;&gt;&lt;/span&gt;&lt;span style=&quot;color:#888&quot;&gt;Inactive&lt;/span&gt;{{/if}}
+                    &lt;/div&gt;
+
+            &lt;!-- Monologue --&gt;
+            &lt;div class=&quot;pt-mono&quot;&gt;
+                &lt;span class=&quot;pt-mono-tag&quot;&gt;Current Thought&lt;/span&gt;
+                &lt;p&gt;&quot;{{stats.internal_thought}}&quot;&lt;/p&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Biological --&gt;
+            {{#if (eq stats.sex &quot;female&quot;)}}
+            &lt;div class=&quot;pt-bio-zone&quot;&gt;
+                &lt;div class=&quot;pt-fertility-ring&quot;&gt;
+                    &lt;div class=&quot;pt-fertility-marker {{#if (eq stats.cycle_stage &quot;ovulation&quot;)}}ovulation-glow{{/if}}&quot;
+                         style=&quot;color: {{#if (eq stats.cycle_stage &quot;ovulation&quot;)}}var(--cy-ovu){{else if (eq stats.cycle_stage &quot;menstruation&quot;)}}var(--cy-men){{else if (eq stats.cycle_stage &quot;follicular&quot;)}}var(--cy-fol){{else if (eq stats.cycle_stage &quot;luteal&quot;)}}var(--cy-lut){{else}}var(--cy-preg){{/if}};&quot;&gt;&lt;/div&gt;
+                    &lt;div class=&quot;pt-fertility-label&quot;&gt;Day {{stats.cycle_day}}&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;pt-bio-text&quot;&gt;
+                    &lt;h4&gt;Fertility Cycle&lt;/h4&gt;
+                    &lt;p&gt;
+                        {{#if (eq stats.cycle_stage &quot;pregnancy&quot;)}}
                             Pregnant — Day {{stats.days_preg}}
-                        {{else if (eq stats.cycle_stage "menstruation")}}
+                        {{else if (eq stats.cycle_stage &quot;menstruation&quot;)}}
                             Menstruation phase. Pregnancy risk: minimal.
-                        {{else if (eq stats.cycle_stage "follicular")}}
+                        {{else if (eq stats.cycle_stage &quot;follicular&quot;)}}
                             Follicular phase. Egg maturing; risk rising gradually.
-                        {{else if (eq stats.cycle_stage "ovulation")}}
-                            <span class="risk-high-text">PEAK FERTILITY</span>. Ovulation window active. Highest conception risk.
-                        {{else if (eq stats.cycle_stage "luteal")}}
+                        {{else if (eq stats.cycle_stage &quot;ovulation&quot;)}}
+                            &lt;span class=&quot;risk-high-text&quot;&gt;PEAK FERTILITY&lt;/span&gt;. Ovulation window active. Highest conception risk.
+                        {{else if (eq stats.cycle_stage &quot;luteal&quot;)}}
                             Luteal phase post-ovulation. Risk declining but viable until next cycle.
                         {{else}}
                             Cycle stage unclear.
                         {{/if}}
-                    </p>
-                    {{#if (eq stats.cycle_stage "ovulation")}}
-                        <span class="pt-risk-badge risk-high">🔥 High Risk</span>
-                    {{else if (eq stats.cycle_stage "luteal")}}
-                        <span class="pt-risk-badge risk-med">~ Medium Risk</span>
-                    {{else if (eq stats.cycle_stage "pregnancy")}}
-                        <span class="pt-risk-badge risk-preg">🤰 Pregnant</span>
+                    &lt;/p&gt;
+                    {{#if (eq stats.cycle_stage &quot;ovulation&quot;)}}
+                        &lt;span class=&quot;pt-risk-badge risk-high&quot;&gt;🔥 High Risk&lt;/span&gt;
+                    {{else if (eq stats.cycle_stage &quot;luteal&quot;)}}
+                        &lt;span class=&quot;pt-risk-badge risk-med&quot;&gt;~ Medium Risk&lt;/span&gt;
+                    {{else if (eq stats.cycle_stage &quot;pregnancy&quot;)}}
+                        &lt;span class=&quot;pt-risk-badge risk-preg&quot;&gt;🤰 Pregnant&lt;/span&gt;
                     {{else}}
-                        <span class="pt-risk-badge risk-low">✓ Low Risk</span>
+                        &lt;span class=&quot;pt-risk-badge risk-low&quot;&gt;✓ Low Risk&lt;/span&gt;
                     {{/if}}
-                </div>
-            </div>
+                &lt;/div&gt;
+            &lt;/div&gt;
             {{/if}}
 
-            {{#if (eq stats.sex "male")}}
-            <div class="pt-bio-zone">
-                <div class="pt-refractory-gauge">
-                    <div class="pt-refractory-arc"></div>
-                    <div class="pt-refractory-center">
-                        <div class="ref-icon">{{#if (gt stats.refractory_minutes 0)}}🔥{{else}}✦{{/if}}</div>
-                        <div class="ref-time {{#if (gt stats.refractory_minutes 0)}}ref-cool{{else}}ref-ready{{/if}}">
+            {{#if (eq stats.sex &quot;male&quot;)}}
+            &lt;div class=&quot;pt-bio-zone&quot;&gt;
+                &lt;div class=&quot;pt-refractory-gauge&quot;&gt;
+                    &lt;div class=&quot;pt-refractory-arc&quot;&gt;&lt;/div&gt;
+                    &lt;div class=&quot;pt-refractory-center&quot;&gt;
+                        &lt;div class=&quot;ref-icon&quot;&gt;{{#if (gt stats.refractory_minutes 0)}}🔥{{else}}✦{{/if}}&lt;/div&gt;
+                        &lt;div class=&quot;ref-time {{#if (gt stats.refractory_minutes 0)}}ref-cool{{else}}ref-ready{{/if}}&quot;&gt;
                             {{#if (gt stats.refractory_minutes 60)}}
                                 {{divideRoundUp stats.refractory_minutes 60}}h
                             {{else if (gt stats.refractory_minutes 0)}}
@@ -9209,13 +9308,13 @@ var pulse_thread_tracker_default = {
                             {{else}}
                                 Ready
                             {{/if}}
-                        </div>
-                    </div>
-                    <div class="pt-refractory-label">Cooldown</div>
-                </div>
-                <div class="pt-bio-text">
-                    <h4>Refractory Status</h4>
-                    <p>
+                        &lt;/div&gt;
+                    &lt;/div&gt;
+                    &lt;div class=&quot;pt-refractory-label&quot;&gt;Cooldown&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;pt-bio-text&quot;&gt;
+                    &lt;h4&gt;Refractory Status&lt;/h4&gt;
+                    &lt;p&gt;
                         {{#if (gt stats.refractory_minutes 60)}}
                             Resting phase. Estimated recovery in ~{{divideRoundUp stats.refractory_minutes 60}} hours.
                         {{else if (gt stats.refractory_minutes 0)}}
@@ -9223,134 +9322,137 @@ var pulse_thread_tracker_default = {
                         {{else}}
                             Fully recovered and responsive.
                         {{/if}}
-                    </p>
+                    &lt;/p&gt;
                     {{#if (gt stats.refractory_minutes 0)}}
-                        <span class="pt-risk-badge risk-med">⏳ Recovery</span>
+                        &lt;span class=&quot;pt-risk-badge risk-med&quot;&gt;⏳ Recovery&lt;/span&gt;
                     {{else}}
-                        <span class="pt-risk-badge risk-low">✓ Ready</span>
+                        &lt;span class=&quot;pt-risk-badge risk-low&quot;&gt;✓ Ready&lt;/span&gt;
                     {{/if}}
-                </div>
-            </div>
+                &lt;/div&gt;
+            &lt;/div&gt;
             {{/if}}
 
-            <!-- Stats -->
-            <div class="pt-stats-grid">
-                <div class="pt-stat-row">
-                    <div class="pt-stat-icon">
-                        <svg viewBox="0 0 24 24" fill="var(--pt-aff)"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            &lt;!-- Stats --&gt;
+            &lt;div class=&quot;pt-stats-grid&quot;&gt;
+                &lt;div class=&quot;pt-stat-row&quot;&gt;
+                    &lt;div class=&quot;pt-stat-icon&quot;&gt;
+                        &lt;svg viewBox=&quot;0 0 24 24&quot; fill=&quot;var(--pt-aff)&quot;&gt;&lt;path d=&quot;M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z&quot;/&gt;&lt;/svg&gt;
                         {{#if stats.apChange}}{{#unless (eq stats.apChange 0)}}
-                        <div class="pt-orbit-ring {{#if (gt stats.apChange 0)}}orbit-pos{{else}}orbit-neg{{/if}}"></div>
+                        &lt;div class=&quot;pt-orbit-ring {{#if (gt stats.apChange 0)}}orbit-pos{{else}}orbit-neg{{/if}}&quot;&gt;&lt;/div&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                    <div class="pt-track-bg"><div class="pt-track-fill fill-aff" style="width: {{divide stats.ap 2}}%"></div></div>
-                    <div class="pt-stat-val">
+                    &lt;/div&gt;
+                    &lt;div class=&quot;pt-track-bg&quot;&gt;&lt;div class=&quot;pt-track-fill fill-aff&quot; style=&quot;width: {{divide stats.ap 2}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div class=&quot;pt-stat-val&quot;&gt;
                         {{stats.ap}}
                         {{#if stats.apChange}}{{#unless (eq stats.apChange 0)}}
-                        <span class="pt-change-bubble {{#if (gt stats.apChange 0)}}ch-pos{{else}}ch-neg{{/if}}">{{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}</span>
+                        &lt;span class=&quot;pt-change-bubble {{#if (gt stats.apChange 0)}}ch-pos{{else}}ch-neg{{/if}}&quot;&gt;{{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}&lt;/span&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                </div>
+                    &lt;/div&gt;
+                &lt;/div&gt;
 
-                <div class="pt-stat-row">
-                    <div class="pt-stat-icon">
-                        <svg viewBox="0 0 24 24" fill="var(--pt-des)"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z"/></svg>
+                &lt;div class=&quot;pt-stat-row&quot;&gt;
+                    &lt;div class=&quot;pt-stat-icon&quot;&gt;
+                        &lt;svg viewBox=&quot;0 0 24 24&quot; fill=&quot;var(--pt-des)&quot;&gt;&lt;path d=&quot;M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z&quot;/&gt;&lt;/svg&gt;
                         {{#if stats.dpChange}}{{#unless (eq stats.dpChange 0)}}
-                        <div class="pt-orbit-ring {{#if (gt stats.dpChange 0)}}orbit-pos{{else}}orbit-neg{{/if}}"></div>
+                        &lt;div class=&quot;pt-orbit-ring {{#if (gt stats.dpChange 0)}}orbit-pos{{else}}orbit-neg{{/if}}&quot;&gt;&lt;/div&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                    <div class="pt-track-bg"><div class="pt-track-fill fill-des" style="width: {{divide stats.dp 1.5}}%"></div></div>
-                    <div class="pt-stat-val">
+                    &lt;/div&gt;
+                    &lt;div class=&quot;pt-track-bg&quot;&gt;&lt;div class=&quot;pt-track-fill fill-des&quot; style=&quot;width: {{divide stats.dp 1.5}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div class=&quot;pt-stat-val&quot;&gt;
                         {{stats.dp}}
                         {{#if stats.dpChange}}{{#unless (eq stats.dpChange 0)}}
-                        <span class="pt-change-bubble {{#if (gt stats.dpChange 0)}}ch-pos{{else}}ch-neg{{/if}}">{{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}</span>
+                        &lt;span class=&quot;pt-change-bubble {{#if (gt stats.dpChange 0)}}ch-pos{{else}}ch-neg{{/if}}&quot;&gt;{{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}&lt;/span&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                </div>
+                    &lt;/div&gt;
+                &lt;/div&gt;
 
-                <div class="pt-stat-row">
-                    <div class="pt-stat-icon">
-                        <svg viewBox="0 0 24 24" fill="var(--pt-tru)"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+                &lt;div class=&quot;pt-stat-row&quot;&gt;
+                    &lt;div class=&quot;pt-stat-icon&quot;&gt;
+                        &lt;svg viewBox=&quot;0 0 24 24&quot; fill=&quot;var(--pt-tru)&quot;&gt;&lt;path d=&quot;M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z&quot;/&gt;&lt;/svg&gt;
                         {{#if stats.tpChange}}{{#unless (eq stats.tpChange 0)}}
-                        <div class="pt-orbit-ring {{#if (gt stats.tpChange 0)}}orbit-pos{{else}}orbit-neg{{/if}}"></div>
+                        &lt;div class=&quot;pt-orbit-ring {{#if (gt stats.tpChange 0)}}orbit-pos{{else}}orbit-neg{{/if}}&quot;&gt;&lt;/div&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                    <div class="pt-track-bg"><div class="pt-track-fill fill-tru" style="width: {{divide stats.tp 1.5}}%"></div></div>
-                    <div class="pt-stat-val">
+                    &lt;/div&gt;
+                    &lt;div class=&quot;pt-track-bg&quot;&gt;&lt;div class=&quot;pt-track-fill fill-tru&quot; style=&quot;width: {{divide stats.tp 1.5}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div class=&quot;pt-stat-val&quot;&gt;
                         {{stats.tp}}
                         {{#if stats.tpChange}}{{#unless (eq stats.tpChange 0)}}
-                        <span class="pt-change-bubble {{#if (gt stats.tpChange 0)}}ch-pos{{else}}ch-neg{{/if}}">{{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}</span>
+                        &lt;span class=&quot;pt-change-bubble {{#if (gt stats.tpChange 0)}}ch-pos{{else}}ch-neg{{/if}}&quot;&gt;{{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}&lt;/span&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                </div>
+                    &lt;/div&gt;
+                &lt;/div&gt;
 
-                <div class="pt-stat-row">
-                    <div class="pt-stat-icon">
-                        <svg viewBox="0 0 24 24" fill="var(--pt-con)"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 11H7v-2h10v2z"/></svg>
+                &lt;div class=&quot;pt-stat-row&quot;&gt;
+                    &lt;div class=&quot;pt-stat-icon&quot;&gt;
+                        &lt;svg viewBox=&quot;0 0 24 24&quot; fill=&quot;var(--pt-con)&quot;&gt;&lt;path d=&quot;M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 11H7v-2h10v2z&quot;/&gt;&lt;/svg&gt;
                         {{#if stats.cpChange}}{{#unless (eq stats.cpChange 0)}}
-                        <div class="pt-orbit-ring {{#if (gt stats.cpChange 0)}}orbit-neg{{else}}orbit-pos{{/if}}"></div>
+                        &lt;div class=&quot;pt-orbit-ring {{#if (gt stats.cpChange 0)}}orbit-neg{{else}}orbit-pos{{/if}}&quot;&gt;&lt;/div&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                    <div class="pt-track-bg"><div class="pt-track-fill fill-con" style="width: {{divide stats.cp 1.5}}%"></div></div>
-                    <div class="pt-stat-val">
+                    &lt;/div&gt;
+                    &lt;div class=&quot;pt-track-bg&quot;&gt;&lt;div class=&quot;pt-track-fill fill-con&quot; style=&quot;width: {{divide stats.cp 1.5}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div class=&quot;pt-stat-val&quot;&gt;
                         {{stats.cp}}
                         {{#if stats.cpChange}}{{#unless (eq stats.cpChange 0)}}
-                        <span class="pt-change-bubble {{#if (gt stats.cpChange 0)}}ch-neg{{else}}ch-pos{{/if}}">{{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}</span>
+                        &lt;span class=&quot;pt-change-bubble {{#if (gt stats.cpChange 0)}}ch-neg{{else}}ch-pos{{/if}}&quot;&gt;{{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}&lt;/span&gt;
                         {{/unless}}{{/if}}
-                    </div>
-                </div>
-            </div>
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
 
-            <!-- Pills -->
-            <div class="pt-pill-row">
-                {{#if (eq stats.cycle_stage "pregnancy")}}
-                    <div class="pt-pill pill-preg">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+            &lt;!-- Pills --&gt;
+            &lt;div class=&quot;pt-pill-row&quot;&gt;
+                {{#if (eq stats.cycle_stage &quot;pregnancy&quot;)}}
+                    &lt;div class=&quot;pt-pill pill-preg&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/&gt;&lt;/svg&gt;
                         Pregnant {{#if stats.days_preg}}({{stats.days_preg}}d){{/if}}
-                    </div>
-                {{else if (eq stats.cycle_stage "ovulation")}}
-                    <div class="pt-pill pill-ovu">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                    &lt;/div&gt;
+                {{else if (eq stats.cycle_stage &quot;ovulation&quot;)}}
+                    &lt;div class=&quot;pt-pill pill-ovu&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/&gt;&lt;/svg&gt;
                         Ovulating
-                    </div>
-                {{else if (eq stats.cycle_stage "menstruation")}}
-                    <div class="pt-pill pill-men">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                    &lt;/div&gt;
+                {{else if (eq stats.cycle_stage &quot;menstruation&quot;)}}
+                    &lt;div class=&quot;pt-pill pill-men&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/&gt;&lt;/svg&gt;
                         Period
-                    </div>
-                {{else if (eq stats.cycle_stage "rut")}}
-                    <div class="pt-pill pill-rut">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                    &lt;/div&gt;
+                {{else if (eq stats.cycle_stage &quot;rut&quot;)}}
+                    &lt;div class=&quot;pt-pill pill-rut&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/&gt;&lt;/svg&gt;
                         Rut
-                    </div>
+                    &lt;/div&gt;
                 {{else}}
-                    <div class="pt-pill pt-empty-pill">--</div>
+                    &lt;div class=&quot;pt-pill pt-empty-pill&quot;&gt;--&lt;/div&gt;
                 {{/if}}
 
                 {{#if (eq stats.last_react 1)}}
-                    <div class="pt-pill pill-react-app" style="background: rgba(46, 204, 113, 0.12); color: var(--st-app);">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17L4 12"/></svg>
+                    &lt;div class=&quot;pt-pill pill-react-app&quot; style=&quot;background: rgba(46, 204, 113, 0.12); color: var(--st-app);&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot;&gt;&lt;path d=&quot;M20 6L9 17L4 12&quot;/&gt;&lt;/svg&gt;
                         Approved
-                    </div>
+                    &lt;/div&gt;
                 {{else if (eq stats.last_react 2)}}
-                    <div class="pt-pill pill-react-dis" style="background: rgba(231, 76, 60, 0.12); color: var(--st-dis);">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    &lt;div class=&quot;pt-pill pill-react-dis&quot; style=&quot;background: rgba(231, 76, 60, 0.12); color: var(--st-dis);&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot;&gt;&lt;path d=&quot;M18 6L6 18M6 6l12 12&quot;/&gt;&lt;/svg&gt;
                         Disapproved
-                    </div>
+                    &lt;/div&gt;
                 {{else}}
-                    <div class="pt-pill pill-react-neu" style="background: rgba(241, 196, 15, 0.12); color: var(--st-neu);">
-                        <svg class="icon-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/></svg>
+                    &lt;div class=&quot;pt-pill pill-react-neu&quot; style=&quot;background: rgba(241, 196, 15, 0.12); color: var(--st-neu);&quot;&gt;
+                        &lt;svg class=&quot;icon-12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.5&quot;&gt;&lt;path d=&quot;M5 12h14&quot;/&gt;&lt;/svg&gt;
                         Neutral
-                    </div>
+                    &lt;/div&gt;
                 {{/if}}
-            </div>
+            &lt;/div&gt;
 
-        </div>
-        {{/each}}
-    </div>
-</div>
-<!-- CARD_TEMPLATE_END -->
+                &lt;/div&gt;
+                {{/each}}
+            &lt;/div&gt;
 
-<!--
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+&lt;!-- CARD_TEMPLATE_END --&gt;
+
+&lt;!--
 TEMPLATE VARIABLES (tabbed mode):
 - {{characters}}: Array of character objects — each object contains:
   - {{characterName}}: Character name
@@ -9360,12 +9462,12 @@ TEMPLATE VARIABLES (tabbed mode):
   - {{stats}}: Flattened stats object containing:
     - {{stats.ap}}, {{stats.dp}}, {{stats.tp}}, {{stats.cp}}
     - {{stats.apChange}}, {{stats.dpChange}}, {{stats.tpChange}}, {{stats.cpChange}}
-    - {{stats.sex}}: 'female', 'male', or 'other'
+    - {{stats.sex}}: &#039;female&#039;, &#039;male&#039;, or &#039;other&#039;
     - {{stats.cycle_stage}}, {{stats.cycle_day}}, {{stats.days_preg}}
     - {{stats.refractory_minutes}}, {{stats.refractory_total}}
     - {{stats.last_react}}, {{stats.internal_thought}}
     - {{stats.days_since_first_meeting}}, {{stats.inactive}}
--->
+--&gt;
 `,
   sysPrompt: `## NARRATIVE CHARACTER TRACKER MODE (Pulse Thread)
 
