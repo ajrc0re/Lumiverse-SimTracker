@@ -8972,32 +8972,6 @@ var pulse_thread_tracker_default = {
 
     .pt-bio-value-muted { color: var(--pt-txt-dim); }
 
-    .pt-cycle-legend {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 4px 8px;
-        padding-top: 2px;
-    }
-
-    .pt-legend-item {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        min-width: 0;
-        font-size: 0.56rem;
-        color: var(--pt-txt-dim);
-        text-transform: uppercase;
-        letter-spacing: 0.45px;
-        font-weight: 700;
-    }
-
-    .pt-legend-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
     .pt-risk-badge {
         display: inline-flex;
         align-items: center;
@@ -9394,12 +9368,6 @@ var pulse_thread_tracker_default = {
                                 {{/if}}
                             &lt;/span&gt;
                         &lt;/div&gt;
-                    &lt;/div&gt;
-                    &lt;div class=&quot;pt-cycle-legend&quot; aria-label=&quot;Fertility cycle legend&quot;&gt;
-                        &lt;span class=&quot;pt-legend-item&quot;&gt;&lt;span class=&quot;pt-legend-dot&quot; style=&quot;background: var(--cy-men);&quot;&gt;&lt;/span&gt;Menstrual&lt;/span&gt;
-                        &lt;span class=&quot;pt-legend-item&quot;&gt;&lt;span class=&quot;pt-legend-dot&quot; style=&quot;background: var(--cy-fol);&quot;&gt;&lt;/span&gt;Follicular&lt;/span&gt;
-                        &lt;span class=&quot;pt-legend-item&quot;&gt;&lt;span class=&quot;pt-legend-dot&quot; style=&quot;background: var(--cy-ovu);&quot;&gt;&lt;/span&gt;Ovulation&lt;/span&gt;
-                        &lt;span class=&quot;pt-legend-item&quot;&gt;&lt;span class=&quot;pt-legend-dot&quot; style=&quot;background: var(--cy-lut);&quot;&gt;&lt;/span&gt;Luteal&lt;/span&gt;
                     &lt;/div&gt;
                 &lt;/div&gt;
             &lt;/div&gt;
