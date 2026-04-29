@@ -7796,18 +7796,18 @@ var rpg_sidebar_preset_default = {
   templateAuthor: "Prolix OCs",
   templatePosition: "RIGHT",
   tabsType: "toggle",
-  htmlTemplate: `<!-- TEMPLATE NAME: Omni-Tracker: RPG Edition -->
-<!-- AUTHOR: Prolix OCs -->
-<!-- POSITION: RIGHT -->
-<!-- TABS_TYPE: toggle -->
+  htmlTemplate: `&lt;!-- TEMPLATE NAME: Omni-Tracker: RPG Edition --&gt;
+&lt;!-- AUTHOR: Prolix OCs --&gt;
+&lt;!-- POSITION: RIGHT --&gt;
+&lt;!-- TABS_TYPE: toggle --&gt;
 
-<!-- CARD_TEMPLATE_START -->
-<style>
+&lt;!-- CARD_TEMPLATE_START --&gt;
+&lt;style&gt;
     /* =========================================
-       1. CORE VARIABLES & THEME
+       1. CORE VARIABLES &amp; THEME
        ========================================= */
     .sim-tracker-container {
-        --sst-font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --sst-font-stack: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif;
         --sst-bg-deep: #050505;
 
         /* Glass System */
@@ -7880,6 +7880,7 @@ var rpg_sidebar_preset_default = {
         justify-content: flex-start;
         align-items: flex-end;
         padding: 24px 8px 24px 0;
+        z-index: 2;
     }
 
     .sim-tracker-tab {
@@ -7897,6 +7898,7 @@ var rpg_sidebar_preset_default = {
         flex-shrink: 0;
         pointer-events: auto !important;
         box-shadow: -5px 0 20px rgba(0,0,0,0.45);
+        z-index: 3;
     }
 
     .sim-tracker-tab:hover { background: rgba(255,255,255,0.12); transform: scale(1.05); color: #fff; }
@@ -7917,6 +7919,7 @@ var rpg_sidebar_preset_default = {
         display: flex;
         align-items: stretch;
         justify-content: flex-end;
+        z-index: 1;
     }
 
     .sim-tracker-card {
@@ -7964,7 +7967,7 @@ var rpg_sidebar_preset_default = {
     }
 
     /* =========================================
-       5. WIDGETS & MODULES
+       5. WIDGETS &amp; MODULES
        ========================================= */
     .widget {
         background: rgba(255,255,255,0.02);
@@ -7978,7 +7981,7 @@ var rpg_sidebar_preset_default = {
         color: var(--sst-txt-muted); font-weight: 700; display: flex; justify-content: space-between;
     }
 
-    /* --- HEADER & ATTRIBUTES --- */
+    /* --- HEADER &amp; ATTRIBUTES --- */
     .header-row { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
     .av-lg {
         width: 56px; height: 56px; border-radius: 50%; background: #222;
@@ -7989,7 +7992,7 @@ var rpg_sidebar_preset_default = {
     .char-name h1 { font-size: 1.3rem; font-weight: 800; color: #fff; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .char-name .class-lvl { font-size: 0.75rem; color: var(--sst-txt-muted); text-transform: uppercase; letter-spacing: 1px; }
 
-    /* D&D Attributes Grid */
+    /* D&amp;D Attributes Grid */
     .attr-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
     .attr-box {
         background: var(--sst-attr-bg); border-radius: 8px; padding: 6px 2px;
@@ -8001,7 +8004,7 @@ var rpg_sidebar_preset_default = {
     .attr-mod { font-size: 0.6rem; color: var(--sst-stam-col); }
     .attr-mod.neg { color: var(--sst-hp-col); }
 
-    /* --- VITALS & COMBAT --- */
+    /* --- VITALS &amp; COMBAT --- */
     .vitals-row { display: flex; gap: 10px; align-items: flex-end; }
     .hp-numeric { font-size: 0.9rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
     .hp-numeric span { color: var(--sst-txt-muted); font-size: 0.75rem; }
@@ -8009,7 +8012,7 @@ var rpg_sidebar_preset_default = {
     .bar-track { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative; }
     .bar-fill { height: 100%; background: var(--sst-hp-col); width: var(--pct); box-shadow: 0 0 10px var(--sst-hp-col); transition: width 0.3s ease; }
 
-    /* Target & Stance */
+    /* Target &amp; Stance */
     .combat-card {
         background: rgba(0,0,0,0.3); border-radius: 12px; padding: 10px;
         display: flex; justify-content: space-between; align-items: center;
@@ -8069,161 +8072,161 @@ var rpg_sidebar_preset_default = {
     }
     .inv-slot.filled { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); cursor: help; }
     .inv-qty { position: absolute; bottom: 2px; right: 2px; font-size: 0.6rem; color: #fff; text-shadow: 0 1px 2px #000; }
-</style>
+&lt;/style&gt;
 
-<div class="sim-tracker-container">
+&lt;div class=&quot;sim-tracker-container&quot;&gt;
 
-    <!-- TABS -->
-    <div class="sim-tracker-tabs">
+    &lt;!-- TABS --&gt;
+    &lt;div class=&quot;sim-tracker-tabs&quot;&gt;
         {{#each characters}}
-        <div class="sim-tracker-tab" data-character="{{@index}}">
+        &lt;div class=&quot;sim-tracker-tab&quot; data-character=&quot;{{@index}}&quot;&gt;
             {{initials name}}
-            <div class="signal {{#if (lt stats.hp.current (divide stats.hp.max 4))}}sig-danger{{else}}sig-ok{{/if}}"></div>
-        </div>
+            &lt;div class=&quot;signal {{#if (lt stats.hp.current (divide stats.hp.max 4))}}sig-danger{{else}}sig-ok{{/if}}&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
         {{/each}}
-    </div>
+    &lt;/div&gt;
 
-    <!-- CARDS -->
-    <div class="sim-tracker-cards-wrapper">
+    &lt;!-- CARDS --&gt;
+    &lt;div class=&quot;sim-tracker-cards-wrapper&quot;&gt;
     {{#each characters}}
-    <div class="sim-tracker-card" data-character="{{@index}}">
+    &lt;div class=&quot;sim-tracker-card&quot; data-character=&quot;{{@index}}&quot;&gt;
 
-        <!-- 1. IDENTITY & ATTRIBUTES -->
-        <div class="header-row">
-            <div class="av-lg">{{initials name}}</div>
-            <div class="char-name">
-                <h1>{{name}}</h1>
-                <div class="class-lvl">{{stats.class}} • Level {{stats.level}}</div>
-            </div>
-        </div>
+        &lt;!-- 1. IDENTITY &amp; ATTRIBUTES --&gt;
+        &lt;div class=&quot;header-row&quot;&gt;
+            &lt;div class=&quot;av-lg&quot;&gt;{{initials name}}&lt;/div&gt;
+            &lt;div class=&quot;char-name&quot;&gt;
+                &lt;h1&gt;{{name}}&lt;/h1&gt;
+                &lt;div class=&quot;class-lvl&quot;&gt;{{stats.class}} • Level {{stats.level}}&lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
 
-        <!-- DnD Attributes -->
-        <div class="attr-grid">
-            <div class="attr-box">
-                <span class="attr-label">STR</span>
-                <span class="attr-val">{{stats.attributes.str}}</span>
-                <span class="attr-mod {{#if (lt stats.attributes.str 10)}}neg{{/if}}">{{stats.attributes.str_mod}}</span>
-            </div>
-            <div class="attr-box">
-                <span class="attr-label">DEX</span>
-                <span class="attr-val">{{stats.attributes.dex}}</span>
-                <span class="attr-mod {{#if (lt stats.attributes.dex 10)}}neg{{/if}}">{{stats.attributes.dex_mod}}</span>
-            </div>
-            <div class="attr-box">
-                <span class="attr-label">CON</span>
-                <span class="attr-val">{{stats.attributes.con}}</span>
-                <span class="attr-mod {{#if (lt stats.attributes.con 10)}}neg{{/if}}">{{stats.attributes.con_mod}}</span>
-            </div>
-            <div class="attr-box">
-                <span class="attr-label">INT</span>
-                <span class="attr-val">{{stats.attributes.int}}</span>
-                <span class="attr-mod {{#if (lt stats.attributes.int 10)}}neg{{/if}}">{{stats.attributes.int_mod}}</span>
-            </div>
-            <div class="attr-box">
-                <span class="attr-label">WIS</span>
-                <span class="attr-val">{{stats.attributes.wis}}</span>
-                <span class="attr-mod {{#if (lt stats.attributes.wis 10)}}neg{{/if}}">{{stats.attributes.wis_mod}}</span>
-            </div>
-            <div class="attr-box">
-                <span class="attr-label">CHA</span>
-                <span class="attr-val">{{stats.attributes.cha}}</span>
-                <span class="attr-mod {{#if (lt stats.attributes.cha 10)}}neg{{/if}}">{{stats.attributes.cha_mod}}</span>
-            </div>
-        </div>
+        &lt;!-- DnD Attributes --&gt;
+        &lt;div class=&quot;attr-grid&quot;&gt;
+            &lt;div class=&quot;attr-box&quot;&gt;
+                &lt;span class=&quot;attr-label&quot;&gt;STR&lt;/span&gt;
+                &lt;span class=&quot;attr-val&quot;&gt;{{stats.attributes.str}}&lt;/span&gt;
+                &lt;span class=&quot;attr-mod {{#if (lt stats.attributes.str 10)}}neg{{/if}}&quot;&gt;{{stats.attributes.str_mod}}&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;attr-box&quot;&gt;
+                &lt;span class=&quot;attr-label&quot;&gt;DEX&lt;/span&gt;
+                &lt;span class=&quot;attr-val&quot;&gt;{{stats.attributes.dex}}&lt;/span&gt;
+                &lt;span class=&quot;attr-mod {{#if (lt stats.attributes.dex 10)}}neg{{/if}}&quot;&gt;{{stats.attributes.dex_mod}}&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;attr-box&quot;&gt;
+                &lt;span class=&quot;attr-label&quot;&gt;CON&lt;/span&gt;
+                &lt;span class=&quot;attr-val&quot;&gt;{{stats.attributes.con}}&lt;/span&gt;
+                &lt;span class=&quot;attr-mod {{#if (lt stats.attributes.con 10)}}neg{{/if}}&quot;&gt;{{stats.attributes.con_mod}}&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;attr-box&quot;&gt;
+                &lt;span class=&quot;attr-label&quot;&gt;INT&lt;/span&gt;
+                &lt;span class=&quot;attr-val&quot;&gt;{{stats.attributes.int}}&lt;/span&gt;
+                &lt;span class=&quot;attr-mod {{#if (lt stats.attributes.int 10)}}neg{{/if}}&quot;&gt;{{stats.attributes.int_mod}}&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;attr-box&quot;&gt;
+                &lt;span class=&quot;attr-label&quot;&gt;WIS&lt;/span&gt;
+                &lt;span class=&quot;attr-val&quot;&gt;{{stats.attributes.wis}}&lt;/span&gt;
+                &lt;span class=&quot;attr-mod {{#if (lt stats.attributes.wis 10)}}neg{{/if}}&quot;&gt;{{stats.attributes.wis_mod}}&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;attr-box&quot;&gt;
+                &lt;span class=&quot;attr-label&quot;&gt;CHA&lt;/span&gt;
+                &lt;span class=&quot;attr-val&quot;&gt;{{stats.attributes.cha}}&lt;/span&gt;
+                &lt;span class=&quot;attr-mod {{#if (lt stats.attributes.cha 10)}}neg{{/if}}&quot;&gt;{{stats.attributes.cha_mod}}&lt;/span&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
 
-        <!-- 2. COMBAT STATUS -->
-        <div class="widget">
-            <div class="w-header"><span>Combat Status</span></div>
+        &lt;!-- 2. COMBAT STATUS --&gt;
+        &lt;div class=&quot;widget&quot;&gt;
+            &lt;div class=&quot;w-header&quot;&gt;&lt;span&gt;Combat Status&lt;/span&gt;&lt;/div&gt;
 
-            <!-- Health (Numeric) -->
-            <div>
-                <div class="hp-numeric">{{stats.hp.current}} / {{stats.hp.max}} <span>HP</span></div>
-                <div class="bar-track">
-                    <div class="bar-fill" style="--pct: {{divideRoundUp (multiply stats.hp.current 100) stats.hp.max}}%"></div>
-                </div>
-            </div>
+            &lt;!-- Health (Numeric) --&gt;
+            &lt;div&gt;
+                &lt;div class=&quot;hp-numeric&quot;&gt;{{stats.hp.current}} / {{stats.hp.max}} &lt;span&gt;HP&lt;/span&gt;&lt;/div&gt;
+                &lt;div class=&quot;bar-track&quot;&gt;
+                    &lt;div class=&quot;bar-fill&quot; style=&quot;--pct: {{divideRoundUp (multiply stats.hp.current 100) stats.hp.max}}%&quot;&gt;&lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
 
-            <!-- Target & Stance -->
-            <div class="combat-card">
-                <div class="target-info">
-                    <span>Targeting</span>
-                    <b style="color:#ff6b6b">{{stats.combat.target}}</b>
-                </div>
-                <div class="stance-badge">{{stats.combat.stance}}</div>
-            </div>
+            &lt;!-- Target &amp; Stance --&gt;
+            &lt;div class=&quot;combat-card&quot;&gt;
+                &lt;div class=&quot;target-info&quot;&gt;
+                    &lt;span&gt;Targeting&lt;/span&gt;
+                    &lt;b style=&quot;color:#ff6b6b&quot;&gt;{{stats.combat.target}}&lt;/b&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;stance-badge&quot;&gt;{{stats.combat.stance}}&lt;/div&gt;
+            &lt;/div&gt;
 
-            <!-- Buffs -->
-            <div class="buff-row">
+            &lt;!-- Buffs --&gt;
+            &lt;div class=&quot;buff-row&quot;&gt;
                 {{#each stats.combat.buffs}}
-                <div class="buff-pill {{type}}" title="Source: {{origin}}">{{name}}</div>
+                &lt;div class=&quot;buff-pill {{type}}&quot; title=&quot;Source: {{origin}}&quot;&gt;{{name}}&lt;/div&gt;
                 {{/each}}
-            </div>
-        </div>
+            &lt;/div&gt;
+        &lt;/div&gt;
 
-        <!-- 3. ABILITIES -->
-        <div class="widget">
-            <div class="w-header"><span>Spellbook</span> <span>{{stats.resources.current}}/{{stats.resources.max}} {{stats.resources.name}}</span></div>
-            <div class="spell-list">
+        &lt;!-- 3. ABILITIES --&gt;
+        &lt;div class=&quot;widget&quot;&gt;
+            &lt;div class=&quot;w-header&quot;&gt;&lt;span&gt;Spellbook&lt;/span&gt; &lt;span&gt;{{stats.resources.current}}/{{stats.resources.max}} {{stats.resources.name}}&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;spell-list&quot;&gt;
                 {{#each stats.abilities}}
-                <div class="spell-row">
-                    <div class="spell-icon">✨</div>
-                    <div class="spell-details">
-                        <div class="spell-name">{{name}}</div>
-                        <div class="spell-cost">{{cost}}</div>
-                    </div>
-                    <div class="spell-status">{{status}}</div>
-                </div>
+                &lt;div class=&quot;spell-row&quot;&gt;
+                    &lt;div class=&quot;spell-icon&quot;&gt;✨&lt;/div&gt;
+                    &lt;div class=&quot;spell-details&quot;&gt;
+                        &lt;div class=&quot;spell-name&quot;&gt;{{name}}&lt;/div&gt;
+                        &lt;div class=&quot;spell-cost&quot;&gt;{{cost}}&lt;/div&gt;
+                    &lt;/div&gt;
+                    &lt;div class=&quot;spell-status&quot;&gt;{{status}}&lt;/div&gt;
+                &lt;/div&gt;
                 {{/each}}
-            </div>
-        </div>
+            &lt;/div&gt;
+        &lt;/div&gt;
 
-        <!-- 4. RELATIONSHIP MATRIX -->
-        <div class="widget">
-            <div class="w-header"><span>Social Links</span></div>
-            <div class="rel-grid">
-                <!-- Affection -->
-                <div class="stat-line">
-                    <svg class="stat-icon" viewBox="0 0 24 24" fill="#ff9a9e"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                    <div class="stat-track"><div class="stat-fill gf-1" style="--v: {{stats.relationships.affection}}%"></div></div>
-                    <div style="font-size:0.7rem">{{stats.relationships.affection}}%</div>
-                </div>
-                <!-- Desire -->
-                <div class="stat-line">
-                    <svg class="stat-icon" viewBox="0 0 24 24" fill="#f5576c"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z"/></svg>
-                    <div class="stat-track"><div class="stat-fill gf-2" style="--v: {{stats.relationships.desire}}%"></div></div>
-                    <div style="font-size:0.7rem">{{stats.relationships.desire}}%</div>
-                </div>
-                <!-- Trust -->
-                <div class="stat-line">
-                    <svg class="stat-icon" viewBox="0 0 24 24" fill="#89f7fe"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-                    <div class="stat-track"><div class="stat-fill gf-3" style="--v: {{stats.relationships.trust}}%"></div></div>
-                    <div style="font-size:0.7rem">{{stats.relationships.trust}}%</div>
-                </div>
-                <!-- Contempt -->
-                <div class="stat-line">
-                    <svg class="stat-icon" viewBox="0 0 24 24" fill="#888"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 11H7v-2h10v2z"/></svg>
-                    <div class="stat-track"><div class="stat-fill gf-4" style="--v: {{stats.relationships.contempt}}%"></div></div>
-                    <div style="font-size:0.7rem">{{stats.relationships.contempt}}%</div>
-                </div>
-            </div>
-        </div>
+        &lt;!-- 4. RELATIONSHIP MATRIX --&gt;
+        &lt;div class=&quot;widget&quot;&gt;
+            &lt;div class=&quot;w-header&quot;&gt;&lt;span&gt;Social Links&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;rel-grid&quot;&gt;
+                &lt;!-- Affection --&gt;
+                &lt;div class=&quot;stat-line&quot;&gt;
+                    &lt;svg class=&quot;stat-icon&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;#ff9a9e&quot;&gt;&lt;path d=&quot;M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z&quot;/&gt;&lt;/svg&gt;
+                    &lt;div class=&quot;stat-track&quot;&gt;&lt;div class=&quot;stat-fill gf-1&quot; style=&quot;--v: {{stats.relationships.affection}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div style=&quot;font-size:0.7rem&quot;&gt;{{stats.relationships.affection}}%&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;!-- Desire --&gt;
+                &lt;div class=&quot;stat-line&quot;&gt;
+                    &lt;svg class=&quot;stat-icon&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;#f5576c&quot;&gt;&lt;path d=&quot;M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z&quot;/&gt;&lt;/svg&gt;
+                    &lt;div class=&quot;stat-track&quot;&gt;&lt;div class=&quot;stat-fill gf-2&quot; style=&quot;--v: {{stats.relationships.desire}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div style=&quot;font-size:0.7rem&quot;&gt;{{stats.relationships.desire}}%&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;!-- Trust --&gt;
+                &lt;div class=&quot;stat-line&quot;&gt;
+                    &lt;svg class=&quot;stat-icon&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;#89f7fe&quot;&gt;&lt;path d=&quot;M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z&quot;/&gt;&lt;/svg&gt;
+                    &lt;div class=&quot;stat-track&quot;&gt;&lt;div class=&quot;stat-fill gf-3&quot; style=&quot;--v: {{stats.relationships.trust}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div style=&quot;font-size:0.7rem&quot;&gt;{{stats.relationships.trust}}%&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;!-- Contempt --&gt;
+                &lt;div class=&quot;stat-line&quot;&gt;
+                    &lt;svg class=&quot;stat-icon&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;#888&quot;&gt;&lt;path d=&quot;M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 11H7v-2h10v2z&quot;/&gt;&lt;/svg&gt;
+                    &lt;div class=&quot;stat-track&quot;&gt;&lt;div class=&quot;stat-fill gf-4&quot; style=&quot;--v: {{stats.relationships.contempt}}%&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+                    &lt;div style=&quot;font-size:0.7rem&quot;&gt;{{stats.relationships.contempt}}%&lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
 
-        <!-- 5. INVENTORY -->
-        <div class="widget">
-            <div class="w-header"><span>Bag</span> <span class="inv-header-meta"></span></div>
-            <div class="inv-grid">
+        &lt;!-- 5. INVENTORY --&gt;
+        &lt;div class=&quot;widget&quot;&gt;
+            &lt;div class=&quot;w-header&quot;&gt;&lt;span&gt;Bag&lt;/span&gt; &lt;span class=&quot;inv-header-meta&quot;&gt;&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;inv-grid&quot;&gt;
                 {{#each stats.inventory}}
-                <div class="inv-slot filled" title="{{name}}">{{icon}}<span class="inv-qty">x{{qty}}</span></div>
+                &lt;div class=&quot;inv-slot filled&quot; title=&quot;{{name}}&quot;&gt;{{icon}}&lt;span class=&quot;inv-qty&quot;&gt;x{{qty}}&lt;/span&gt;&lt;/div&gt;
                 {{/each}}
-            </div>
-        </div>
+            &lt;/div&gt;
+        &lt;/div&gt;
 
-    </div>
+    &lt;/div&gt;
     {{/each}}
-    </div>
+    &lt;/div&gt;
 
-</div>
-<!-- CARD_TEMPLATE_END -->
+&lt;/div&gt;
+&lt;!-- CARD_TEMPLATE_END --&gt;
 `,
   sysPrompt: `## RPG MODE (D&D 5e Style)
 
