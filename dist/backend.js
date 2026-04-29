@@ -13018,7 +13018,7 @@ spindle.on("GENERATION_STARTED", (payload, userId) => {
     await rehydrateChatTrackerHistory(chatId);
   })();
 });
-spindle.on("CHAT_CHANGED", (payload, userId) => {
+spindle.on("CHAT_SWITCHED", (payload, userId) => {
   (async () => {
     await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object")

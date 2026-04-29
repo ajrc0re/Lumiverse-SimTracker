@@ -1580,7 +1580,7 @@ spindle.on("GENERATION_STARTED", (payload: unknown, userId?: string) => {
   })();
 });
 
-spindle.on("CHAT_CHANGED", (payload: unknown, userId?: string) => {
+spindle.on("CHAT_SWITCHED", (payload: unknown, userId?: string) => {
   void (async () => {
     await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object") return;
