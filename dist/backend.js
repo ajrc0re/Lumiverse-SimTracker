@@ -11957,11 +11957,46 @@ function buildCanonicalTrackerTag(payload, identifier) {
 ${payload.trim()}
 </${tagName}>`;
 }
+function extractAnyTrackerFencePayload(message) {
+  const fenceRe = /```[ \t]*([a-z0-9_-]+)(?=[ \t\r\n]|$)[^\n\r]*\r?\n([\s\S]*?)\r?\n?\s*```/gi;
+  let match;
+  while ((match = fenceRe.exec(message)) !== null) {
+    const payload = (match[2] || "").trim();
+    if (!payload)
+      continue;
+    const directTagPayload = extractTrackerTagLoose(payload, config.trackerTagName);
+    if (directTagPayload)
+      return directTagPayload;
+    const parsed = parseTrackerPayload(payload);
+    if (parsed)
+      return payload;
+  }
+  return null;
+}
+function legacyHiddenDivTrackerRanges(message) {
+  const ranges = [];
+  const divRe = /<div\b([^>]*)>([\s\S]*?)<\/div>/gi;
+  let match;
+  while ((match = divRe.exec(message)) !== null) {
+    const attrs = match[1] || "";
+    const inner = match[2] || "";
+    const full = match[0] || "";
+    if (typeof match.index !== "number" || !full)
+      continue;
+    if (!/style\s*=\s*(?:"[^"]*display\s*:\s*none\s*;?[^"]*"|'[^']*display\s*:\s*none\s*;?[^']*')/i.test(attrs)) {
+      continue;
+    }
+    if (!extractLegacyHiddenDivNormalizedPayload(inner, config.codeBlockIdentifier))
+      continue;
+    ranges.push({ start: match.index, end: match.index + full.length });
+  }
+  return ranges;
+}
 function extractLegacyHiddenDivNormalizedPayload(inner, identifier) {
   const directTagPayload = extractTrackerTagLoose(inner, config.trackerTagName);
   if (directTagPayload)
     return directTagPayload;
-  const fencedPayload = extractSimBlock(inner, identifier) || (identifier !== DEFAULT_CONFIG.codeBlockIdentifier ? extractSimBlock(inner, DEFAULT_CONFIG.codeBlockIdentifier) : null);
+  const fencedPayload = extractSimBlock(inner, identifier) || (identifier !== DEFAULT_CONFIG.codeBlockIdentifier ? extractSimBlock(inner, DEFAULT_CONFIG.codeBlockIdentifier) : null) || extractAnyTrackerFencePayload(inner);
   if (!fencedPayload)
     return null;
   return extractTrackerTagLoose(fencedPayload, config.trackerTagName) || fencedPayload.trim() || null;
@@ -13180,6 +13215,9 @@ function stripOldTrackerBlocksGlobal(messages, identifier, keepNewest) {
         continue;
       allBlocks.push({ msgIdx, start: match.index, end: match.index + text.length });
     }
+    for (const range of legacyHiddenDivTrackerRanges(msg.content)) {
+      allBlocks.push({ msgIdx, start: range.start, end: range.end });
+    }
   });
   if (allBlocks.length === 0)
     return messages;
@@ -13236,6 +13274,13 @@ function stripOldTrackerBlocksGlobal(messages, identifier, keepNewest) {
         start: match.index,
         end: match.index + text.length,
         shouldStrip: stripStarts.has(match.index)
+      });
+    }
+    for (const range of legacyHiddenDivTrackerRanges(content)) {
+      ranges.push({
+        start: range.start,
+        end: range.end,
+        shouldStrip: stripStarts.has(range.start)
       });
     }
     ranges.sort((a, b) => a.start - b.start);
