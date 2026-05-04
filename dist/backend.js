@@ -11945,8 +11945,46 @@ function extractTrackerTag(message, tagName, identifier) {
   }
   return null;
 }
+function extractLegacyHiddenDivTrackerPayload(message) {
+  const divRe = /<div\b([^>]*)>([\s\S]*?)<\/div>/gi;
+  let match;
+  while ((match = divRe.exec(message)) !== null) {
+    const attrs = match[1] || "";
+    const inner = match[2] || "";
+    if (!/style\s*=\s*(?:"[^"]*display\s*:\s*none\s*;?[^"]*"|'[^']*display\s*:\s*none\s*;?[^']*')/i.test(attrs)) {
+      continue;
+    }
+    const payload = extractSimBlock(inner, config.codeBlockIdentifier) || (config.codeBlockIdentifier !== DEFAULT_CONFIG.codeBlockIdentifier ? extractSimBlock(inner, DEFAULT_CONFIG.codeBlockIdentifier) : null);
+    if (payload)
+      return payload;
+  }
+  return null;
+}
 function extractTrackerPayloadFromMessage(message) {
-  return extractTrackerTag(message, config.trackerTagName, config.codeBlockIdentifier) || extractSimBlock(message, config.codeBlockIdentifier);
+  return extractTrackerTag(message, config.trackerTagName, config.codeBlockIdentifier) || extractSimBlock(message, config.codeBlockIdentifier) || extractLegacyHiddenDivTrackerPayload(message);
+}
+function normalizeLegacyHiddenDivTrackers(message) {
+  if (!message)
+    return { content: message, replacements: 0 };
+  const tagName = sanitizeTagName(config.trackerTagName);
+  const identifier = sanitizeIdentifier(config.codeBlockIdentifier);
+  const divRe = /<div\b([^>]*)>([\s\S]*?)<\/div>/gi;
+  let replacements = 0;
+  const content = message.replace(divRe, (full, rawAttrs, rawInner) => {
+    const attrs = typeof rawAttrs === "string" ? rawAttrs : "";
+    const inner = typeof rawInner === "string" ? rawInner : "";
+    if (!/style\s*=\s*(?:"[^"]*display\s*:\s*none\s*;?[^"]*"|'[^']*display\s*:\s*none\s*;?[^']*')/i.test(attrs)) {
+      return full;
+    }
+    const payload = extractSimBlock(inner, identifier) || (identifier !== DEFAULT_CONFIG.codeBlockIdentifier ? extractSimBlock(inner, DEFAULT_CONFIG.codeBlockIdentifier) : null);
+    if (!payload)
+      return full;
+    replacements += 1;
+    return `<${tagName} type="${identifier}">
+${payload}
+</${tagName}>`;
+  });
+  return { content, replacements };
 }
 function sanitizeTrackerFormat(value) {
   return value === "yaml" ? "yaml" : "json";
@@ -12081,12 +12119,45 @@ function getChatTrackerHistory(chatId) {
     return [];
   return chatTrackerHistory.get(chatId) || [];
 }
+async function normalizeLegacyTrackersInChat(chatId) {
+  const messages = await spindle.chat.getMessages(chatId);
+  if (!hasPermission("chat_mutation"))
+    return messages;
+  let repairedMessages = 0;
+  let repairedBlocks = 0;
+  for (const msg of messages) {
+    const normalizedContent = normalizeLegacyHiddenDivTrackers(msg.content);
+    const normalizedSwipes = msg.swipes.map((swipe) => normalizeLegacyHiddenDivTrackers(swipe));
+    const swipesChanged = normalizedSwipes.some((entry, idx) => entry.content !== msg.swipes[idx]);
+    const replacements = normalizedContent.replacements + normalizedSwipes.reduce((sum, entry) => sum + entry.replacements, 0);
+    if (replacements === 0)
+      continue;
+    const nextSwipes = swipesChanged ? normalizedSwipes.map((entry) => entry.content) : msg.swipes;
+    await spindle.chat.updateMessage(chatId, msg.id, {
+      content: normalizedContent.content,
+      swipes: nextSwipes
+    });
+    msg.content = normalizedContent.content;
+    msg.swipes = nextSwipes;
+    if (typeof nextSwipes[msg.swipe_id] === "string") {
+      msg.content = nextSwipes[msg.swipe_id];
+    }
+    repairedMessages += 1;
+    repairedBlocks += replacements;
+  }
+  if (repairedBlocks > 0) {
+    spindle.log.info(`Normalized ${repairedBlocks} legacy hidden tracker block(s) across ${repairedMessages} message(s) in chat ${chatId}`);
+  }
+  return messages;
+}
 async function rehydrateChatTrackerHistory(chatId) {
-  if (!chatId || rehydratedChats.has(chatId))
+  if (!chatId)
     return;
-  rehydratedChats.add(chatId);
   try {
-    const messages = await spindle.chat.getMessages(chatId);
+    const messages = await normalizeLegacyTrackersInChat(chatId);
+    if (rehydratedChats.has(chatId))
+      return;
+    rehydratedChats.add(chatId);
     let history = chatTrackerHistory.get(chatId);
     if (!history) {
       history = [];
@@ -13027,6 +13098,9 @@ spindle.on("CHAT_SWITCHED", (payload, userId) => {
     const chatId = typeof obj.chatId === "string" ? obj.chatId : typeof obj.chat_id === "string" ? obj.chat_id : null;
     if (chatId)
       activeChatId = chatId;
+    if (chatId) {
+      rehydrateChatTrackerHistory(chatId);
+    }
   })();
 });
 spindle.on("GENERATION_ENDED", (payload, userId) => {
