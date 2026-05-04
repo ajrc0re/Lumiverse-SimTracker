@@ -1572,6 +1572,10 @@ export function setup(ctx: SpindleFrontendContext) {
       secondaryLLMStripHTML: typeof incoming.secondaryLLMStripHTML === "boolean" ? incoming.secondaryLLMStripHTML : DEFAULT_CONFIG.secondaryLLMStripHTML,
     };
     configReady = true;
+    if (configRetryTimer) {
+      clearTimeout(configRetryTimer);
+      configRetryTimer = null;
+    }
     syncControls();
     configTrackerTagNameHint = config.trackerTagName;
     applyHideStyle();
@@ -1843,6 +1847,20 @@ export function setup(ctx: SpindleFrontendContext) {
   setStatus("Loading config...");
   renderEmpty("When a message includes a tracker tag, cards will appear here.");
 
+  // Retry config request after a short delay in case the backend is still
+  // initializing following an extension update or host restart.
+  let configRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleConfigRetry = () => {
+    if (configReady) return;
+    configRetryTimer = setTimeout(() => {
+      if (!configReady) {
+        ctx.sendToBackend({ type: "get_config" });
+        scheduleConfigRetry();
+      }
+    }, 2000);
+  };
+  scheduleConfigRetry();
+
   return () => {
     panelRoot = null;
     backendUnsub();
@@ -1861,5 +1879,9 @@ export function setup(ctx: SpindleFrontendContext) {
     inlineProcessor.destroy();
     removePanelStyle();
     ctx.dom.cleanup();
+    if (configRetryTimer) {
+      clearTimeout(configRetryTimer);
+      configRetryTimer = null;
+    }
   };
 }

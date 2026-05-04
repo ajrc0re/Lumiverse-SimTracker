@@ -18081,6 +18081,10 @@ function setup(ctx) {
       secondaryLLMStripHTML: typeof incoming.secondaryLLMStripHTML === "boolean" ? incoming.secondaryLLMStripHTML : DEFAULT_CONFIG.secondaryLLMStripHTML
     };
     configReady = true;
+    if (configRetryTimer) {
+      clearTimeout(configRetryTimer);
+      configRetryTimer = null;
+    }
     syncControls();
     configTrackerTagNameHint = config.trackerTagName;
     applyHideStyle();
@@ -18333,6 +18337,18 @@ function setup(ctx) {
   updatePermissionGatedControls();
   setStatus("Loading config...");
   renderEmpty("When a message includes a tracker tag, cards will appear here.");
+  let configRetryTimer = null;
+  const scheduleConfigRetry = () => {
+    if (configReady)
+      return;
+    configRetryTimer = setTimeout(() => {
+      if (!configReady) {
+        ctx.sendToBackend({ type: "get_config" });
+        scheduleConfigRetry();
+      }
+    }, 2000);
+  };
+  scheduleConfigRetry();
   return () => {
     panelRoot = null;
     backendUnsub();
@@ -18354,6 +18370,10 @@ function setup(ctx) {
     inlineProcessor.destroy();
     removePanelStyle();
     ctx.dom.cleanup();
+    if (configRetryTimer) {
+      clearTimeout(configRetryTimer);
+      configRetryTimer = null;
+    }
   };
 }
 export {

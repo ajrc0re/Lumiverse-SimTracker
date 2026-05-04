@@ -13307,16 +13307,21 @@ async function getEphemeralPoolStatusSafe() {
   }
 }
 async function sendConfigState() {
-  await refreshGrantedPermissions();
-  await loadSeededTemplatePresets();
-  spindle.sendToFrontend({
-    type: "config",
-    config,
-    grantedPermissions: Array.from(runtime.grantedPermissions),
-    requestedPermissions: spindle.manifest.permissions || [],
-    seededPresets: runtime.seededPresets,
-    ephemeralPoolStatus: await getEphemeralPoolStatusSafe()
-  }, activeUserId || undefined);
+  try {
+    await refreshGrantedPermissions();
+    await loadSeededTemplatePresets();
+    spindle.sendToFrontend({
+      type: "config",
+      config,
+      grantedPermissions: Array.from(runtime.grantedPermissions),
+      requestedPermissions: spindle.manifest?.permissions || [],
+      seededPresets: runtime.seededPresets,
+      ephemeralPoolStatus: await getEphemeralPoolStatusSafe()
+    }, activeUserId || undefined);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spindle.log.error(`sendConfigState failed: ${message}`);
+  }
 }
 async function handleImportPresetFile(payload) {
   const text = typeof payload.text === "string" ? payload.text : "";
@@ -13406,8 +13411,13 @@ spindle.onFrontendMessage(async (payload, userId) => {
   activeUserId = userId;
   const message = payload;
   if (message.type === "get_config") {
-    await loadConfig();
-    await sendConfigState();
+    try {
+      await loadConfig();
+      await sendConfigState();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      spindle.log.error(`get_config handler failed: ${msg}`);
+    }
     return;
   }
   if (message.type === "set_config") {
@@ -13521,3 +13531,6 @@ spindle.onFrontendMessage(async (payload, userId) => {
 await initGrantedPermissions();
 await loadConfig();
 spindle.log.info("Silly Sim Tracker (Lumiverse) backend started");
+try {
+  await sendConfigState();
+} catch {}

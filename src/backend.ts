@@ -1957,16 +1957,21 @@ async function getEphemeralPoolStatusSafe(): Promise<Record<string, unknown> | n
 }
 
 async function sendConfigState(): Promise<void> {
-  await refreshGrantedPermissions();
-  await loadSeededTemplatePresets();
-  spindle.sendToFrontend({
-    type: "config",
-    config,
-    grantedPermissions: Array.from(runtime.grantedPermissions),
-    requestedPermissions: spindle.manifest.permissions || [],
-    seededPresets: runtime.seededPresets,
-    ephemeralPoolStatus: await getEphemeralPoolStatusSafe(),
-  }, activeUserId || undefined);
+  try {
+    await refreshGrantedPermissions();
+    await loadSeededTemplatePresets();
+    spindle.sendToFrontend({
+      type: "config",
+      config,
+      grantedPermissions: Array.from(runtime.grantedPermissions),
+      requestedPermissions: spindle.manifest?.permissions || [],
+      seededPresets: runtime.seededPresets,
+      ephemeralPoolStatus: await getEphemeralPoolStatusSafe(),
+    }, activeUserId || undefined);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spindle.log.error(`sendConfigState failed: ${message}`);
+  }
 }
 
 async function handleImportPresetFile(payload: Record<string, unknown>): Promise<void> {
@@ -2066,8 +2071,13 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
   const message = payload as Record<string, unknown>;
 
   if (message.type === "get_config") {
-    await loadConfig();
-    await sendConfigState();
+    try {
+      await loadConfig();
+      await sendConfigState();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      spindle.log.error(`get_config handler failed: ${msg}`);
+    }
     return;
   }
 
@@ -2189,5 +2199,10 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
 await initGrantedPermissions();
 await loadConfig();
 spindle.log.info("Silly Sim Tracker (Lumiverse) backend started");
+try {
+  await sendConfigState();
+} catch {
+  // Ignore — frontend will request config when ready.
+}
 
 export {};
