@@ -10011,10 +10011,10 @@ Each character has:
 // tracker-card-templates/pulse-thread-tracker.json
 var pulse_thread_tracker_default = {
   templateName: "Pulse Thread Tracker",
-  templateAuthor: "Lumiverse Assistant",
+  templateAuthor: "Prolix OCs",
   templatePosition: "BOTTOM",
   htmlTemplate: `&lt;!-- TEMPLATE NAME: Pulse Thread Tracker --&gt;
-&lt;!-- AUTHOR: Lumiverse Assistant --&gt;
+&lt;!-- AUTHOR: Prolix OCs --&gt;
 &lt;!-- POSITION: BOTTOM --&gt;
 &lt;!-- TABS_TYPE: toggle --&gt;
 &lt;!-- sim-tracker-tabs bottom-mounted tabbed variant --&gt;
@@ -10123,13 +10123,19 @@ var pulse_thread_tracker_default = {
         display: flex;
         gap: 6px;
         padding: 14px 18px 0 18px;
+        max-width: 100%;
+        min-width: 0;
         overflow-x: auto;
+        overflow-y: hidden;
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
-        touch-action: pan-x;
-        overscroll-behavior-x: contain;
+        touch-action: pan-x pinch-zoom;
+        overscroll-behavior: contain;
         scroll-snap-type: x mandatory;
+        pointer-events: auto;
+        cursor: grab;
     }
+    .pt-tab-bar:active { cursor: grabbing; }
     .pt-tab-bar::-webkit-scrollbar { display: none; }
 
     .pt-tab {
@@ -11213,7 +11219,7 @@ var pulse_thread_tracker_default = {
             {{/each}}
 
             &lt;!-- Tab bar --&gt;
-            &lt;div class=&quot;pt-tab-bar&quot;&gt;
+            &lt;div class=&quot;pt-tab-bar&quot; onpointerdown=&quot;event.stopPropagation()&quot; onpointermove=&quot;event.stopPropagation()&quot; onpointerup=&quot;event.stopPropagation()&quot; ontouchstart=&quot;event.stopPropagation()&quot; ontouchmove=&quot;event.stopPropagation()&quot; ontouchend=&quot;event.stopPropagation()&quot; onwheel=&quot;event.stopPropagation()&quot;&gt;
                 {{#each characters}}
                 &lt;label class=&quot;pt-tab&quot; for=&quot;pt-char-{{@index}}&quot; style=&quot;{{#if bgColor}}background: {{adjustColorBrightness bgColor 15}}; border-color: {{adjustColorBrightness bgColor 30}};{{/if}}&quot;&gt;
                     &lt;div class=&quot;pt-tab-avatar&quot; style=&quot;{{#if bgColor}}background: linear-gradient(145deg, {{adjustColorBrightness bgColor 60}} 0%, {{adjustColorBrightness darkerBgColor 50}} 100%);{{/if}} color: #fff;&quot;&gt;
