@@ -1383,6 +1383,35 @@ export function setup(ctx: SpindleFrontendContext) {
     bindSidePanelTabs(sidebarRoot);
   };
 
+  // Pulse Thread (and similar CSS-only tab templates) gate visibility on
+  // `:checked` of radio/checkbox inputs. When React reconciles the bubble
+  // subtree around our injected host (e.g. on scroll-back through TanStack
+  // Virtual's overscan boundary), the browser sometimes drops the live
+  // `.checked` property even though the `checked` HTML attribute stays.
+  // Result: the host is in the DOM but per-character pages are all hidden
+  // until the user clicks a tab (which re-asserts the property). We do the
+  // same thing programmatically — but only when the group has no checked
+  // member, so user tab clicks stay sticky.
+  const restoreFormControlState = (host: Element): void => {
+    const checkboxes = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="checkbox"][checked]'));
+    for (const cb of checkboxes) {
+      if (!cb.checked) cb.checked = true;
+    }
+    const radios = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    const groups = new Map<string, HTMLInputElement[]>();
+    for (const r of radios) {
+      const name = r.name || "";
+      let list = groups.get(name);
+      if (!list) { list = []; groups.set(name, list); }
+      list.push(r);
+    }
+    for (const group of groups.values()) {
+      if (group.some((r) => r.checked)) continue;
+      const defaultChecked = group.find((r) => r.hasAttribute("checked"));
+      if (defaultChecked) defaultChecked.checked = true;
+    }
+  };
+
   const renderTrackerIntoMessage = (
     messageId: string,
     data: TrackerData,
@@ -1406,6 +1435,7 @@ export function setup(ctx: SpindleFrontendContext) {
     const mount = ctx.dom.inject(bubbleNode, host, insertPos);
     trackerMessageMounts.set(messageId, mount);
     trackerMessageRenders.set(messageId, { data, preset, previousData, mode });
+    restoreFormControlState(mount);
   };
 
   const handleTrackerPayload = (raw: string, sourceContent: string, messageId: string | null = null) => {
@@ -1694,10 +1724,12 @@ export function setup(ctx: SpindleFrontendContext) {
     }
   };
 
-  // Lumiverse virtualizes the message list (TanStack Virtual). When a message
-  // scrolls out and back in, React rebuilds its subtree and wipes our injected
-  // tracker host. ctx.dom.inject is one-shot, so we mirror inlineTemplates'
-  // MutationObserver pattern to re-inject from the cached render inputs.
+  // Lumiverse virtualizes the message list (TanStack Virtual). Two failure
+  // modes on scroll-back:
+  //   1. Full remount — React rebuilds the bubble subtree and wipes the
+  //      injected host. We re-inject from the cached render inputs.
+  //   2. In-place reconciliation — host survives, but radios lose `:checked`
+  //      state (see restoreFormControlState above).
   const observeTrackerHosts = (): (() => void) => {
     const pending = new Set<string>();
     let scheduled = false;
@@ -1709,7 +1741,10 @@ export function setup(ctx: SpindleFrontendContext) {
         const messageNode = document.querySelector(`[data-message-id="${id}"]`);
         if (!messageNode) continue;
         const existingHost = document.querySelector(`[data-sst-message-tracker-id="${id}"]`);
-        if (existingHost && existingHost.isConnected) continue;
+        if (existingHost && existingHost.isConnected) {
+          restoreFormControlState(existingHost);
+          continue;
+        }
         const tracked = trackerMessageMounts.get(id);
         if (tracked && !tracked.isConnected) trackerMessageMounts.delete(id);
         renderTrackerIntoMessage(id, inputs.data, inputs.preset, inputs.previousData, inputs.mode);
@@ -1741,6 +1776,10 @@ export function setup(ctx: SpindleFrontendContext) {
       node instanceof Element && node.hasAttribute?.("data-sst-message-tracker-id");
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
+        // Skip mutations inside our own host — restoreFormControlState only
+        // sets `.checked` properties (not attributes), so it doesn't trigger
+        // mutation events; but template-internal label clicks or animations
+        // shouldn't churn us either.
         if (m.target instanceof Element && m.target.closest?.("[data-sst-message-tracker-id]")) continue;
         if (m.type === "childList") {
           for (const node of Array.from(m.addedNodes)) {
@@ -1754,6 +1793,13 @@ export function setup(ctx: SpindleFrontendContext) {
               const id = (node as Element).getAttribute("data-sst-message-tracker-id");
               if (id && trackerMessageRenders.has(id)) pending.add(id);
             }
+          }
+          // In-place reconciliation: any childList mutation inside a
+          // tracker-bearing message subtree may have churned form state.
+          if (m.target instanceof Element) {
+            const msgHost = m.target.closest?.("[data-message-id]");
+            const id = msgHost?.getAttribute?.("data-message-id");
+            if (id && trackerMessageRenders.has(id)) pending.add(id);
           }
         } else if (m.type === "attributes" && m.target instanceof Element && m.attributeName === "data-message-id") {
           const id = m.target.getAttribute("data-message-id");

@@ -17917,6 +17917,31 @@ function setup(ctx) {
     sideTrackerMount = ctx.dom.inject(sidebarRoot, wrapped, "beforeend");
     bindSidePanelTabs(sidebarRoot);
   };
+  const restoreFormControlState = (host) => {
+    const checkboxes = Array.from(host.querySelectorAll('input[type="checkbox"][checked]'));
+    for (const cb of checkboxes) {
+      if (!cb.checked)
+        cb.checked = true;
+    }
+    const radios = Array.from(host.querySelectorAll('input[type="radio"]'));
+    const groups = new Map;
+    for (const r of radios) {
+      const name = r.name || "";
+      let list = groups.get(name);
+      if (!list) {
+        list = [];
+        groups.set(name, list);
+      }
+      list.push(r);
+    }
+    for (const group of groups.values()) {
+      if (group.some((r) => r.checked))
+        continue;
+      const defaultChecked = group.find((r) => r.hasAttribute("checked"));
+      if (defaultChecked)
+        defaultChecked.checked = true;
+    }
+  };
   const renderTrackerIntoMessage = (messageId, data, preset, previousData, mode) => {
     clearMessageTrackerRender(messageId);
     const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -17931,6 +17956,7 @@ function setup(ctx) {
     const mount = ctx.dom.inject(bubbleNode, host, insertPos);
     trackerMessageMounts.set(messageId, mount);
     trackerMessageRenders.set(messageId, { data, preset, previousData, mode });
+    restoreFormControlState(mount);
   };
   const handleTrackerPayload = (raw, sourceContent, messageId = null) => {
     if (!configReady) {
@@ -18215,8 +18241,10 @@ function setup(ctx) {
         if (!messageNode)
           continue;
         const existingHost = document.querySelector(`[data-sst-message-tracker-id="${id}"]`);
-        if (existingHost && existingHost.isConnected)
+        if (existingHost && existingHost.isConnected) {
+          restoreFormControlState(existingHost);
           continue;
+        }
         const tracked = trackerMessageMounts.get(id);
         if (tracked && !tracked.isConnected)
           trackerMessageMounts.delete(id);
@@ -18269,6 +18297,12 @@ function setup(ctx) {
               if (id && trackerMessageRenders.has(id))
                 pending.add(id);
             }
+          }
+          if (m.target instanceof Element) {
+            const msgHost = m.target.closest?.("[data-message-id]");
+            const id = msgHost?.getAttribute?.("data-message-id");
+            if (id && trackerMessageRenders.has(id))
+              pending.add(id);
           }
         } else if (m.type === "attributes" && m.target instanceof Element && m.attributeName === "data-message-id") {
           const id = m.target.getAttribute("data-message-id");
