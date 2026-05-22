@@ -9088,7 +9088,7 @@ var pulse_thread_tracker_default = {
     .pt-breast-outline {
         fill: none;
         stroke: color-mix(in srgb, #ff7aa2 65%, white 30%);
-        stroke-width: 2.4;
+        stroke-width: 2.6;
         stroke-linecap: round;
         stroke-linejoin: round;
         opacity: 0.95;
@@ -9096,34 +9096,85 @@ var pulse_thread_tracker_default = {
     }
 
     .pt-breast-outline.lactating {
+        stroke: color-mix(in srgb, #ffd86b 35%, color-mix(in srgb, #ff7aa2 65%, white 30%) 65%);
         filter: drop-shadow(0 0 5px color-mix(in srgb, #ffd86b 55%, transparent));
     }
 
     .pt-breast-inner {
         fill: rgba(255, 255, 255, 0.05);
-        stroke: rgba(255, 255, 255, 0.08);
-        stroke-width: 1.2;
+        stroke: rgba(255, 255, 255, 0.06);
+        stroke-width: 1;
+    }
+
+    .pt-breast-cleavage {
+        fill: none;
+        stroke: rgba(0, 0, 0, 0.32);
+        stroke-width: 1.4;
+        stroke-linecap: round;
+        opacity: 0.5;
+    }
+
+    .pt-breast-fold {
+        fill: none;
+        stroke: rgba(0, 0, 0, 0.22);
+        stroke-width: 0.9;
+        stroke-linecap: round;
+        opacity: 0.55;
+    }
+
+    .pt-breast-gloss {
+        fill: rgba(255, 255, 255, 0.10);
+        pointer-events: none;
+    }
+
+    .pt-cup-tag {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 6px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: color-mix(in srgb, #ff7aa2 18%, var(--pt-bg-deep) 82%);
+        border: 1px solid color-mix(in srgb, #ff7aa2 35%, var(--pt-border) 65%);
+        color: color-mix(in srgb, #ffb1c7 80%, white 20%);
+        font-size: calc(9px * var(--pt-scale));
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        line-height: 1.4;
+        text-transform: none;
+    }
+
+    .pt-areola {
+        fill: color-mix(in srgb, #b85c7c 28%, rgba(255, 255, 255, 0.06));
+        stroke: color-mix(in srgb, #b85c7c 42%, rgba(255, 255, 255, 0.12));
+        stroke-width: 0.6;
+        opacity: 0.85;
+        transition: fill 400ms ease-out;
+    }
+
+    .pt-areola.engorged {
+        fill: color-mix(in srgb, #b8456b 42%, rgba(255, 255, 255, 0.08));
+        stroke: color-mix(in srgb, #b8456b 55%, rgba(255, 255, 255, 0.16));
     }
 
     .pt-nipple {
-        fill: color-mix(in srgb, #ff7aa2 80%, rgba(255,255,255,0.18));
-        stroke: color-mix(in srgb, #ff5c8a 80%, rgba(255,255,255,0.2));
-        stroke-width: 1;
+        fill: color-mix(in srgb, #ff5c8a 78%, rgba(255, 255, 255, 0.14));
+        stroke: color-mix(in srgb, #ff3c70 80%, rgba(255, 255, 255, 0.2));
+        stroke-width: 0.6;
         transform-box: fill-box;
         transform-origin: center;
         transition: fill 400ms ease-out, filter 400ms ease-out;
     }
 
     .pt-nipple.engorged {
-        fill: color-mix(in srgb, #ff5c8a 92%, white 8%);
-        stroke: color-mix(in srgb, #ff5c8a 95%, rgba(255,255,255,0.25));
-        filter: drop-shadow(0 0 4px color-mix(in srgb, #ff5c8a 60%, transparent));
+        fill: color-mix(in srgb, #ff3870 90%, white 10%);
+        stroke: color-mix(in srgb, #ff3870 95%, rgba(255, 255, 255, 0.25));
+        filter: drop-shadow(0 0 3.5px color-mix(in srgb, #ff3870 70%, transparent));
         animation: nippleEngorged 2.4s ease-in-out infinite;
     }
 
     @keyframes nippleEngorged {
         0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.18); }
+        50% { transform: scale(1.22); }
     }
 
     .pt-milk-liquid {
@@ -9999,38 +10050,66 @@ var pulse_thread_tracker_default = {
                         &lt;div class=&quot;pt-breast-vessel&quot;&gt;
                             &lt;svg class=&quot;pt-breast-svg&quot; viewBox=&quot;0 0 100 120&quot; aria-hidden=&quot;true&quot; focusable=&quot;false&quot;&gt;
                                 &lt;defs&gt;
+                                    &lt;!-- Breast silhouette: anatomically scaled per character via
+                                         cup_size. Paths, anchor points, areola/nipple coords,
+                                         underbreast folds, cleavage and gloss are all
+                                         precomputed by the renderer (computeBreastGeometry). --&gt;
                                     &lt;clipPath id=&quot;pt-breast-clip-{{@index}}&quot;&gt;
-                                        &lt;circle cx=&quot;32&quot; cy=&quot;60&quot; r=&quot;22&quot; /&gt;
-                                        &lt;circle cx=&quot;68&quot; cy=&quot;60&quot; r=&quot;22&quot; /&gt;
+                                        &lt;path d=&quot;{{breastGeometry.pathLeft}}&quot; /&gt;
+                                        &lt;path d=&quot;{{breastGeometry.pathRight}}&quot; /&gt;
                                     &lt;/clipPath&gt;
                                     &lt;linearGradient id=&quot;pt-breast-depth-{{@index}}&quot; x1=&quot;0.5&quot; y1=&quot;0&quot; x2=&quot;0.5&quot; y2=&quot;1&quot;&gt;
                                         &lt;stop offset=&quot;0%&quot; stop-color=&quot;#7a3a55&quot; stop-opacity=&quot;0.45&quot; /&gt;
-                                        &lt;stop offset=&quot;100%&quot; stop-color=&quot;#3a1528&quot; stop-opacity=&quot;0.65&quot; /&gt;
+                                        &lt;stop offset=&quot;100%&quot; stop-color=&quot;#3a1528&quot; stop-opacity=&quot;0.7&quot; /&gt;
                                     &lt;/linearGradient&gt;
+                                    &lt;radialGradient id=&quot;pt-breast-shade-{{@index}}&quot; cx=&quot;0.4&quot; cy=&quot;0.35&quot; r=&quot;0.65&quot;&gt;
+                                        &lt;stop offset=&quot;0%&quot; stop-color=&quot;rgba(255,255,255,0.22)&quot; /&gt;
+                                        &lt;stop offset=&quot;100%&quot; stop-color=&quot;rgba(255,255,255,0)&quot; /&gt;
+                                    &lt;/radialGradient&gt;
                                 &lt;/defs&gt;
 
-                                &lt;!-- Inner cavity (depth shading inside each breast) --&gt;
-                                &lt;circle class=&quot;pt-breast-inner&quot; style=&quot;fill:url(#pt-breast-depth-{{@index}})&quot; cx=&quot;32&quot; cy=&quot;60&quot; r=&quot;22&quot; /&gt;
-                                &lt;circle class=&quot;pt-breast-inner&quot; style=&quot;fill:url(#pt-breast-depth-{{@index}})&quot; cx=&quot;68&quot; cy=&quot;60&quot; r=&quot;22&quot; /&gt;
+                                &lt;!-- Inner cavity depth (gradient inside each teardrop) --&gt;
+                                &lt;path class=&quot;pt-breast-inner&quot; style=&quot;fill:url(#pt-breast-depth-{{@index}})&quot; d=&quot;{{breastGeometry.pathLeft}}&quot; /&gt;
+                                &lt;path class=&quot;pt-breast-inner&quot; style=&quot;fill:url(#pt-breast-depth-{{@index}})&quot; d=&quot;{{breastGeometry.pathRight}}&quot; /&gt;
 
-                                &lt;!-- Milk fill (rises with breast_fullness_pct) --&gt;
+                                &lt;!-- Milk fill (rises with breast_fullness_pct, clipped to both breasts) --&gt;
                                 &lt;g clip-path=&quot;url(#pt-breast-clip-{{@index}})&quot;&gt;
-                                    &lt;rect class=&quot;pt-milk-liquid&quot; x=&quot;0&quot; y=&quot;{{breastFillTop stats.breast_fullness_pct}}&quot; width=&quot;100&quot; height=&quot;{{breastFillHeight stats.breast_fullness_pct}}&quot; /&gt;
-                                    &lt;path class=&quot;pt-milk-surface&quot; d=&quot;M 12 {{breastFillTop stats.breast_fullness_pct}} C 30 {{add (breastFillTop stats.breast_fullness_pct) 3}} 70 {{add (breastFillTop stats.breast_fullness_pct) 3}} 88 {{breastFillTop stats.breast_fullness_pct}}&quot; /&gt;
+                                    &lt;rect class=&quot;pt-milk-liquid&quot; x=&quot;0&quot; y=&quot;{{breastGeometry.fillTop}}&quot; width=&quot;100&quot; height=&quot;{{breastGeometry.fillHeight}}&quot; /&gt;
+                                    &lt;path class=&quot;pt-milk-surface&quot; d=&quot;M 8 {{breastGeometry.fillTop}} C 28 {{breastGeometry.fillSurfaceMid}} 72 {{breastGeometry.fillSurfaceMid}} 92 {{breastGeometry.fillTop}}&quot; /&gt;
+                                    &lt;!-- Soft upper-curve gloss (clipped so it follows the breast shape) --&gt;
+                                    &lt;ellipse class=&quot;pt-breast-gloss&quot; cx=&quot;{{breastGeometry.glossXLeft}}&quot; cy=&quot;{{breastGeometry.glossY}}&quot; rx=&quot;{{breastGeometry.glossRX}}&quot; ry=&quot;{{breastGeometry.glossRY}}&quot; fill=&quot;url(#pt-breast-shade-{{@index}})&quot; /&gt;
+                                    &lt;ellipse class=&quot;pt-breast-gloss&quot; cx=&quot;{{breastGeometry.glossXRight}}&quot; cy=&quot;{{breastGeometry.glossY}}&quot; rx=&quot;{{breastGeometry.glossRX}}&quot; ry=&quot;{{breastGeometry.glossRY}}&quot; fill=&quot;url(#pt-breast-shade-{{@index}})&quot; /&gt;
                                 &lt;/g&gt;
 
-                                &lt;!-- Breast outlines on top --&gt;
-                                &lt;circle class=&quot;pt-breast-outline {{#if stats.lactating}}lactating{{/if}}&quot; cx=&quot;32&quot; cy=&quot;60&quot; r=&quot;22&quot; /&gt;
-                                &lt;circle class=&quot;pt-breast-outline {{#if stats.lactating}}lactating{{/if}}&quot; cx=&quot;68&quot; cy=&quot;60&quot; r=&quot;22&quot; /&gt;
+                                &lt;!-- Cleavage hint: a short shadow line in the narrow band where
+                                     the breasts touch. Length/position track the apex. --&gt;
+                                &lt;path class=&quot;pt-breast-cleavage&quot; d=&quot;{{breastGeometry.cleavagePath}}&quot; /&gt;
 
-                                &lt;!-- Nipples --&gt;
-                                &lt;circle class=&quot;pt-nipple {{#if (gt stats.nipple_sensitivity_pct 60)}}engorged{{/if}}&quot; cx=&quot;32&quot; cy=&quot;71&quot; r=&quot;2.8&quot; /&gt;
-                                &lt;circle class=&quot;pt-nipple {{#if (gt stats.nipple_sensitivity_pct 60)}}engorged{{/if}}&quot; cx=&quot;68&quot; cy=&quot;71&quot; r=&quot;2.8&quot; /&gt;
+                                &lt;!-- Underbreast folds: faint creases at each breast&#039;s IMF.
+                                     Drift downward as cup size grows. --&gt;
+                                &lt;path class=&quot;pt-breast-fold&quot; d=&quot;{{breastGeometry.foldLeftPath}}&quot; /&gt;
+                                &lt;path class=&quot;pt-breast-fold&quot; d=&quot;{{breastGeometry.foldRightPath}}&quot; /&gt;
+
+                                &lt;!-- Outlines on top of fill and folds --&gt;
+                                &lt;path class=&quot;pt-breast-outline {{#if stats.lactating}}lactating{{/if}}&quot; d=&quot;{{breastGeometry.pathLeft}}&quot; /&gt;
+                                &lt;path class=&quot;pt-breast-outline {{#if stats.lactating}}lactating{{/if}}&quot; d=&quot;{{breastGeometry.pathRight}}&quot; /&gt;
+
+                                &lt;!-- Areola: broader, softer disk centred on each breast&#039;s
+                                     apex. Position and radius scale with cup. --&gt;
+                                &lt;circle class=&quot;pt-areola {{#if (gt stats.nipple_sensitivity_pct 60)}}engorged{{/if}}&quot; cx=&quot;{{breastGeometry.apexXLeft}}&quot; cy=&quot;{{breastGeometry.areolaY}}&quot; r=&quot;{{breastGeometry.areolaR}}&quot; /&gt;
+                                &lt;circle class=&quot;pt-areola {{#if (gt stats.nipple_sensitivity_pct 60)}}engorged{{/if}}&quot; cx=&quot;{{breastGeometry.apexXRight}}&quot; cy=&quot;{{breastGeometry.areolaY}}&quot; r=&quot;{{breastGeometry.areolaR}}&quot; /&gt;
+
+                                &lt;!-- Nipple: small, deeper colour, scales gently when sensitivity &gt; 60. --&gt;
+                                &lt;circle class=&quot;pt-nipple {{#if (gt stats.nipple_sensitivity_pct 60)}}engorged{{/if}}&quot; cx=&quot;{{breastGeometry.apexXLeft}}&quot; cy=&quot;{{breastGeometry.areolaY}}&quot; r=&quot;{{breastGeometry.nippleR}}&quot; /&gt;
+                                &lt;circle class=&quot;pt-nipple {{#if (gt stats.nipple_sensitivity_pct 60)}}engorged{{/if}}&quot; cx=&quot;{{breastGeometry.apexXRight}}&quot; cy=&quot;{{breastGeometry.areolaY}}&quot; r=&quot;{{breastGeometry.nippleR}}&quot; /&gt;
                             &lt;/svg&gt;
                         &lt;/div&gt;
                         &lt;div class=&quot;pt-bio-panel&quot;&gt;
                             &lt;div class=&quot;pt-bio-title-row&quot;&gt;
-                                &lt;h4&gt;Lactation&lt;/h4&gt;
+                                &lt;h4&gt;
+                                    Lactation
+                                    {{#if breastGeometry.cupLabel}}&lt;span class=&quot;pt-cup-tag&quot;&gt;{{breastGeometry.cupLabel}}&lt;/span&gt;{{/if}}
+                                &lt;/h4&gt;
                                 {{#if stats.lactating}}
                                     &lt;span class=&quot;pt-risk-badge risk-preg&quot;&gt;Lactating&lt;/span&gt;
                                 {{else if (gt stats.breast_fullness_pct 70)}}
@@ -10271,13 +10350,14 @@ TEMPLATE VARIABLES (tabbed mode):
     - {{stats.cycle_stage_id}}, {{stats.cycle_day}}, {{stats.womb_fullness_pct}}, {{stats.womb_receptivity_pct}}
     - {{stats.cervix_state_id}}, {{stats.breeding_count}}, {{stats.preg}}, {{stats.days_preg}}, {{stats.conception_date}}
     - {{stats.refractory_minutes}}, {{stats.refractory_total}}, {{stats.semen_ml}}, {{stats.semen_capacity_ml}}, {{stats.male_fertility_pct}}
-    - {{stats.breast_fullness_pct}}, {{stats.milk_ml}}, {{stats.milk_capacity_ml}}, {{stats.nipple_sensitivity_pct}}, {{stats.lactating}}
+    - {{stats.cup_size}}, {{stats.breast_fullness_pct}}, {{stats.milk_ml}}, {{stats.milk_capacity_ml}}, {{stats.nipple_sensitivity_pct}}, {{stats.lactating}}
+  - {{breastGeometry}}: precomputed by the renderer — pathLeft/pathRight, fillTop/Height, apexY/XLeft/XRight, areolaY/R, nippleR, cleavagePath, foldLeftPath/foldRightPath, glossXLeft/XRight/Y/RX/RY, cupLabel
     - {{stats.anal_fullness_pct}}, {{stats.anal_tightness_pct}}, {{stats.prostate_stimulation_pct}}
     - {{stats.last_react}}, {{stats.internal_thought}}
     - {{stats.days_since_first_meeting}}, {{stats.inactive}}, {{stats.inactiveReason}}
 --&gt;
 `,
-  sysPrompt: '## NARRATIVE CHARACTER TRACKER (Pulse Thread)\n\n**Objective:** Emit one JSON/YAML tracker per turn. Include `worldData` with `current_date` (YYYY-MM-DD) and `current_time` (24h), plus a `characters` array containing every tracked character.\n\n---\n\n### CRITICAL RULES\n\n1. **Strict schema adherence.** Always generate fresh tracker data using the exact canonical schema below. Do not copy, reuse, or echo hard-coded example values from this prompt or from prior turns. Every field must be populated from the current narrative state or preserved from prior tracker values — never from the example template.\n2. **Array wrapping is mandatory.** Never emit a flat top-level map like `{ "CharacterName": { ... } }`. Always use `{ "characters": [ { ... }, { ... } ] }`, even for a single character.\n3. **`name` must be at the character object level.** You may nest stats under `"stats": { ... }`; the tracker flattens them. `name` must never appear inside `stats`.\n4. **No omitted fields.** Every character object must include every field below on every turn. Use `0`, `false`, or `""` for unknown/inapplicable values. Preserve prior values when known.\n5. **Output order:** Narrative → tracker tag → `sim` codeblock. Never omit the codeblock.\n6. **Never track the user.** Do not include `{{user}}`, the player, or any self-insert persona in the `characters` array. The tracker is for narrative characters and NPCs only.\n7. **Multi-character cap:** Track up to 4 active characters. Mark inactive ones with `"inactive": true`.\n8. **Numeric IDs, not strings.** Where a field is an enum (`cycle_stage_id`, `cervix_state_id`, `last_react`, `inactiveReason`), emit the integer. The renderer maps it to its display label.\n9. **Do not emit derived fields.** Stat deltas (`apChange`, `dpChange`, `tpChange`, `cpChange`), readable cycle/cervix labels, and relationship/desire descriptors are derived by the renderer. Do not include them.\n\n---\n\n### CANONICAL SCHEMA\n\n```json\n{\n  "worldData": {\n    "current_date": "YYYY-MM-DD",\n    "current_time": "HH:MM"\n  },\n  "characters": [\n    {\n      "name": "Character Name",\n      "ap": 0,\n      "dp": 0,\n      "tp": 0,\n      "cp": 0,\n      "sex": "female",\n      "cycle_stage_id": 0,\n      "cycle_day": 0,\n      "womb_fullness_pct": 0,\n      "womb_receptivity_pct": 0,\n      "cervix_state_id": 0,\n      "breast_fullness_pct": 0,\n      "milk_ml": 0,\n      "milk_capacity_ml": 0,\n      "nipple_sensitivity_pct": 0,\n      "lactating": false,\n      "breeding_count": 0,\n      "preg": false,\n      "conceived": false,\n      "days_preg": 0,\n      "conception_date": "",\n      "refractory_minutes": 0,\n      "refractory_total": 0,\n      "semen_ml": 0,\n      "semen_capacity_ml": 0,\n      "male_fertility_pct": 0,\n      "anal_fullness_pct": 0,\n      "anal_tightness_pct": 0,\n      "prostate_stimulation_pct": 0,\n      "last_react": 0,\n      "internal_thought": "",\n      "days_since_first_meeting": 0,\n      "inactive": false,\n      "inactiveReason": 0,\n      "bg": "#808080"\n    }\n  ]\n}\n```\n\n---\n\n### STAT METERS (HARD CAPS)\n\n| Field | Range | Brackets |\n|---|---|---|\n| **ap** Affection | 0-200 | 0-30 Strangers / 31-60 Acquaintances / 61-90 Friends / 91-120 Romantic / 121-150 Steady / 151-180 Committed / 181-200 Devoted |\n| **dp** Desire | 0-150 | 0-25 Cold / 26-50 Warm / 51-75 Interested / 76-100 Aroused / 101-125 Needy / 126-150 Desperate |\n| **tp** Trust | 0-150 | Falls when lied to, cheated, or promises broken. Rises with kept promises and demonstrated reliability. |\n| **cp** Contempt | 0-150 | Rises when harmed. A rising CP can drag AP/DP/TP down. |\n\nMovement is +/- per turn, scaled to the magnitude of the moment. Do not include `apChange`/`dpChange`/`tpChange`/`cpChange` — the renderer computes deltas by diffing the current tracker against the previous tracker block automatically.\n\n---\n\n### REACTIONS & INACTIVITY ENUMS\n\n- `last_react` — most recent reaction toward the user this turn:\n  - `0` = Neutral\n  - `1` = Like / Approve\n  - `2` = Dislike / Disapprove\n- `inactiveReason` — when `inactive: true`, set the cause:\n  - `0` = Not inactive (default)\n  - `1` = Asleep\n  - `2` = Comatose\n  - `3` = Contempt / refusing engagement\n  - `4` = Incapacitated\n  - `5` = Death\n\n---\n\n### BIOLOGICAL TRACKING\n\n**`sex` gate:** lowercase one of `"female"`, `"male"`, `"futanari"`, `"other"`. Preserve from prior state unless the narrative explicitly changes biology.\n\n**General rule for all biology:** Preserve prior values across turns. Advance only when narrative time passes. Use `0` / `""` / `false` when genuinely inapplicable. Futanari characters output **both** female and male field groups.\n\n#### Female / Futanari — Fertility & Womb\n\nFor `sex: "female"` or `"futanari"`, always include and update:\n\n- `cycle_day` — Current day in the cycle, typically 1-28 (or established species length). Advance with narrative time.\n- `cycle_stage_id` — Integer enum for the current fertility phase:\n  - `0` = unknown / N/A\n  - `1` = menstruation (days 1-5)\n  - `2` = follicular (days 6-13)\n  - `3` = ovulation (days 14-16, peak fertility)\n  - `4` = luteal (days 17-28)\n  - `5` = pregnancy\n  - `6` = rut (heat / estrus surge — species-dependent)\n- `womb_fullness_pct` — 0-100. Estimate from narrative; preserve unless events change it (ejaculation, leakage, douching, menstruation, pregnancy progression).\n- `womb_receptivity_pct` — 0-100. High during ovulation/rut and heavy arousal; low during menstruation, contempt, or low arousal.\n- `cervix_state_id` — Integer enum, ordered from most closed to most open. Track narrative arousal and fertile-window biology together:\n  - `0` = unknown / N/A\n  - `1` = sealed — locked tight (pregnancy plug, post-coital seal, deep refractory)\n  - `2` = firm — closed, non-fertile baseline\n  - `3` = soft — relaxed, near-fertile or aroused\n  - `4` = open — parted, fertile window or active receptivity\n  - `5` = dilated — wide open, peak fertility paired with heavy arousal\n  - `6` = kissed — directly contacted or breached by a partner; deepest exposure\n- `breeding_count` — Times filled internally this cycle. Increment after each internal ejaculation; preserve between turns; reset only at the start of a new cycle.\n\n**Conception & Pregnancy (staged):**\n\nThe pipeline stages reproduction across two flags:\n\n- `conceived: true` — fertilization has happened but pregnancy isn\'t yet visibly evident. The character is silently carrying.\n- `preg: true` — pregnancy has been confirmed (test, narrative reveal, missed period, showing). Implies `cycle_stage_id: 5` and `cervix_state_id: 1` (sealed) unless labor begins.\n\n**Engine-enforced auto-conception:** when womb fullness exceeds 85% during a fertile window (ovulation, rut, or early luteal cycle_day ≤ 19) and the character is not already conceived/pregnant, the engine flips a coin to mark her `conceived: true` (with `conception_date` set to the current world date). At 100% fullness the coin is skipped and conception is automatic. **If the prior tracker block shows `conceived: true`, preserve it on every subsequent emission until pregnancy is confirmed — never revert it to `false`.**\n\nManual rules:\n\n- If pregnant: `preg: true`, `cycle_stage_id: 5`, advance `days_preg` daily, preserve `conception_date` (YYYY-MM-DD). Set `cervix_state_id: 1`.\n- If conceived but not yet pregnant: `conceived: true`, `preg: false`, `days_preg: 0`, `conception_date` set. The narrative may reveal pregnancy after several in-world days — at that point flip `preg: true` and start advancing `days_preg`.\n- If not pregnant and not conceived: `preg: false`, `conceived: false`, `days_preg: 0`, `conception_date: ""`.\n\n#### Female / Futanari — Breast & Lactation\n\nThe tracker renders a breast/lactation panel for every female-aligned character (`female`, `futanari`, `intersex`, `hermaphrodite`, `both`). It is the female-side counterpart to the male semen panel — tracking reproductive-fluid storage and the lactation lifecycle. Update these whenever pregnancy, postpartum care, breast play, or lactation occurs in the narrative.\n\n- `breast_fullness_pct` — 0-100. Engorgement level. Rises during pregnancy (especially second/third trimester), during arousal (mild), and as milk accumulates between feedings/pumping. Drops after nursing, pumping, or expressing. Preserve baseline per character (small breasts may peak lower than large breasts narratively, but the percentage is relative to *that character\'s* capacity).\n- `milk_ml` — Current milk volume stored (0 to `milk_capacity_ml`). Rises with lactation production over narrative time. Drops to a low level after feeding/pumping. `0` when not lactating.\n- `milk_capacity_ml` — Maximum milk storage capacity. Preserve once established. Typical human range ~50-300 ml per breast; tracker treats both breasts together (so 100-600 ml is a reasonable range). `0` when not lactating.\n- `nipple_sensitivity_pct` — 0-100. Active sensitivity. Rises with arousal, pregnancy hormones, nursing latch, cold, or direct stimulation. Falls quickly when stimulation stops. `0` when not relevant.\n- `lactating` — boolean. `true` once milk production has actually begun (mid-to-late pregnancy onward, or any other established lactation state); `false` for non-lactating characters.\n\nIf the character is not pregnant, not postpartum, and not narratively lactating, leave all five at `0` / `false`. The panel still renders with empty values for consistency. During pregnancy, expect `breast_fullness_pct` to climb, `lactating` to flip true around mid-pregnancy or at parturition, and `milk_ml` / `milk_capacity_ml` to populate as lactation establishes.\n\n#### Male / Futanari — Refractory & Semen\n\nFor `sex: "male"` or `"futanari"`, populate these fields. Other characters may include them as `0`.\n\n- `refractory_minutes` — Minutes remaining until ready. `0` = ready.\n- `refractory_total` — Total minutes of the current refractory period. `0` when not in refractory.\n- `semen_ml` — Current volume, `0` to `semen_capacity_ml`. Drops after ejaculation; recovers with rest/arousal.\n- `semen_capacity_ml` — Maximum volume. Preserve unless biology changes.\n- `male_fertility_pct` — 0-100. Adjust for sperm count, magical fertility, infertility, rut, recovery, fatigue, etc.\n\nConvert all time to minutes. Decrement `refractory_minutes` toward `0` as narrative time passes.\n\n#### Anal Tracking — All Characters\n\nThe tracker renders an anal panel for every gendered character (`female`, `male`, `futanari`, etc.). The prostate graphic and prostate stat row only render for prostate-bearing characters (`male`, `futanari`, `intersex`, `hermaphrodite`, `both`); pure-female cards show fullness and tightness only.\n\n**Update these whenever anal play, anal sex, or prostate stimulation occurs in the narrative — otherwise the panel exists but never reflects events.**\n\n- `anal_fullness_pct` — 0-100. Volume currently inside the anal canal (semen, toys, fingers, etc.). Rises with insertion/ejaculation, falls with withdrawal, expulsion, or cleanup over time. Preserve between turns. Applies to all characters.\n- `anal_tightness_pct` — 0-100. Resistance of the sphincter. `100` = untouched / virgin tight; drops with stretching, sustained use, lubrication, and arousal. Recovers with rest. Preserve baseline per character. Applies to all characters.\n- `prostate_stimulation_pct` — 0-100. Active prostate stimulation level this moment. Rises with direct pressure / deep penetration / toys angled at the prostate; falls quickly when stimulation stops. **Leave `0` for pure-female characters** — the renderer hides the prostate panel/graphic for them automatically.\n\nIf no anal content has occurred for a character, leave all three at `0`. If anal content **has** occurred — even just penetration without ejaculation — `anal_tightness_pct` should drop from its baseline and (where applicable) `prostate_stimulation_pct` and `anal_fullness_pct` should reflect what\'s happening.\n\n#### Futanari / Dual-Biology\n\nOutput **all** female cycle fields, lactation fields, male reproductive fields, and anal fields. The tracker renders all applicable panels in a compressed multi-row column.\n\n---\n\n### INTERNAL THOUGHT & META\n\n- `internal_thought` — One short first-person sentence capturing the character\'s current inner monologue. Refresh every turn; never leave stale.\n- `days_since_first_meeting` — Total in-world days since the character first met the user. Increment as narrative dates advance.\n- `inactive` / `inactiveReason` — Use when the character is asleep, comatose, dead, refusing engagement, or otherwise out of the scene.\n\n---\n\n### THEMING\n\nProvide `"bg"` as a hex color per character (e.g. `"#2d1b4e"`). Pick a color that matches the character\'s vibe; preserve across turns once chosen.\n',
+  sysPrompt: '## NARRATIVE CHARACTER TRACKER (Pulse Thread)\n\n**Objective:** Emit one JSON/YAML tracker per turn. Include `worldData` with `current_date` (YYYY-MM-DD) and `current_time` (24h), plus a `characters` array containing every tracked character.\n\n---\n\n### CRITICAL RULES\n\n1. **Strict schema adherence.** Always generate fresh tracker data using the exact canonical schema below. Do not copy, reuse, or echo hard-coded example values from this prompt or from prior turns. Every field must be populated from the current narrative state or preserved from prior tracker values — never from the example template.\n2. **Array wrapping is mandatory.** Never emit a flat top-level map like `{ "CharacterName": { ... } }`. Always use `{ "characters": [ { ... }, { ... } ] }`, even for a single character.\n3. **`name` must be at the character object level.** You may nest stats under `"stats": { ... }`; the tracker flattens them. `name` must never appear inside `stats`.\n4. **No omitted fields.** Every character object must include every field below on every turn. Use `0`, `false`, or `""` for unknown/inapplicable values. Preserve prior values when known.\n5. **Output order:** Narrative → tracker tag → `sim` codeblock. Never omit the codeblock.\n6. **Never track the user.** Do not include `{{user}}`, the player, or any self-insert persona in the `characters` array. The tracker is for narrative characters and NPCs only.\n7. **Multi-character cap:** Track up to 4 active characters. Mark inactive ones with `"inactive": true`.\n8. **Numeric IDs, not strings.** Where a field is an enum (`cycle_stage_id`, `cervix_state_id`, `last_react`, `inactiveReason`), emit the integer. The renderer maps it to its display label.\n9. **Do not emit derived fields.** Stat deltas (`apChange`, `dpChange`, `tpChange`, `cpChange`), readable cycle/cervix labels, and relationship/desire descriptors are derived by the renderer. Do not include them.\n\n---\n\n### CANONICAL SCHEMA\n\n```json\n{\n  "worldData": {\n    "current_date": "YYYY-MM-DD",\n    "current_time": "HH:MM"\n  },\n  "characters": [\n    {\n      "name": "Character Name",\n      "ap": 0,\n      "dp": 0,\n      "tp": 0,\n      "cp": 0,\n      "sex": "female",\n      "cycle_stage_id": 0,\n      "cycle_day": 0,\n      "womb_fullness_pct": 0,\n      "womb_receptivity_pct": 0,\n      "cervix_state_id": 0,\n      "cup_size": "",\n      "breast_fullness_pct": 0,\n      "milk_ml": 0,\n      "milk_capacity_ml": 0,\n      "nipple_sensitivity_pct": 0,\n      "lactating": false,\n      "breeding_count": 0,\n      "preg": false,\n      "conceived": false,\n      "days_preg": 0,\n      "conception_date": "",\n      "refractory_minutes": 0,\n      "refractory_total": 0,\n      "semen_ml": 0,\n      "semen_capacity_ml": 0,\n      "male_fertility_pct": 0,\n      "anal_fullness_pct": 0,\n      "anal_tightness_pct": 0,\n      "prostate_stimulation_pct": 0,\n      "last_react": 0,\n      "internal_thought": "",\n      "days_since_first_meeting": 0,\n      "inactive": false,\n      "inactiveReason": 0,\n      "bg": "#808080"\n    }\n  ]\n}\n```\n\n---\n\n### STAT METERS (HARD CAPS)\n\n| Field | Range | Brackets |\n|---|---|---|\n| **ap** Affection | 0-200 | 0-30 Strangers / 31-60 Acquaintances / 61-90 Friends / 91-120 Romantic / 121-150 Steady / 151-180 Committed / 181-200 Devoted |\n| **dp** Desire | 0-150 | 0-25 Cold / 26-50 Warm / 51-75 Interested / 76-100 Aroused / 101-125 Needy / 126-150 Desperate |\n| **tp** Trust | 0-150 | Falls when lied to, cheated, or promises broken. Rises with kept promises and demonstrated reliability. |\n| **cp** Contempt | 0-150 | Rises when harmed. A rising CP can drag AP/DP/TP down. |\n\nMovement is +/- per turn, scaled to the magnitude of the moment. Do not include `apChange`/`dpChange`/`tpChange`/`cpChange` — the renderer computes deltas by diffing the current tracker against the previous tracker block automatically.\n\n---\n\n### REACTIONS & INACTIVITY ENUMS\n\n- `last_react` — most recent reaction toward the user this turn:\n  - `0` = Neutral\n  - `1` = Like / Approve\n  - `2` = Dislike / Disapprove\n- `inactiveReason` — when `inactive: true`, set the cause:\n  - `0` = Not inactive (default)\n  - `1` = Asleep\n  - `2` = Comatose\n  - `3` = Contempt / refusing engagement\n  - `4` = Incapacitated\n  - `5` = Death\n\n---\n\n### BIOLOGICAL TRACKING\n\n**`sex` gate:** lowercase one of `"female"`, `"male"`, `"futanari"`, `"other"`. Preserve from prior state unless the narrative explicitly changes biology.\n\n**General rule for all biology:** Preserve prior values across turns. Advance only when narrative time passes. Use `0` / `""` / `false` when genuinely inapplicable. Futanari characters output **both** female and male field groups.\n\n#### Female / Futanari — Fertility & Womb\n\nFor `sex: "female"` or `"futanari"`, always include and update:\n\n- `cycle_day` — Current day in the cycle, typically 1-28 (or established species length). Advance with narrative time.\n- `cycle_stage_id` — Integer enum for the current fertility phase:\n  - `0` = unknown / N/A\n  - `1` = menstruation (days 1-5)\n  - `2` = follicular (days 6-13)\n  - `3` = ovulation (days 14-16, peak fertility)\n  - `4` = luteal (days 17-28)\n  - `5` = pregnancy\n  - `6` = rut (heat / estrus surge — species-dependent)\n- `womb_fullness_pct` — 0-100. Estimate from narrative; preserve unless events change it (ejaculation, leakage, douching, menstruation, pregnancy progression).\n- `womb_receptivity_pct` — 0-100. High during ovulation/rut and heavy arousal; low during menstruation, contempt, or low arousal.\n- `cervix_state_id` — Integer enum, ordered from most closed to most open. Track narrative arousal and fertile-window biology together:\n  - `0` = unknown / N/A\n  - `1` = sealed — locked tight (pregnancy plug, post-coital seal, deep refractory)\n  - `2` = firm — closed, non-fertile baseline\n  - `3` = soft — relaxed, near-fertile or aroused\n  - `4` = open — parted, fertile window or active receptivity\n  - `5` = dilated — wide open, peak fertility paired with heavy arousal\n  - `6` = kissed — directly contacted or breached by a partner; deepest exposure\n- `breeding_count` — Times filled internally this cycle. Increment after each internal ejaculation; preserve between turns; reset only at the start of a new cycle.\n\n**Conception & Pregnancy (staged):**\n\nThe pipeline stages reproduction across two flags:\n\n- `conceived: true` — fertilization has happened but pregnancy isn\'t yet visibly evident. The character is silently carrying.\n- `preg: true` — pregnancy has been confirmed (test, narrative reveal, missed period, showing). Implies `cycle_stage_id: 5` and `cervix_state_id: 1` (sealed) unless labor begins.\n\n**Engine-enforced auto-conception:** when womb fullness exceeds 85% during a fertile window (ovulation, rut, or early luteal cycle_day ≤ 19) and the character is not already conceived/pregnant, the engine flips a coin to mark her `conceived: true` (with `conception_date` set to the current world date). At 100% fullness the coin is skipped and conception is automatic. **If the prior tracker block shows `conceived: true`, preserve it on every subsequent emission until pregnancy is confirmed — never revert it to `false`.**\n\nManual rules:\n\n- If pregnant: `preg: true`, `cycle_stage_id: 5`, advance `days_preg` daily, preserve `conception_date` (YYYY-MM-DD). Set `cervix_state_id: 1`.\n- If conceived but not yet pregnant: `conceived: true`, `preg: false`, `days_preg: 0`, `conception_date` set. The narrative may reveal pregnancy after several in-world days — at that point flip `preg: true` and start advancing `days_preg`.\n- If not pregnant and not conceived: `preg: false`, `conceived: false`, `days_preg: 0`, `conception_date: ""`.\n\n#### Female / Futanari — Breast & Lactation\n\nThe tracker renders a breast/lactation panel for every female-aligned character (`female`, `futanari`, `intersex`, `hermaphrodite`, `both`). It is the female-side counterpart to the male semen panel — tracking anatomy, reproductive-fluid storage, and the lactation lifecycle. Update these whenever pregnancy, postpartum care, breast play, or lactation occurs in the narrative.\n\n**Anatomy (one-time establishment):**\n\n- `cup_size` — string, uppercase cup letter, **one of** `"AA"`, `"A"`, `"B"`, `"C"`, `"D"`, `"DD"`, `"E"`, `"F"`, `"G"`, `"H"`, `"I"`, `"J"`, `"K"`. UK doubled letters `"FF"`, `"GG"`, `"HH"`, `"II"`, `"JJ"` are accepted as aliases for the next US size up. The renderer maps this letter to a precise visual: the breast SVG silhouette is scaled in width, depth, and underbreast hang to match the cup size, with the areola and nipple repositioning to anatomically correct landmarks. Empty string falls back to a C-cup visual.\n\n  Establish per character on first appearance using narrative cues — descriptive language (`"petite"`, `"modest"`, `"ample"`, `"buxom"`, `"enormous"`), explicit canonical size, body type, age, build. Suggested mapping for free-form description:\n\n  | Cue | Cup |\n  |---|---|\n  | Flat-chested, prepubescent, tiny, barely there | `AA` |\n  | Small, petite, perky, modest | `A` |\n  | Small-to-medium, B-cup, fits a hand | `B` |\n  | Medium, average, handful, palmable | `C` |\n  | Full, ample, well-endowed | `D` |\n  | Generous, busty, double-D | `DD` |\n  | Heavy, very full, F/G-cup descriptions | `F`–`G` |\n  | Huge, massive, "hentai-proportioned", over-the-top | `H`+ |\n\n  **Preserve `cup_size` across all turns.** Only change it under explicit biological transformation in-narrative — puberty progression, magical growth/reduction, surgery, lactation-driven permanent growth, etc. Cup size does **not** change with arousal, pregnancy engorgement, or milk fullness; those modulate `breast_fullness_pct` instead.\n\n**Dynamic state:**\n\n- `breast_fullness_pct` — 0-100. Engorgement level *relative to that character\'s cup capacity*. Rises during pregnancy (especially second/third trimester), during arousal (mild), and as milk accumulates between feedings/pumping. Drops after nursing, pumping, or expressing. A C-cup at 80% and a G-cup at 80% will both look proportionally engorged for their frame — the percentage is relative, the absolute size comes from `cup_size`.\n- `milk_ml` — Current milk volume stored (0 to `milk_capacity_ml`). Rises with lactation production over narrative time. Drops to a low level after feeding/pumping. `0` when not lactating.\n- `milk_capacity_ml` — Maximum milk storage capacity. Preserve once established. Typical human range ~50-300 ml per breast; tracker treats both breasts together (so 100-600 ml is a reasonable range). `0` when not lactating.\n- `nipple_sensitivity_pct` — 0-100. Active sensitivity. Rises with arousal, pregnancy hormones, nursing latch, cold, or direct stimulation. Falls quickly when stimulation stops. `0` when not relevant.\n- `lactating` — boolean. `true` once milk production has actually begun (mid-to-late pregnancy onward, or any other established lactation state); `false` for non-lactating characters.\n\nIf the character is not pregnant, not postpartum, and not narratively lactating, leave all five at `0` / `false`. The panel still renders with empty values for consistency. During pregnancy, expect `breast_fullness_pct` to climb, `lactating` to flip true around mid-pregnancy or at parturition, and `milk_ml` / `milk_capacity_ml` to populate as lactation establishes.\n\n#### Male / Futanari — Refractory & Semen\n\nFor `sex: "male"` or `"futanari"`, populate these fields. Other characters may include them as `0`.\n\n- `refractory_minutes` — Minutes remaining until ready. `0` = ready.\n- `refractory_total` — Total minutes of the current refractory period. `0` when not in refractory.\n- `semen_ml` — Current volume, `0` to `semen_capacity_ml`. Drops after ejaculation; recovers with rest/arousal.\n- `semen_capacity_ml` — Maximum volume. Preserve unless biology changes.\n- `male_fertility_pct` — 0-100. Adjust for sperm count, magical fertility, infertility, rut, recovery, fatigue, etc.\n\nConvert all time to minutes. Decrement `refractory_minutes` toward `0` as narrative time passes.\n\n#### Anal Tracking — All Characters\n\nThe tracker renders an anal panel for every gendered character (`female`, `male`, `futanari`, etc.). The prostate graphic and prostate stat row only render for prostate-bearing characters (`male`, `futanari`, `intersex`, `hermaphrodite`, `both`); pure-female cards show fullness and tightness only.\n\n**Update these whenever anal play, anal sex, or prostate stimulation occurs in the narrative — otherwise the panel exists but never reflects events.**\n\n- `anal_fullness_pct` — 0-100. Volume currently inside the anal canal (semen, toys, fingers, etc.). Rises with insertion/ejaculation, falls with withdrawal, expulsion, or cleanup over time. Preserve between turns. Applies to all characters.\n- `anal_tightness_pct` — 0-100. Resistance of the sphincter. `100` = untouched / virgin tight; drops with stretching, sustained use, lubrication, and arousal. Recovers with rest. Preserve baseline per character. Applies to all characters.\n- `prostate_stimulation_pct` — 0-100. Active prostate stimulation level this moment. Rises with direct pressure / deep penetration / toys angled at the prostate; falls quickly when stimulation stops. **Leave `0` for pure-female characters** — the renderer hides the prostate panel/graphic for them automatically.\n\nIf no anal content has occurred for a character, leave all three at `0`. If anal content **has** occurred — even just penetration without ejaculation — `anal_tightness_pct` should drop from its baseline and (where applicable) `prostate_stimulation_pct` and `anal_fullness_pct` should reflect what\'s happening.\n\n#### Futanari / Dual-Biology\n\nOutput **all** female cycle fields, lactation fields, male reproductive fields, and anal fields. The tracker renders all applicable panels in a compressed multi-row column.\n\n---\n\n### INTERNAL THOUGHT & META\n\n- `internal_thought` — One short first-person sentence capturing the character\'s current inner monologue. Refresh every turn; never leave stale.\n- `days_since_first_meeting` — Total in-world days since the character first met the user. Increment as narrative dates advance.\n- `inactive` / `inactiveReason` — Use when the character is asleep, comatose, dead, refusing engagement, or otherwise out of the scene.\n\n---\n\n### THEMING\n\nProvide `"bg"` as a hex color per character (e.g. `"#2d1b4e"`). Pick a color that matches the character\'s vibe; preserve across turns once chosen.\n',
   customFields: [
     {
       key: "ap",
@@ -10320,8 +10400,12 @@ TEMPLATE VARIABLES (tabbed mode):
       description: "[number] Cervix openness enum (most closed → most open): 0=unknown, 1=sealed, 2=firm, 3=soft, 4=open, 5=dilated, 6=kissed. Renderer maps to a display label."
     },
     {
+      key: "cup_size",
+      description: "[string] Uppercase cup letter — one of 'AA', 'A', 'B', 'C', 'D', 'DD', 'E', 'F', 'G', 'H', 'I', 'J', 'K'. UK doubled letters FF/GG/HH/II/JJ accepted as aliases. The renderer scales the breast SVG silhouette (width, depth, underbreast hang) to match. Establish on first appearance from narrative cues; preserve across turns unless biology changes (puberty, magic, surgery). Empty defaults to a C-cup visual."
+    },
+    {
       key: "breast_fullness_pct",
-      description: "[number] Breast engorgement (0-100). Rises with pregnancy, arousal (mild), and milk accumulation. Drops after nursing/pumping. Preserve baseline."
+      description: "[number] Breast engorgement (0-100) relative to cup capacity. Rises with pregnancy, arousal (mild), and milk accumulation. Drops after nursing/pumping. Independent of cup_size — modulates fullness within the established anatomy."
     },
     {
       key: "milk_ml",
@@ -17029,13 +17113,161 @@ function milkPercent(stats) {
   const record = stats;
   return percentOf(record.milk_ml, record.milk_capacity_ml);
 }
-function breastFillTop(value) {
-  const pct = clampPercent(value);
-  return 82 - pct / 100 * 44;
+var CUP_SIZE_SCALE = {
+  AA: { x: 0.55, y: 0.58 },
+  A: { x: 0.65, y: 0.7 },
+  B: { x: 0.78, y: 0.82 },
+  C: { x: 0.88, y: 0.9 },
+  D: { x: 1, y: 1 },
+  DD: { x: 1.08, y: 1.08 },
+  E: { x: 1.08, y: 1.08 },
+  F: { x: 1.13, y: 1.14 },
+  G: { x: 1.18, y: 1.21 },
+  H: { x: 1.22, y: 1.28 },
+  I: { x: 1.25, y: 1.32 },
+  J: { x: 1.28, y: 1.36 },
+  K: { x: 1.3, y: 1.4 }
+};
+var CUP_SIZE_ALIASES = {
+  DDD: "F",
+  FF: "G",
+  GG: "H",
+  HH: "I",
+  II: "J",
+  JJ: "K",
+  KK: "K"
+};
+var CUP_SIZE_DEFAULT = CUP_SIZE_SCALE.C;
+function sanitizeCupSize(raw) {
+  if (typeof raw !== "string")
+    return "";
+  const cleaned = raw.trim().toUpperCase().replace(/[^A-Z]/g, "");
+  if (!cleaned)
+    return "";
+  const aliased = CUP_SIZE_ALIASES[cleaned];
+  if (aliased)
+    return aliased;
+  return CUP_SIZE_SCALE[cleaned] ? cleaned : "";
 }
-function breastFillHeight(value) {
-  const pct = clampPercent(value);
-  return pct / 100 * 44;
+function cupScaleFor(stats) {
+  if (!stats || typeof stats !== "object" || Array.isArray(stats))
+    return CUP_SIZE_DEFAULT;
+  const key = sanitizeCupSize(stats.cup_size);
+  return key ? CUP_SIZE_SCALE[key] : CUP_SIZE_DEFAULT;
+}
+function cupSizeLabel(stats) {
+  if (!stats || typeof stats !== "object" || Array.isArray(stats))
+    return "";
+  const record = stats;
+  if (typeof record.cup_size !== "string")
+    return "";
+  const raw = record.cup_size.trim().toUpperCase().replace(/[^A-Z]/g, "");
+  if (!raw)
+    return "";
+  return sanitizeCupSize(raw) ? raw : "";
+}
+function roundCoord(n) {
+  return Math.round(n * 100) / 100;
+}
+function fmtCoord(n) {
+  const r = roundCoord(n);
+  if (Number.isInteger(r))
+    return String(r);
+  return r.toFixed(2).replace(/\.?0+$/, "");
+}
+function buildBreastPath(side, xS, yS) {
+  const sgn = side === "left" ? -1 : 1;
+  const center = 50;
+  const top_y = 38;
+  const apex_y = top_y + 26 * yS;
+  const bottom_y = top_y + 52 * yS;
+  const top_x = center + sgn * 18;
+  const outer_x = center + sgn * 40 * xS;
+  const bottom_x = center + sgn * 20;
+  const inner_x = center + sgn * 4;
+  const c1a_x = top_x + (outer_x - top_x) * 0.45;
+  const c1a_y = top_y;
+  const c1b_x = outer_x + -sgn * 2;
+  const c1b_y = apex_y - 16 * yS;
+  const c2a_x = outer_x + sgn * 2;
+  const c2a_y = apex_y + 16 * yS;
+  const c2b_x = bottom_x + sgn * 14 * xS;
+  const c2b_y = bottom_y;
+  const c3a_x = bottom_x + -sgn * 12 * xS;
+  const c3a_y = bottom_y;
+  const c3b_x = inner_x;
+  const c3b_y = apex_y + 16 * yS;
+  const c4a_x = inner_x;
+  const c4a_y = apex_y - 14 * yS;
+  const c4b_x = top_x + -sgn * 8;
+  const c4b_y = top_y;
+  const F = fmtCoord;
+  return [
+    `M ${F(top_x)} ${F(top_y)}`,
+    `C ${F(c1a_x)} ${F(c1a_y)}, ${F(c1b_x)} ${F(c1b_y)}, ${F(outer_x)} ${F(apex_y)}`,
+    `C ${F(c2a_x)} ${F(c2a_y)}, ${F(c2b_x)} ${F(c2b_y)}, ${F(bottom_x)} ${F(bottom_y)}`,
+    `C ${F(c3a_x)} ${F(c3a_y)}, ${F(c3b_x)} ${F(c3b_y)}, ${F(inner_x)} ${F(apex_y)}`,
+    `C ${F(c4a_x)} ${F(c4a_y)}, ${F(c4b_x)} ${F(c4b_y)}, ${F(top_x)} ${F(top_y)}`,
+    "Z"
+  ].join(" ");
+}
+function computeBreastGeometry(stats) {
+  const { x: xS, y: yS } = cupScaleFor(stats);
+  const top_y = 38;
+  const apex_y = top_y + 26 * yS;
+  const bottom_y = top_y + 52 * yS;
+  const pathLeft = buildBreastPath("left", xS, yS);
+  const pathRight = buildBreastPath("right", xS, yS);
+  const fullness = stats && typeof stats === "object" && !Array.isArray(stats) ? clampPercent(stats.breast_fullness_pct) : 0;
+  const range = bottom_y - top_y;
+  const fillTop = bottom_y - fullness / 100 * range;
+  const fillHeight = fullness / 100 * range;
+  const outer_x_left = 50 - 40 * xS;
+  const outer_x_right = 50 + 40 * xS;
+  const inner_x_left = 46;
+  const inner_x_right = 54;
+  const apexXLeft = (outer_x_left + inner_x_left) / 2;
+  const apexXRight = (outer_x_right + inner_x_right) / 2;
+  const areolaY = apex_y + 8 * yS;
+  const areolaR = Math.max(2.5, Math.min(6, 4.6 * yS));
+  const nippleR = Math.max(1.2, Math.min(2.5, 1.8 * yS));
+  const cleavTop = apex_y - 10;
+  const cleavMid = apex_y - 2;
+  const cleavBotMid = apex_y + 10;
+  const cleavBot = apex_y + 18;
+  const cleavagePath = `M 50 ${fmtCoord(cleavTop)} C 48 ${fmtCoord(cleavMid)}, 48 ${fmtCoord(cleavBotMid)}, 50 ${fmtCoord(cleavBot)}`;
+  const foldY = bottom_y - 4;
+  const foldDipY = bottom_y + 3;
+  const foldLeftPath = `M 14 ${fmtCoord(foldY)} C 22 ${fmtCoord(foldDipY)}, 38 ${fmtCoord(foldDipY)}, 45 ${fmtCoord(foldY)}`;
+  const foldRightPath = `M 86 ${fmtCoord(foldY)} C 78 ${fmtCoord(foldDipY)}, 62 ${fmtCoord(foldDipY)}, 55 ${fmtCoord(foldY)}`;
+  const glossY = top_y + (apex_y - top_y) * 0.45;
+  const glossXLeft = 32 + (outer_x_left - 32) * 0.4;
+  const glossXRight = 68 + (outer_x_right - 68) * 0.4;
+  const glossRX = Math.max(5, Math.min(16, 11 * xS));
+  const glossRY = Math.max(3, Math.min(10, 6.5 * yS));
+  return {
+    pathLeft,
+    pathRight,
+    fillTop: roundCoord(fillTop),
+    fillHeight: roundCoord(fillHeight),
+    fillSurfaceMid: roundCoord(fillTop + 3),
+    apexY: roundCoord(apex_y),
+    bottomY: roundCoord(bottom_y),
+    apexXLeft: roundCoord(apexXLeft),
+    apexXRight: roundCoord(apexXRight),
+    areolaY: roundCoord(areolaY),
+    areolaR: roundCoord(areolaR),
+    nippleR: roundCoord(nippleR),
+    cleavagePath,
+    foldLeftPath,
+    foldRightPath,
+    glossXLeft: roundCoord(glossXLeft),
+    glossXRight: roundCoord(glossXRight),
+    glossY: roundCoord(glossY),
+    glossRX: roundCoord(glossRX),
+    glossRY: roundCoord(glossRY),
+    cupLabel: cupSizeLabel(stats)
+  };
 }
 function isConceived(stats) {
   if (!stats || typeof stats !== "object" || Array.isArray(stats))
@@ -17564,8 +17796,6 @@ function registerTemplateHelpers() {
   import_handlebars2.default.registerHelper("hasProstateTracking", hasProstateTracking);
   import_handlebars2.default.registerHelper("hasLactationTracking", hasLactationTracking);
   import_handlebars2.default.registerHelper("milkPercent", milkPercent);
-  import_handlebars2.default.registerHelper("breastFillTop", breastFillTop);
-  import_handlebars2.default.registerHelper("breastFillHeight", breastFillHeight);
   import_handlebars2.default.registerHelper("analFillTop", analFillTop);
   import_handlebars2.default.registerHelper("analFillHeight", analFillHeight);
   import_handlebars2.default.registerHelper("semenFillTop", semenFillTop);
@@ -17651,22 +17881,24 @@ function buildTemplateData(data, preset, previousData) {
     }
     const normalizedCycleStage = typeof templateStats.cycle_stage === "string" ? templateStats.cycle_stage.toLowerCase() : templateStats.cycle_stage;
     const normalizedSex = typeof templateStats.sex === "string" ? templateStats.sex.toLowerCase() : templateStats.sex;
+    const resolvedStats = {
+      ...templateStats,
+      sex: normalizedSex,
+      cycle_stage: normalizedCycleStage,
+      ...statChanges[name] || {},
+      internal_thought: stats.internal_thought || stats.thought || "No thought recorded.",
+      relationshipStatus: stats.relationshipStatus || "Unknown Status",
+      desireStatus: stats.desireStatus || "Unknown Desire",
+      inactive: Boolean(stats.inactive),
+      inactiveReason: Number(stats.inactiveReason || 0)
+    };
     return {
       name,
       characterName: name,
       currentDate,
       currentTime,
-      stats: {
-        ...templateStats,
-        sex: normalizedSex,
-        cycle_stage: normalizedCycleStage,
-        ...statChanges[name] || {},
-        internal_thought: stats.internal_thought || stats.thought || "No thought recorded.",
-        relationshipStatus: stats.relationshipStatus || "Unknown Status",
-        desireStatus: stats.desireStatus || "Unknown Desire",
-        inactive: Boolean(stats.inactive),
-        inactiveReason: Number(stats.inactiveReason || 0)
-      },
+      stats: resolvedStats,
+      breastGeometry: computeBreastGeometry(resolvedStats),
       bgColor,
       darkerBgColor: darkenColor(bgColor),
       reactionEmoji: getReactionEmoji(stats.last_react),

@@ -218,12 +218,12 @@ Handlebars.registerHelper("milkPercent", function (stats) {
 
 Handlebars.registerHelper("breastFillTop", function (value) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
-  return 82 - (pct / 100) * 44;
+  return 90 - (pct / 100) * 52;
 });
 
 Handlebars.registerHelper("breastFillHeight", function (value) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
-  return (pct / 100) * 44;
+  return (pct / 100) * 52;
 });
 
 Handlebars.registerHelper("gt", function (a, b) {
