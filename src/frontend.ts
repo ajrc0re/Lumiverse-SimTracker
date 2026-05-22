@@ -73,11 +73,12 @@ const FERTILITY_STAGE_ID_BY_NAME = Object.fromEntries(
 
 const CERVIX_STATE_BY_ID: Record<number, string> = {
   0: "",
-  1: "soft",
+  1: "sealed",
   2: "firm",
-  3: "open",
-  4: "dilated",
-  5: "sealed",
+  3: "soft",
+  4: "open",
+  5: "dilated",
+  6: "kissed",
 };
 
 function cycleStage(stats: unknown): string {
@@ -175,9 +176,19 @@ function hasAnalTracking(stats: unknown): boolean {
   const record = stats as Record<string, unknown>;
   const sex = sexValue(record);
   return (
-    ["male", "futanari", "futa", "both", "intersex", "hermaphrodite"].includes(sex) ||
+    ["male", "female", "futanari", "futa", "both", "intersex", "hermaphrodite"].includes(sex) ||
     Number(record.anal_fullness_pct) > 0 ||
     Number(record.anal_tightness_pct) > 0 ||
+    Number(record.prostate_stimulation_pct) > 0
+  );
+}
+
+function hasProstateTracking(stats: unknown): boolean {
+  if (!stats || typeof stats !== "object" || Array.isArray(stats)) return false;
+  const record = stats as Record<string, unknown>;
+  const sex = sexValue(record);
+  return (
+    ["male", "futanari", "futa", "both", "intersex", "hermaphrodite"].includes(sex) ||
     Number(record.prostate_stimulation_pct) > 0
   );
 }
@@ -733,6 +744,7 @@ function registerTemplateHelpers(): void {
   Handlebars.registerHelper("wombFillTop", wombFillTop);
   Handlebars.registerHelper("wombFillHeight", wombFillHeight);
   Handlebars.registerHelper("hasAnalTracking", hasAnalTracking);
+  Handlebars.registerHelper("hasProstateTracking", hasProstateTracking);
   Handlebars.registerHelper("analFillTop", analFillTop);
   Handlebars.registerHelper("analFillHeight", analFillHeight);
   Handlebars.registerHelper("semenFillTop", semenFillTop);

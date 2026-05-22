@@ -78,14 +78,16 @@ const rehydratedChats = new Set<string>();
 const conceptionNotified = new Set<string>();
 
 /**
- * Conception-gate config.  Threshold is the minimum womb fullness % that
- * triggers the coin-flip (or auto-pass at 100 %).  Only applies when
- * cycle_stage is "ovulation" and the character is not already conceived
- * or pregnant.
+ * Conception-gate config.  Threshold is the womb fullness % strictly above
+ * which the coin-flip fires (auto-pass at 100 %).  Eligibility window is
+ * ovulation, rut, or early luteal (days 17-19).  Triggered characters get
+ * their stored tracker mutated in-place to set `conceived: true` so the
+ * LLM sees the authoritative state on the next turn.
  */
 const CONCEPTION_CONFIG = {
-  threshold: 80,
+  threshold: 85,
   autoAt: 100,
+  earlyLutealMaxDay: 19,
 };
 
 type MessageContext = {
@@ -589,6 +591,25 @@ function isOvulating(stats: CharacterStats): boolean {
   return stage === "ovulation" || stageId === 3;
 }
 
+function isInFertileWindow(stats: CharacterStats): boolean {
+  const stage = String(stats.cycle_stage || "").toLowerCase();
+  const stageId = Number(stats.cycle_stage_id || 0);
+  if (stage === "ovulation" || stageId === 3) return true;
+  if (stage === "rut" || stageId === 6) return true;
+  if (stage === "luteal" || stageId === 4) {
+    const day = Number(stats.cycle_day || 0);
+    return day > 0 && day <= CONCEPTION_CONFIG.earlyLutealMaxDay;
+  }
+  return false;
+}
+
+function extractCurrentDate(payload: Record<string, unknown>): string {
+  const world = payload.worldData as Record<string, unknown> | undefined;
+  const date = world?.current_date;
+  if (typeof date === "string" && date.trim()) return date.trim();
+  return new Date().toISOString().slice(0, 10);
+}
+
 function isAlreadyConceivedOrPregnant(stats: CharacterStats): boolean {
   return stats.preg === true || stats.conceived === true || stats.conception_date === true;
 }
@@ -618,19 +639,24 @@ function checkConceptionTriggers(chatId: string | null, payload: Record<string, 
 
   for (const stats of characters) {
     if (!isFemaleOrFuta(stats)) continue;
-    if (!isOvulating(stats)) continue;
     if (isAlreadyConceivedOrPregnant(stats)) {
-      // Clear any stale notification lock since she's now officially flagged
+      // She's officially flagged; drop the lock and skip
       const key = `${chatId}::${stats.name}`;
       if (conceptionNotified.has(key)) conceptionNotified.delete(key);
       continue;
     }
+    if (!isInFertileWindow(stats)) continue;
 
     const fullness = Number(stats.womb_fullness_pct);
     if (!Number.isFinite(fullness) || fullness <= CONCEPTION_CONFIG.threshold) continue;
 
     const key = `${chatId}::${stats.name}`;
-    if (conceptionNotified.has(key)) continue;
+    if (conceptionNotified.has(key)) {
+      // Coin already passed; the LLM dropped `conceived` from its emission.
+      // Re-add to the trigger list so the mutation path re-asserts it.
+      triggered.push(String(stats.name || "Unknown"));
+      continue;
+    }
 
     const shouldTrigger = fullness >= CONCEPTION_CONFIG.autoAt || coinFlip();
     if (shouldTrigger) {
@@ -640,6 +666,81 @@ function checkConceptionTriggers(chatId: string | null, payload: Record<string, 
   }
 
   return triggered;
+}
+
+type ConceptionMutation = {
+  messageId: string;
+  oldPayload: string;
+  newPayload: string;
+};
+
+/**
+ * Build a forced-conception mutation plan against the most recent stored
+ * tracker payload.  Returns the old/new payload pair (and source message
+ * ID) when the named characters would actually flip to `conceived: true`,
+ * or null when there's nothing to do.  The caller is responsible for
+ * committing the mutation to history and rewriting any in-flight LLM
+ * context to match.
+ */
+function planForcedConception(
+  chatId: string | null,
+  names: string[],
+  conceptionDate: string,
+): ConceptionMutation | null {
+  if (!chatId || names.length === 0) return null;
+  const history = chatTrackerHistory.get(chatId);
+  if (!history || history.length === 0) return null;
+  const latest = history[history.length - 1];
+  const parsed = parseTrackerPayload(latest.payload);
+  if (!parsed) return null;
+
+  const characters = getCharactersFromPayload(parsed as Record<string, unknown>);
+  let mutated = false;
+
+  for (const char of characters) {
+    if (typeof char.name !== "string" || !names.includes(char.name)) continue;
+    if (char.preg === true || char.conceived === true) continue;
+    char.conceived = true;
+    if (typeof char.conception_date !== "string" || !char.conception_date.trim()) {
+      char.conception_date = conceptionDate;
+    }
+    mutated = true;
+  }
+
+  if (!mutated) return null;
+
+  const newPayload = JSON.stringify(parsed, null, 2);
+  return { messageId: latest.messageId, oldPayload: latest.payload, newPayload };
+}
+
+function commitForcedConception(chatId: string, plan: ConceptionMutation): void {
+  const history = chatTrackerHistory.get(chatId);
+  if (!history) return;
+  const idx = history.findIndex((entry) => entry.messageId === plan.messageId);
+  if (idx === -1) return;
+  history[idx] = { ...history[idx], payload: plan.newPayload };
+}
+
+/**
+ * Rewrite any retained message whose visible tracker payload matches
+ * `oldPayload` so it carries `newPayload` instead. Preserves the
+ * surrounding tag/fence wrapper. Operates on the interceptor's in-memory
+ * messages array; does not touch persisted chat state.
+ */
+function rewriteTrackerInMessages(
+  messages: Array<{ content?: unknown }>,
+  oldPayload: string,
+  newPayload: string,
+): void {
+  const oldTrim = oldPayload.trim();
+  if (!oldTrim || oldTrim === newPayload.trim()) return;
+  for (let i = 0; i < messages.length; i += 1) {
+    const msg = messages[i];
+    if (!msg || typeof msg.content !== "string") continue;
+    const found = extractTrackerPayloadFromMessage(msg.content);
+    if (!found || found.trim() !== oldTrim) continue;
+    messages[i] = { ...msg, content: msg.content.replace(oldPayload, newPayload) };
+  }
 }
 
 /**
@@ -652,16 +753,18 @@ function buildConceptionDirective(names: string[]): string {
   if (names.length === 0) return "";
   const subject = names.length === 1 ? names[0] : names.join(", ");
   const verb = names.length === 1 ? "has" : "have";
-  return `CONCEPTION DIRECTIVE: ${subject} ${verb} conceived. Update the next tracker to mark ${names.length === 1 ? "her" : "them"} as "conceived": true (and set "conception_date" to today's date). Do NOT set "preg": true yet; that transition happens later.`;
+  const pronoun = names.length === 1 ? "her" : "them";
+  return `CONCEPTION DIRECTIVE: ${subject} ${verb} conceived. The prior tracker has been updated in-place to reflect this — \`conceived: true\` with \`conception_date\` set. PRESERVE this state on the next tracker emission; do not revert ${pronoun} to \`conceived: false\`. Do NOT set \`preg: true\` yet; that transition happens later as the narrative reveals the pregnancy.`;
 }
 
 const CERVIX_STATE_BY_ID: Record<number, string> = {
   0: "",
-  1: "soft",
+  1: "sealed",
   2: "firm",
-  3: "open",
-  4: "dilated",
-  5: "sealed",
+  3: "soft",
+  4: "open",
+  5: "dilated",
+  6: "kissed",
 };
 
 function cervixStateLabel(stats: CharacterStats): string {
@@ -2031,12 +2134,37 @@ function tryRegisterInterceptor(): void {
       await rehydrateChatTrackerHistory(chatId);
 
       const needed = keepNewest - currentCount;
-      // Fetch the most recent entries; we may discard duplicates already
-      // present in the assembled prompt.
+
+      // ── Conception gate ───────────────────────────────────────────────
+      // Check the very latest tracker for characters in the fertile
+      // window (ovulation / rut / early-luteal) with womb fullness above
+      // threshold. On a coin-flip pass (or auto-pass at 100 %):
+      //   1. Plan a mutation of the stored payload to add `conceived: true`.
+      //   2. Commit the mutation to chatTrackerHistory so future turns
+      //      inherit the authoritative state.
+      //   3. Rewrite the matching tracker block in the in-flight messages
+      //      array so the dedup pass below recognises it as the same
+      //      entry and the LLM sees only the mutated version this turn.
+      //   4. Inject a reminder directive as a belt-and-braces backstop.
+      const preMutationLatest = getRecentChatTrackers(chatId, 1);
+      const latestPayload = preMutationLatest.length > 0
+        ? parseTrackerPayload(preMutationLatest[preMutationLatest.length - 1].payload)
+        : null;
+      const conceptionNames = latestPayload ? checkConceptionTriggers(chatId, latestPayload) : [];
+      if (latestPayload && conceptionNames.length > 0) {
+        const plan = planForcedConception(chatId, conceptionNames, extractCurrentDate(latestPayload));
+        if (plan) {
+          commitForcedConception(chatId, plan);
+          rewriteTrackerInMessages(retained, plan.oldPayload, plan.newPayload);
+        }
+      }
+      const conceptionDirective = buildConceptionDirective(conceptionNames);
+
+      // Fetch the most recent entries (post-mutation); we may discard
+      // duplicates already represented in the assembled prompt.
       const history = getRecentChatTrackers(chatId, keepNewest);
       if (history.length === 0) return retained;
 
-      // Avoid injecting a payload that's already represented in the prompt.
       const existingPayloads = new Set<string>();
       for (const msg of retained) {
         if (!msg || typeof msg.content !== "string") continue;
@@ -2054,15 +2182,6 @@ function tryRegisterInterceptor(): void {
       if (toInject.length === 0) return retained;
 
       const block = buildTrackerInjectionBlock(toInject);
-
-      // ── Conception gate ───────────────────────────────────────────────
-      // Check the very latest tracker for characters that are ovulating
-      // with high womb fullness. If the coin-flip (or auto-at-100%)
-      // condition is met, inject a directive telling the LLM to mark
-      // them as conceived on the next tracker emission.
-      const latestPayload = parseTrackerPayload(history[history.length - 1].payload);
-      const conceptionNames = latestPayload ? checkConceptionTriggers(chatId, latestPayload) : [];
-      const conceptionDirective = buildConceptionDirective(conceptionNames);
 
       // Prefer appending to the last assistant message in the array so the
       // tracker appears exactly where the LLM would normally have emitted

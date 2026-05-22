@@ -164,6 +164,7 @@ Handlebars.registerHelper("hasAnalTracking", function (stats) {
   const sex = sexValue(stats);
   return (
     sex === "male" ||
+    sex === "female" ||
     sex === "futanari" ||
     sex === "futa" ||
     sex === "both" ||
@@ -171,6 +172,20 @@ Handlebars.registerHelper("hasAnalTracking", function (stats) {
     sex === "hermaphrodite" ||
     Number(stats.anal_fullness_pct) > 0 ||
     Number(stats.anal_tightness_pct) > 0 ||
+    Number(stats.prostate_stimulation_pct) > 0
+  );
+});
+
+Handlebars.registerHelper("hasProstateTracking", function (stats) {
+  if (!stats || typeof stats !== "object" || Array.isArray(stats)) return false;
+  const sex = sexValue(stats);
+  return (
+    sex === "male" ||
+    sex === "futanari" ||
+    sex === "futa" ||
+    sex === "both" ||
+    sex === "intersex" ||
+    sex === "hermaphrodite" ||
     Number(stats.prostate_stimulation_pct) > 0
   );
 });
