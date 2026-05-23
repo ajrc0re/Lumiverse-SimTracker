@@ -2141,6 +2141,16 @@ export function setup(ctx: SpindleFrontendContext) {
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
+  // Spindle emits CHAT_SWITCHED with `{ chatId: string | null }` on
+  // navigation. Subscribing directly means the panel notices a chat change
+  // even when no message activity follows it (e.g. opening an empty chat
+  // or jumping between two chats without sending anything).
+  const chatSwitchedUnsub = ctx.events.on("CHAT_SWITCHED", (payload: unknown) => {
+    if (!payload || typeof payload !== "object") return;
+    const obj = payload as Record<string, unknown>;
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
+    handleChatSwitch(chatId);
+  });
 
   const stopInlineObserver = inlineProcessor.observeDocument();
   stopTrackerObserver = observeTrackerHosts();
@@ -2321,6 +2331,7 @@ export function setup(ctx: SpindleFrontendContext) {
     messageEditedUnsub();
     messageSwipedUnsub();
     messageRenderedUnsub();
+    chatSwitchedUnsub();
     stopInlineObserver();
     permissionUnsub();
     if (removeHideStyle) removeHideStyle();

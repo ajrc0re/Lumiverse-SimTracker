@@ -18823,6 +18823,13 @@ function setup(ctx) {
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
+  const chatSwitchedUnsub = ctx.events.on("CHAT_SWITCHED", (payload) => {
+    if (!payload || typeof payload !== "object")
+      return;
+    const obj = payload;
+    const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
+    handleChatSwitch(chatId);
+  });
   const stopInlineObserver = inlineProcessor.observeDocument();
   stopTrackerObserver = observeTrackerHosts();
   const permissionUnsub = ctx.events.on("PERMISSION_CHANGED", (detail) => {
@@ -18982,6 +18989,7 @@ function setup(ctx) {
     messageEditedUnsub();
     messageSwipedUnsub();
     messageRenderedUnsub();
+    chatSwitchedUnsub();
     stopInlineObserver();
     permissionUnsub();
     if (removeHideStyle)
