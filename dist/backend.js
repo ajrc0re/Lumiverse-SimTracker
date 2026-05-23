@@ -13438,13 +13438,15 @@ Based on the above conversation${hasHistory ? " and the previous tracker state(s
       temperature: config.secondaryLLMTemperature
     };
     spindle.log.info(`Secondary LLM request \u2192 chat=${chatId} target=${targetMessageId} connection=${config.secondaryLLMConnectionId || "(default)"} model=${trimmedModel} temperature=${config.secondaryLLMTemperature} history=${historicalTrackers.length} contextMessages=${cleanedMessages.length}`);
-    const result = await spindle.generate.raw({
+    const generationRequest = {
       type: "raw",
       messages: llmMessages,
       parameters,
       connection_id: config.secondaryLLMConnectionId || undefined,
-      userId: activeUserId || undefined
-    });
+      userId: activeUserId || undefined,
+      model: trimmedModel
+    };
+    const result = await spindle.generate.raw(generationRequest);
     const resultObj = result;
     const generatedText = typeof resultObj.content === "string" ? resultObj.content : "";
     if (!generatedText) {

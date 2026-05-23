@@ -1820,13 +1820,20 @@ async function generateTrackerWithSecondaryLLM(chatId: string, targetMessageId: 
     spindle.log.info(
       `Secondary LLM request → chat=${chatId} target=${targetMessageId} connection=${config.secondaryLLMConnectionId || "(default)"} model=${trimmedModel} temperature=${config.secondaryLLMTemperature} history=${historicalTrackers.length} contextMessages=${cleanedMessages.length}`,
     );
-    const result = await spindle.generate.raw({
-      type: "raw",
+    // The current `GenerationRequestDTO` only declares `parameters` for
+    // overrides, but empirically Spindle strips `model` from `parameters`
+    // before forwarding. The docstring examples in spindle-api.ts show
+    // `model` at the top level of the request, so we send it both places
+    // and let whichever path the runtime honours win.
+    const generationRequest = {
+      type: "raw" as const,
       messages: llmMessages,
       parameters,
       connection_id: config.secondaryLLMConnectionId || undefined,
       userId: activeUserId || undefined,
-    });
+      model: trimmedModel,
+    };
+    const result = await spindle.generate.raw(generationRequest as Parameters<typeof spindle.generate.raw>[0]);
 
     const resultObj = result as Record<string, unknown>;
     const generatedText = typeof resultObj.content === "string" ? resultObj.content : "";
