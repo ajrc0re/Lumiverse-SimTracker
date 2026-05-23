@@ -1910,6 +1910,12 @@ export function setup(ctx: SpindleFrontendContext) {
       const entry = obj.entry as { messageId?: unknown; payload?: unknown } | null;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
+        // Hydration safety net: only useful when the latest tracker-bearing
+        // message was virtualized out at chat-open time so the post-switch
+        // DOM scan couldn't find it. If we already rendered for that
+        // messageId, skip — otherwise we'd flash the message-level render
+        // with `previousData` now equal to the latest data (no diffs).
+        if (msgId && trackerMessageIds.has(msgId)) return;
         handleTrackerPayload(entry.payload, entry.payload, msgId);
       }
       return;

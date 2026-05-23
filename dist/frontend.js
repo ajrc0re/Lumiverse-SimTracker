@@ -18590,6 +18590,8 @@ function setup(ctx) {
       const entry = obj.entry;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
+        if (msgId && trackerMessageIds.has(msgId))
+          return;
         handleTrackerPayload(entry.payload, entry.payload, msgId);
       }
       return;
