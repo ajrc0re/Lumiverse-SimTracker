@@ -18422,7 +18422,33 @@ function setup(ctx) {
         defaultChecked.checked = true;
     }
   };
+  const sameRenderInputs = (a, data, preset, previousData, mode) => {
+    if (!a)
+      return false;
+    if (a.preset.id !== preset.id || a.mode !== mode)
+      return false;
+    if (JSON.stringify(a.data) !== JSON.stringify(data))
+      return false;
+    if (JSON.stringify(a.previousData) !== JSON.stringify(previousData))
+      return false;
+    return true;
+  };
   const renderTrackerIntoMessage = (messageId, data, preset, previousData, mode) => {
+    const cachedInputs = trackerMessageRenders.get(messageId);
+    const existingMount = trackerMessageMounts.get(messageId);
+    const stillMounted = !!existingMount && existingMount.isConnected;
+    if (stillMounted && sameRenderInputs(cachedInputs, data, preset, previousData, mode)) {
+      return;
+    }
+    if (stillMounted && cachedInputs && cachedInputs.preset.id === preset.id && cachedInputs.mode === mode) {
+      const markup2 = buildTrackerMarkup(data, preset, previousData);
+      if (!markup2.html)
+        return;
+      existingMount.innerHTML = markup2.html;
+      trackerMessageRenders.set(messageId, { data, preset, previousData, mode });
+      restoreFormControlState(existingMount);
+      return;
+    }
     clearMessageTrackerRender(messageId);
     const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
     if (!messageNode)
@@ -18697,6 +18723,26 @@ function setup(ctx) {
       return;
     runInlinePass(context.messageId);
   };
+  const onMessageDeleted = (payload) => {
+    handleChatSwitch(extractChatId(payload));
+    const context = readMessageContext(payload);
+    if (!context || !context.messageId)
+      return;
+    if (trackerMessageIds.has(context.messageId)) {
+      trackerMessageIds.delete(context.messageId);
+      clearMessageTrackerRender(context.messageId);
+    }
+    inlineProcessor.clearMessage(context.messageId);
+    if (latestTrackerMessageId === context.messageId) {
+      latestTrackerMessageId = null;
+      previousTrackerData = null;
+      latestTrackerRaw = null;
+      latestTrackerSourceContent = null;
+      latestContent = null;
+      clearSideTrackerRender();
+      updateRegenerateButton();
+    }
+  };
   const renderTrackersFromDOM = () => {
     const messageNodes = Array.from(document.querySelectorAll("[data-message-id]"));
     for (const msgNode of messageNodes) {
@@ -18822,6 +18868,8 @@ function setup(ctx) {
   const messageUnsub = ctx.events.on("MESSAGE_SENT", onEvent);
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
+  const swipeEditedUnsub = ctx.events.on("SWIPE_EDITED", onSwipe);
+  const messageDeletedUnsub = ctx.events.on("MESSAGE_DELETED", onMessageDeleted);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
   const chatSwitchedUnsub = ctx.events.on("CHAT_SWITCHED", (payload) => {
     if (!payload || typeof payload !== "object")
@@ -18988,6 +19036,8 @@ function setup(ctx) {
     messageUnsub();
     messageEditedUnsub();
     messageSwipedUnsub();
+    swipeEditedUnsub();
+    messageDeletedUnsub();
     messageRenderedUnsub();
     chatSwitchedUnsub();
     stopInlineObserver();

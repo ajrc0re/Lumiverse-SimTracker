@@ -13523,6 +13523,16 @@ spindle.on("CHAT_SWITCHED", (payload, userId) => {
     }
   })();
 });
+spindle.on("MESSAGE_DELETED", (payload, userId) => {
+  (async () => {
+    await ensureConfigForUser(userId);
+    const ctx = readMessageContext(payload);
+    if (!ctx.chatId || !ctx.messageId)
+      return;
+    forgetChatTracker(ctx.chatId, ctx.messageId);
+    spindle.log.info(`Forgot tracker side-channel entry for deleted message ${ctx.messageId} in chat ${ctx.chatId}`);
+  })();
+});
 spindle.on("GENERATION_ENDED", (payload, userId) => {
   (async () => {
     await ensureConfigForUser(userId);

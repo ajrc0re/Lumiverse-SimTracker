@@ -1934,6 +1934,20 @@ spindle.on("CHAT_SWITCHED", (payload: unknown, userId?: string) => {
   })();
 });
 
+// When a message disappears, evict its side-channel entry. Without this,
+// `getRecentChatTrackers` would still surface the deleted message's
+// tracker as "previous state" on a future regenerate, and the side panel
+// could keep pointing at a row the user removed.
+spindle.on("MESSAGE_DELETED", (payload: unknown, userId?: string) => {
+  void (async () => {
+    await ensureConfigForUser(userId);
+    const ctx = readMessageContext(payload);
+    if (!ctx.chatId || !ctx.messageId) return;
+    forgetChatTracker(ctx.chatId, ctx.messageId);
+    spindle.log.info(`Forgot tracker side-channel entry for deleted message ${ctx.messageId} in chat ${ctx.chatId}`);
+  })();
+});
+
 spindle.on("GENERATION_ENDED", (payload: unknown, userId?: string) => {
   void (async () => {
     await ensureConfigForUser(userId);

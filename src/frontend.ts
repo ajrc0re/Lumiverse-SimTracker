@@ -1714,6 +1714,23 @@ export function setup(ctx: SpindleFrontendContext) {
     }
   };
 
+  // Cheap deep-equality stable enough for tracker payloads (plain JSON shape).
+  // Used to short-circuit re-renders when the parsed data hasn't changed —
+  // critical during streaming because the tag interceptor fires per chunk.
+  const sameRenderInputs = (
+    a: TrackerRenderInputs | undefined,
+    data: TrackerData,
+    preset: TemplatePreset,
+    previousData: TrackerData | null,
+    mode: TrackerMountMode,
+  ): boolean => {
+    if (!a) return false;
+    if (a.preset.id !== preset.id || a.mode !== mode) return false;
+    if (JSON.stringify(a.data) !== JSON.stringify(data)) return false;
+    if (JSON.stringify(a.previousData) !== JSON.stringify(previousData)) return false;
+    return true;
+  };
+
   const renderTrackerIntoMessage = (
     messageId: string,
     data: TrackerData,
@@ -1721,6 +1738,30 @@ export function setup(ctx: SpindleFrontendContext) {
     previousData: TrackerData | null,
     mode: TrackerMountMode,
   ) => {
+    const cachedInputs = trackerMessageRenders.get(messageId);
+    const existingMount = trackerMessageMounts.get(messageId);
+    const stillMounted = !!existingMount && existingMount.isConnected;
+
+    // Hot path: nothing to do. Identical data + same preset/mode + mount
+    // still in the DOM ⇒ skip entirely. This is what cuts the per-token
+    // re-render flicker during streaming.
+    if (stillMounted && sameRenderInputs(cachedInputs, data, preset, previousData, mode)) {
+      return;
+    }
+
+    // Warm path: mount is still in place, only the payload changed. Swap
+    // the innerHTML so there's no detach/attach gap in the paint pipeline.
+    if (stillMounted && cachedInputs && cachedInputs.preset.id === preset.id && cachedInputs.mode === mode) {
+      const markup = buildTrackerMarkup(data, preset, previousData);
+      if (!markup.html) return;
+      existingMount!.innerHTML = markup.html;
+      trackerMessageRenders.set(messageId, { data, preset, previousData, mode });
+      restoreFormControlState(existingMount!);
+      return;
+    }
+
+    // Cold path: first mount, preset switch, mount lost to virtualization,
+    // or mode change — fall through to a clean clear+inject.
     clearMessageTrackerRender(messageId);
     const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
     if (!messageNode) return;
@@ -2016,6 +2057,30 @@ export function setup(ctx: SpindleFrontendContext) {
     runInlinePass(context.messageId);
   };
 
+  const onMessageDeleted = (payload: unknown) => {
+    handleChatSwitch(extractChatId(payload));
+    const context = readMessageContext(payload);
+    if (!context || !context.messageId) return;
+    // Tear down any local tracker render and forget the message so the
+    // regenerate button and the side panel don't reference a ghost.
+    if (trackerMessageIds.has(context.messageId)) {
+      trackerMessageIds.delete(context.messageId);
+      clearMessageTrackerRender(context.messageId);
+    }
+    inlineProcessor.clearMessage(context.messageId);
+    if (latestTrackerMessageId === context.messageId) {
+      latestTrackerMessageId = null;
+      previousTrackerData = null;
+      latestTrackerRaw = null;
+      latestTrackerSourceContent = null;
+      latestContent = null;
+      clearSideTrackerRender();
+      updateRegenerateButton();
+    }
+    // The backend has its own MESSAGE_DELETED subscription that drops the
+    // side-channel entry, so no frontend → backend bridge needed here.
+  };
+
   const renderTrackersFromDOM = () => {
     const messageNodes = Array.from(document.querySelectorAll("[data-message-id]"));
     for (const msgNode of messageNodes) {
@@ -2140,6 +2205,12 @@ export function setup(ctx: SpindleFrontendContext) {
   const messageUnsub = ctx.events.on("MESSAGE_SENT", onEvent);
   const messageEditedUnsub = ctx.events.on("MESSAGE_EDITED", onEvent);
   const messageSwipedUnsub = ctx.events.on("MESSAGE_SWIPED", onSwipe);
+  // SWIPE_EDITED is coarser than MESSAGE_SWIPED and fires when another
+  // extension rewrites the swipe array via chat.updateMessage(). The
+  // payload carries the full post-mutation message, so we can reuse
+  // the swipe pipeline to re-process whatever the new content is.
+  const swipeEditedUnsub = ctx.events.on("SWIPE_EDITED", onSwipe);
+  const messageDeletedUnsub = ctx.events.on("MESSAGE_DELETED", onMessageDeleted);
   const messageRenderedUnsub = ctx.events.on("CHARACTER_MESSAGE_RENDERED", onMessageRendered);
   // Spindle emits CHAT_SWITCHED with `{ chatId: string | null }` on
   // navigation. Subscribing directly means the panel notices a chat change
@@ -2330,6 +2401,8 @@ export function setup(ctx: SpindleFrontendContext) {
     messageUnsub();
     messageEditedUnsub();
     messageSwipedUnsub();
+    swipeEditedUnsub();
+    messageDeletedUnsub();
     messageRenderedUnsub();
     chatSwitchedUnsub();
     stopInlineObserver();
