@@ -1,5 +1,43 @@
 // @bun
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+function __accessProp(key) {
+  return this[key];
+}
+var __toCommonJS = (from) => {
+  var entry = (__moduleCache ??= new WeakMap).get(from), desc;
+  if (entry)
+    return entry;
+  entry = __defProp({}, "__esModule", { value: true });
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (var key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(entry, key))
+        __defProp(entry, key, {
+          get: __accessProp.bind(from, key),
+          enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
+        });
+  }
+  __moduleCache.set(from, entry);
+  return entry;
+};
+var __moduleCache;
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+var __returnValue = (v) => v;
+function __exportSetter(name, newValue) {
+  this[name] = __returnValue.bind(null, newValue);
+}
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, {
+      get: all[name],
+      enumerable: true,
+      configurable: true,
+      set: __exportSetter.bind(all, name)
+    });
+};
+var __esm = (fn, res) => () => (fn && (res = fn(fn = 0)), res);
 var __require = import.meta.require;
 
 // node_modules/yaml/dist/nodes/identity.js
@@ -2392,59 +2430,27 @@ var require_schema2 = __commonJS((exports) => {
   exports.schema = schema;
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/binary.js
-var require_binary = __commonJS((exports) => {
-  var node_buffer = __require("buffer");
-  var Scalar = require_Scalar();
-  var stringifyString = require_stringifyString();
-  var binary = {
-    identify: (value) => value instanceof Uint8Array,
+// stub-yaml-binary:stub-yaml-binary
+var exports_stub_yaml_binary = {};
+__export(exports_stub_yaml_binary, {
+  binary: () => binary
+});
+var binary;
+var init_stub_yaml_binary = __esm(() => {
+  binary = {
+    identify: () => false,
     default: false,
     tag: "tag:yaml.org,2002:binary",
     resolve(src, onError) {
-      if (typeof node_buffer.Buffer === "function") {
-        return node_buffer.Buffer.from(src, "base64");
-      } else if (typeof atob === "function") {
-        const str = atob(src.replace(/[\n\r]/g, ""));
-        const buffer = new Uint8Array(str.length);
-        for (let i = 0;i < str.length; ++i)
-          buffer[i] = str.charCodeAt(i);
-        return buffer;
-      } else {
-        onError("This environment does not support reading binary tags; either Buffer or atob is required");
-        return src;
+      if (typeof onError === "function") {
+        onError("Binary YAML tags are not supported in this build");
       }
+      return src;
     },
-    stringify({ comment, type, value }, ctx, onComment, onChompKeep) {
-      if (!value)
-        return "";
-      const buf = value;
-      let str;
-      if (typeof node_buffer.Buffer === "function") {
-        str = buf instanceof node_buffer.Buffer ? buf.toString("base64") : node_buffer.Buffer.from(buf.buffer).toString("base64");
-      } else if (typeof btoa === "function") {
-        let s = "";
-        for (let i = 0;i < buf.length; ++i)
-          s += String.fromCharCode(buf[i]);
-        str = btoa(s);
-      } else {
-        throw new Error("This environment does not support writing binary tags; either Buffer or btoa is required");
-      }
-      type ?? (type = Scalar.Scalar.BLOCK_LITERAL);
-      if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
-        const lineWidth = Math.max(ctx.options.lineWidth - ctx.indent.length, ctx.options.minContentWidth);
-        const n = Math.ceil(str.length / lineWidth);
-        const lines = new Array(n);
-        for (let i = 0, o = 0;i < n; ++i, o += lineWidth) {
-          lines[i] = str.substr(o, lineWidth);
-        }
-        str = lines.join(type === Scalar.Scalar.BLOCK_LITERAL ? `
-` : " ");
-      }
-      return stringifyString.stringifyString({ comment, type, value: str }, ctx, onComment, onChompKeep);
+    stringify() {
+      throw new Error("Binary YAML tags are not supported in this build");
     }
   };
-  exports.binary = binary;
 });
 
 // node_modules/yaml/dist/schema/yaml-1.1/pairs.js
@@ -2916,7 +2922,7 @@ var require_schema3 = __commonJS((exports) => {
   var _null = require_null();
   var seq = require_seq();
   var string = require_string();
-  var binary = require_binary();
+  var binary2 = (init_stub_yaml_binary(), __toCommonJS(exports_stub_yaml_binary));
   var bool = require_bool2();
   var float = require_float2();
   var int = require_int2();
@@ -2939,7 +2945,7 @@ var require_schema3 = __commonJS((exports) => {
     float.floatNaN,
     float.floatExp,
     float.float,
-    binary.binary,
+    binary2.binary,
     merge.merge,
     omap.omap,
     pairs.pairs,
@@ -2962,7 +2968,7 @@ var require_tags = __commonJS((exports) => {
   var int = require_int();
   var schema = require_schema();
   var schema$1 = require_schema2();
-  var binary = require_binary();
+  var binary2 = (init_stub_yaml_binary(), __toCommonJS(exports_stub_yaml_binary));
   var merge = require_merge();
   var omap = require_omap();
   var pairs = require_pairs();
@@ -2977,7 +2983,7 @@ var require_tags = __commonJS((exports) => {
     ["yaml-1.1", schema$2.schema]
   ]);
   var tagsByName = {
-    binary: binary.binary,
+    binary: binary2.binary,
     bool: bool.boolTag,
     float: float.float,
     floatExp: float.floatExp,
@@ -2997,7 +3003,7 @@ var require_tags = __commonJS((exports) => {
     timestamp: timestamp.timestamp
   };
   var coreKnownTags = {
-    "tag:yaml.org,2002:binary": binary.binary,
+    "tag:yaml.org,2002:binary": binary2.binary,
     "tag:yaml.org,2002:merge": merge.merge,
     "tag:yaml.org,2002:omap": omap.omap,
     "tag:yaml.org,2002:pairs": pairs.pairs,

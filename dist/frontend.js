@@ -12925,48 +12925,19 @@ var jsonError = {
 };
 var schema2 = [map, seq].concat(jsonScalars, jsonError);
 
-// node_modules/yaml/browser/dist/schema/yaml-1.1/binary.js
+// stub-yaml-binary:stub-yaml-binary
 var binary = {
-  identify: (value) => value instanceof Uint8Array,
+  identify: () => false,
   default: false,
   tag: "tag:yaml.org,2002:binary",
   resolve(src, onError) {
-    if (typeof atob === "function") {
-      const str = atob(src.replace(/[\n\r]/g, ""));
-      const buffer = new Uint8Array(str.length);
-      for (let i = 0;i < str.length; ++i)
-        buffer[i] = str.charCodeAt(i);
-      return buffer;
-    } else {
-      onError("This environment does not support reading binary tags; either Buffer or atob is required");
-      return src;
+    if (typeof onError === "function") {
+      onError("Binary YAML tags are not supported in this build");
     }
+    return src;
   },
-  stringify({ comment, type, value }, ctx, onComment, onChompKeep) {
-    if (!value)
-      return "";
-    const buf = value;
-    let str;
-    if (typeof btoa === "function") {
-      let s = "";
-      for (let i = 0;i < buf.length; ++i)
-        s += String.fromCharCode(buf[i]);
-      str = btoa(s);
-    } else {
-      throw new Error("This environment does not support writing binary tags; either Buffer or btoa is required");
-    }
-    type ?? (type = Scalar.BLOCK_LITERAL);
-    if (type !== Scalar.QUOTE_DOUBLE) {
-      const lineWidth = Math.max(ctx.options.lineWidth - ctx.indent.length, ctx.options.minContentWidth);
-      const n = Math.ceil(str.length / lineWidth);
-      const lines = new Array(n);
-      for (let i = 0, o = 0;i < n; ++i, o += lineWidth) {
-        lines[i] = str.substr(o, lineWidth);
-      }
-      str = lines.join(type === Scalar.BLOCK_LITERAL ? `
-` : " ");
-    }
-    return stringifyString({ comment, type, value: str }, ctx, onComment, onChompKeep);
+  stringify() {
+    throw new Error("Binary YAML tags are not supported in this build");
   }
 };
 
