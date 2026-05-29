@@ -153,7 +153,7 @@ else if (CMD === 'assemble') {
   const outPath = outFlag || (config.outFile || './assembled-template.json');
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
   console.log(`Assembled template written to ${outPath}`);
-  console.log(`  HTML: ${htmlContent.length} chars → escaped: ${escapedHtml.length}`);
+  console.log(`  HTML: ${htmlContent.length} chars (raw)`);
   console.log(`  Prompt: ${promptContent.length} chars`);
   console.log(`  Fields: ${fieldsContent.length}`);
   console.log(`  Settings: ${Object.keys(settingsContent).length}`);
