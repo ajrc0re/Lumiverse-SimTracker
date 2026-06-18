@@ -10512,11 +10512,11 @@ TEMPLATE VARIABLES (tabbed mode):
 // custom/narrative-weave-simtracker.json
 var narrative_weave_simtracker_default = {
   templateName: "Narrative Weave SimTracker",
-  templateAuthor: "Prolix OCs",
+  templateAuthor: "c0re",
   trackerDesc: "A narrative relationship and plot momentum tracker for up to four NPCs plus a separate world and story state.",
   templatePosition: "BOTTOM",
   htmlTemplate: `<!-- TEMPLATE NAME: Narrative Weave SimTracker -->
-<!-- AUTHOR: Prolix OCs -->
+<!-- AUTHOR: c0re -->
 <!-- POSITION: BOTTOM -->
 
 <!-- CARD_TEMPLATE_START -->
@@ -11246,11 +11246,16 @@ Track relationship state for NPC characters and maintain a separate structured w
 2. After the narrative, always emit exactly one complete canonical tracker tag: \`<tracker type="sim">...</tracker>\`.
 3. Put valid JSON inside the tag. Use the top-level shape \`{ "worldData": { ... }, "characters": [ ... ] }\`.
 4. Emit the complete schema every turn. Do not omit core fields, do not output a separate hidden Plot Momentum prose block, and do not add a second tracker block.
-5. Carry forward known values. When context is uncertain, preserve the prior value instead of resetting it, inventing a replacement, or dropping the field.
+5. Carry forward known values. When context is uncertain, preserve the prior value instead of resetting it, inventing a replacement, or dropping the field. The sole exception is an invalid player entry in \`characters\`: remove it immediately and never carry it forward.
 
 ## Character Scope
 
-- Track NPC characters only. Never include {{user}} in \`characters\`; {{user}} is the player character.
+- \`characters\` is an NPC-only allow-list, not a list of every person present in the scene.
+- NEVER include the player character in \`characters\`. {{user}} is the human-controlled player character, not an NPC, and is permanently forbidden from character tracking.
+- Treat \`{{user}}\`, the resolved user display name, the active player persona name, and any established aliases for that same player character as one forbidden identity. Changing the label does not make the player an NPC.
+- Do not create relationship stats, mood, internal thoughts, reaction, inactivity state, or a card entry for the player character.
+- If a previous tracker contains the player in \`characters\`, delete that entire entry. Do not preserve, migrate, rename, or replace it.
+- If no NPC currently qualifies for tracking, emit \`"characters": []\`. Never add the player merely to avoid an empty array.
 - Track at most 4 NPC characters.
 - Each character must include: \`name\`, \`mood\`, \`inactive\`, \`inactive_reason\`, \`internal_thought\`, \`bg\`, \`reaction\`, \`ap\`, \`ap_status\`, \`dp\`, \`dp_status\`, \`tp\`, and \`cp\`.
 - \`name\` is the NPC name only.
@@ -11259,6 +11264,10 @@ Track relationship state for NPC characters and maintain a separate structured w
 - \`bg\` is a stable hex color based on appearance, personality, theme, or narrative energy.
 - \`reaction\`: 0=Neutral, 1=Like, 2=Dislike.
 - \`inactive\`: true only when unavailable/inactive. \`inactive_reason\`: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death. Use 0 whenever \`inactive\` is false.
+
+### Mandatory Player-Exclusion Check
+
+Before emitting JSON, inspect every proposed object in \`characters\` and ask: "Is this entity the human-controlled player character, {{user}}, the active user persona, or an alias of that identity?" If yes, remove the object completely. Every remaining object must be an independently controlled NPC. This check overrides historical tracker data, scene presence, point-of-view language, and all state-preservation rules.
 
 ## Relationship Meter Rules
 
@@ -11295,14 +11304,14 @@ All caps and movement limits are absolute. Clamp values after every update.
 
 - Range 0-150; hard cap 150 and floor 0.
 - Trust in {{user}}. Higher values support admitting faults, believing {{user}}, opening up, and relying on them.
-- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, reserved for rare major events.
+- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, movement greater than the standard values are reserved for rare major events.
 - Lies, cheating, manipulation, betrayal, and broken promises reduce trust.
 
 ### Contempt Points (\`cp\`)
 
 - Range 0-150; hard cap 150 and floor 0.
 - Disdain toward {{user}}. Harm, humiliation, betrayal, and moral disgust raise it; good faith, apology, repair, regret, and meaningful restitution may lower it.
-- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, reserved for rare major events.
+- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, movement greater than the standard values are reserved for rare major events.
 - A narratively justified CP rise may lower other relationship meters.
 
 ## World and Time State
@@ -11345,8 +11354,13 @@ Path options may describe only NPC actions and environmental changes. Never make
 
 {{sim_format}}
 
-The tracker tag must be the final content after the narrative. Validate JSON syntax, numeric types, booleans, caps, exact AP/DP status strings, complete fields, and the maximum of four NPCs before sending.`,
+The tracker tag must be the final content after the narrative. Validate JSON syntax, numeric types, booleans, caps, exact AP/DP status strings, complete fields, and the maximum of four NPCs before sending. As the final validation step, confirm that no entry is {{user}}, the resolved user name, the active player persona, or any alias of the player character. If any such entry exists, remove it before sending.
+`,
   customFields: [
+    {
+      key: "name",
+      description: "[string] NPC name only. Never use {{user}}, the resolved user display name, the active player persona name, or any alias of the human-controlled player character."
+    },
     {
       key: "mood",
       description: `[string] NPC's current mood in their own words, answering "What is your mood?"`
