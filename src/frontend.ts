@@ -54,7 +54,12 @@ const DEFAULT_CONFIG: TrackerConfig = {
 
 const BUILTIN_PRESETS = getTemplatePresets();
 let runtimeSeededPresets: TemplatePreset[] = [];
-const TEMPLATE_CACHE = new Map<string, Handlebars.TemplateDelegate>();
+type CompiledTemplateCacheEntry = {
+  source: string;
+  compiled: Handlebars.TemplateDelegate;
+};
+
+const TEMPLATE_CACHE = new Map<string, CompiledTemplateCacheEntry>();
 let helpersRegistered = false;
 let panelRoot: Element | null = null;
 
@@ -1074,13 +1079,13 @@ function extractCardTemplate(htmlTemplate?: string): string {
 }
 
 function compileTemplate(preset: TemplatePreset): Handlebars.TemplateDelegate | null {
-  const key = preset.id;
-  if (TEMPLATE_CACHE.has(key)) return TEMPLATE_CACHE.get(key) || null;
   const html = extractCardTemplate(preset.htmlTemplate);
   if (!html) return null;
+  const cached = TEMPLATE_CACHE.get(preset.id);
+  if (cached?.source === html) return cached.compiled;
   try {
     const compiled = Handlebars.compile(html);
-    TEMPLATE_CACHE.set(key, compiled);
+    TEMPLATE_CACHE.set(preset.id, { source: html, compiled });
     return compiled;
   } catch {
     return null;
@@ -1778,6 +1783,8 @@ export function setup(ctx: SpindleFrontendContext) {
   ): boolean => {
     if (!a) return false;
     if (a.preset.id !== preset.id || a.mode !== mode) return false;
+    if (a.preset.htmlTemplate !== preset.htmlTemplate) return false;
+    if (JSON.stringify(a.preset.extSettings) !== JSON.stringify(preset.extSettings)) return false;
     if (JSON.stringify(a.data) !== JSON.stringify(data)) return false;
     if (JSON.stringify(a.previousData) !== JSON.stringify(previousData)) return false;
     return true;

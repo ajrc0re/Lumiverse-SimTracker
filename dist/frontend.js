@@ -19012,15 +19012,15 @@ function extractCardTemplate(htmlTemplate) {
   return raw.trim();
 }
 function compileTemplate(preset) {
-  const key = preset.id;
-  if (TEMPLATE_CACHE.has(key))
-    return TEMPLATE_CACHE.get(key) || null;
   const html = extractCardTemplate(preset.htmlTemplate);
   if (!html)
     return null;
+  const cached = TEMPLATE_CACHE.get(preset.id);
+  if (cached?.source === html)
+    return cached.compiled;
   try {
     const compiled = import_handlebars2.default.compile(html);
-    TEMPLATE_CACHE.set(key, compiled);
+    TEMPLATE_CACHE.set(preset.id, { source: html, compiled });
     return compiled;
   } catch {
     return null;
@@ -19611,6 +19611,10 @@ function setup(ctx) {
     if (!a)
       return false;
     if (a.preset.id !== preset.id || a.mode !== mode)
+      return false;
+    if (a.preset.htmlTemplate !== preset.htmlTemplate)
+      return false;
+    if (JSON.stringify(a.preset.extSettings) !== JSON.stringify(preset.extSettings))
       return false;
     if (JSON.stringify(a.data) !== JSON.stringify(data))
       return false;
