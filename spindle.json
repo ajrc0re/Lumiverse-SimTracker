@@ -22,13 +22,13 @@
     {
       "from": "tracker-card-templates",
       "to": "templates",
-      "overwrite": true,
+      "overwrite": false,
       "required": true
     },
     {
       "from": "custom",
       "to": "templates",
-      "overwrite": true,
+      "overwrite": false,
       "required": true
     }
   ],
