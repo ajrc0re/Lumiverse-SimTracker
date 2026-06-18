@@ -10536,6 +10536,8 @@ var narrative_weave_simtracker_default = {
     --nw-dp: #ee8454;
     --nw-tp: #49b8ae;
     --nw-cp: #d15c5c;
+    --nw-beneficial: #55c98b;
+    --nw-detrimental: #ef6b72;
     width: min(100%, 1100px);
     margin: 14px auto;
     color: var(--nw-text);
@@ -10668,6 +10670,48 @@ var narrative_weave_simtracker_default = {
     flex-wrap: wrap;
     align-items: baseline;
     gap: 8px 14px;
+  }
+
+  .nw-character-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 10px;
+    min-width: 0;
+  }
+
+  .nw-turn-updates {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .nw-change-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 25px;
+    padding: 3px 8px;
+    border: 1px solid var(--nw-border);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .nw-change-beneficial {
+    color: #9ce4bb;
+    border-color: color-mix(in srgb, var(--nw-beneficial) 55%, var(--nw-border));
+    background: color-mix(in srgb, var(--nw-beneficial) 14%, transparent);
+  }
+
+  .nw-change-detrimental {
+    color: #ffabb0;
+    border-color: color-mix(in srgb, var(--nw-detrimental) 55%, var(--nw-border));
+    background: color-mix(in srgb, var(--nw-detrimental) 14%, transparent);
   }
 
   .nw-day-chip {
@@ -10841,6 +10885,7 @@ var narrative_weave_simtracker_default = {
   }
 
   .nw-track {
+    position: relative;
     height: 7px;
     margin-top: 8px;
     overflow: hidden;
@@ -10849,10 +10894,26 @@ var narrative_weave_simtracker_default = {
   }
 
   .nw-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 0;
     height: 100%;
     border-radius: inherit;
-    transition: width 280ms ease;
+    transition: width 280ms ease, left 280ms ease;
+  }
+
+  .nw-delta-segment {
+    z-index: 2;
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.32);
+  }
+
+  .nw-delta-beneficial {
+    background: var(--nw-beneficial);
+  }
+
+  .nw-delta-detrimental {
+    background: var(--nw-detrimental);
   }
 
   .nw-fill-ap {
@@ -11123,9 +11184,30 @@ var narrative_weave_simtracker_default = {
         style="--nw-accent: {{bgColor}}; --nw-accent-dark: {{darkerBgColor}};"
       >
         <summary class="nw-summary">
-          <h2 class="nw-summary-title">
-            {{#if characterName}}{{characterName}}{{else}}Unnamed NPC{{/if}}
-          </h2>
+          <div class="nw-character-title">
+            <h2 class="nw-summary-title">
+              {{#if characterName}}{{characterName}}{{else}}Unnamed NPC{{/if}}
+            </h2>
+            <div class="nw-turn-updates" aria-label="Changes this turn">
+              {{#if (eq stats.reaction 1)}}
+                <span class="nw-change-chip nw-change-beneficial" title="Mostly beneficial turn" aria-label="Mostly beneficial turn">👍</span>
+              {{else if (eq stats.reaction 2)}}
+                <span class="nw-change-chip nw-change-detrimental" title="Mostly detrimental turn" aria-label="Mostly detrimental turn">👎</span>
+              {{/if}}
+              {{#if stats.apChange}}
+                <span class="nw-change-chip {{#if (gt stats.apChange 0)}}nw-change-beneficial{{else}}nw-change-detrimental{{/if}}">AP {{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}</span>
+              {{/if}}
+              {{#if stats.dpChange}}
+                <span class="nw-change-chip {{#if (gt stats.dpChange 0)}}nw-change-beneficial{{else}}nw-change-detrimental{{/if}}">DP {{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}</span>
+              {{/if}}
+              {{#if stats.tpChange}}
+                <span class="nw-change-chip {{#if (gt stats.tpChange 0)}}nw-change-beneficial{{else}}nw-change-detrimental{{/if}}">TP {{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}</span>
+              {{/if}}
+              {{#if stats.cpChange}}
+                <span class="nw-change-chip {{#if (lt stats.cpChange 0)}}nw-change-beneficial{{else}}nw-change-detrimental{{/if}}">CP {{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}</span>
+              {{/if}}
+            </div>
+          </div>
           <div class="nw-mood">
             {{#if stats.mood}}{{stats.mood}}{{else}}Mood not recorded.{{/if}}
           </div>
@@ -11157,11 +11239,11 @@ var narrative_weave_simtracker_default = {
               {{/if}}
 
               <span class="nw-status">
-                {{#if (eq stats.reaction 1)}}👍 Like
-                {{else if (eq stats.reaction 2)}}👎 Dislike
-                {{else if (eq stats.last_react 1)}}👍 Like
-                {{else if (eq stats.last_react 2)}}👎 Dislike
-                {{else}}😐 Neutral{{/if}}
+                {{#if (eq stats.reaction 1)}}👍 Positive turn
+                {{else if (eq stats.reaction 2)}}👎 Negative turn
+                {{else if (eq stats.last_react 1)}}👍 Positive turn
+                {{else if (eq stats.last_react 2)}}👎 Negative turn
+                {{else}}😐 Neutral turn{{/if}}
               </span>
             </div>
           </section>
@@ -11178,7 +11260,17 @@ var narrative_weave_simtracker_default = {
                   {{#if stats.ap_status}}{{stats.ap_status}}{{else}}Strangers{{/if}}
                 </div>
                 <div class="nw-track" role="progressbar" aria-label="Affection points" aria-valuemin="0" aria-valuemax="200" aria-valuenow="{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}}">
-                  <div class="nw-fill nw-fill-ap" style="width: {{divide stats.ap 2}}%;"></div>
+                  {{#if stats.apChange}}
+                    {{#if (gt stats.apChange 0)}}
+                      <div class="nw-fill nw-fill-ap" style="width: {{divide (subtract stats.ap stats.apChange) 2}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-beneficial" title="Affection gained: +{{stats.apChange}}" style="left: {{divide (subtract stats.ap stats.apChange) 2}}%; width: {{divide stats.apChange 2}}%;"></div>
+                    {{else}}
+                      <div class="nw-fill nw-fill-ap" style="width: {{divide stats.ap 2}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-detrimental" title="Affection lost: {{abs stats.apChange}}" style="left: {{divide stats.ap 2}}%; width: {{divide (abs stats.apChange) 2}}%;"></div>
+                    {{/if}}
+                  {{else}}
+                    <div class="nw-fill nw-fill-ap" style="width: {{divide stats.ap 2}}%;"></div>
+                  {{/if}}
                 </div>
               </div>
 
@@ -11191,7 +11283,17 @@ var narrative_weave_simtracker_default = {
                   {{#if stats.dp_status}}{{stats.dp_status}}{{else}}Not feeling the heat{{/if}}
                 </div>
                 <div class="nw-track" role="progressbar" aria-label="Desire points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}}">
-                  <div class="nw-fill nw-fill-dp" style="width: {{divide stats.dp 1.5}}%;"></div>
+                  {{#if stats.dpChange}}
+                    {{#if (gt stats.dpChange 0)}}
+                      <div class="nw-fill nw-fill-dp" style="width: {{divide (subtract stats.dp stats.dpChange) 1.5}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-beneficial" title="Desire gained: +{{stats.dpChange}}" style="left: {{divide (subtract stats.dp stats.dpChange) 1.5}}%; width: {{divide stats.dpChange 1.5}}%;"></div>
+                    {{else}}
+                      <div class="nw-fill nw-fill-dp" style="width: {{divide stats.dp 1.5}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-detrimental" title="Desire lost: {{abs stats.dpChange}}" style="left: {{divide stats.dp 1.5}}%; width: {{divide (abs stats.dpChange) 1.5}}%;"></div>
+                    {{/if}}
+                  {{else}}
+                    <div class="nw-fill nw-fill-dp" style="width: {{divide stats.dp 1.5}}%;"></div>
+                  {{/if}}
                 </div>
               </div>
 
@@ -11202,7 +11304,17 @@ var narrative_weave_simtracker_default = {
                 </div>
                 <div class="nw-stat-status">Trust toward the player character.</div>
                 <div class="nw-track" role="progressbar" aria-label="Trust points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}}">
-                  <div class="nw-fill nw-fill-tp" style="width: {{divide stats.tp 1.5}}%;"></div>
+                  {{#if stats.tpChange}}
+                    {{#if (gt stats.tpChange 0)}}
+                      <div class="nw-fill nw-fill-tp" style="width: {{divide (subtract stats.tp stats.tpChange) 1.5}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-beneficial" title="Trust gained: +{{stats.tpChange}}" style="left: {{divide (subtract stats.tp stats.tpChange) 1.5}}%; width: {{divide stats.tpChange 1.5}}%;"></div>
+                    {{else}}
+                      <div class="nw-fill nw-fill-tp" style="width: {{divide stats.tp 1.5}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-detrimental" title="Trust lost: {{abs stats.tpChange}}" style="left: {{divide stats.tp 1.5}}%; width: {{divide (abs stats.tpChange) 1.5}}%;"></div>
+                    {{/if}}
+                  {{else}}
+                    <div class="nw-fill nw-fill-tp" style="width: {{divide stats.tp 1.5}}%;"></div>
+                  {{/if}}
                 </div>
               </div>
 
@@ -11213,7 +11325,17 @@ var narrative_weave_simtracker_default = {
                 </div>
                 <div class="nw-stat-status">Contempt toward the player character.</div>
                 <div class="nw-track" role="progressbar" aria-label="Contempt points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}}">
-                  <div class="nw-fill nw-fill-cp" style="width: {{divide stats.cp 1.5}}%;"></div>
+                  {{#if stats.cpChange}}
+                    {{#if (gt stats.cpChange 0)}}
+                      <div class="nw-fill nw-fill-cp" style="width: {{divide (subtract stats.cp stats.cpChange) 1.5}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-detrimental" title="Contempt increased: +{{stats.cpChange}}" style="left: {{divide (subtract stats.cp stats.cpChange) 1.5}}%; width: {{divide stats.cpChange 1.5}}%;"></div>
+                    {{else}}
+                      <div class="nw-fill nw-fill-cp" style="width: {{divide stats.cp 1.5}}%;"></div>
+                      <div class="nw-fill nw-delta-segment nw-delta-beneficial" title="Contempt decreased: {{abs stats.cpChange}}" style="left: {{divide stats.cp 1.5}}%; width: {{divide (abs stats.cpChange) 1.5}}%;"></div>
+                    {{/if}}
+                  {{else}}
+                    <div class="nw-fill nw-fill-cp" style="width: {{divide stats.cp 1.5}}%;"></div>
+                  {{/if}}
                 </div>
               </div>
             </div>
@@ -11234,6 +11356,7 @@ TEMPLATE VARIABLES:
 - {{characterName}}: NPC name.
 - {{bgColor}} / {{darkerBgColor}}: Character color and darker variant.
 - {{stats.*}}: Character fields, statuses, and relationship values.
+- {{stats.apChange}} / {{stats.dpChange}} / {{stats.tpChange}} / {{stats.cpChange}}: Renderer-derived changes from the previous tracker turn.
 -->
 `,
   sysPrompt: `## NARRATIVE WEAVE SIMTRACKER
@@ -11262,12 +11385,26 @@ Track relationship state for NPC characters and maintain a separate structured w
 - \`mood\` is the NPC's current mood in their own words, as if asked, "What is your mood?"
 - \`internal_thought\` is current thought/feeling text, never wrapped in asterisks, and must never exceed 3 sentences.
 - \`bg\` is a stable hex color based on appearance, personality, theme, or narrative energy.
-- \`reaction\`: 0=Neutral, 1=Like, 2=Dislike.
+- \`reaction\` is the aggregate temperature of this turn's relationship-meter changes. Recalculate it every turn using the procedure below; never carry it forward unchanged by default.
 - \`inactive\`: true only when unavailable/inactive. \`inactive_reason\`: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death. Use 0 whenever \`inactive\` is false.
 
 ### Mandatory Player-Exclusion Check
 
 Before emitting JSON, inspect every proposed object in \`characters\` and ask: "Is this entity the human-controlled player character, {{user}}, the active user persona, or an alias of that identity?" If yes, remove the object completely. Every remaining object must be an independently controlled NPC. This check overrides historical tracker data, scene presence, point-of-view language, and all state-preservation rules.
+
+### Per-Turn Reaction Temperature
+
+\`reaction\` summarizes whether each NPC's relationship meters changed in a mostly beneficial, mostly neutral, or mostly detrimental direction during this turn. It is not a permanent opinion and must not become sticky.
+
+1. Compare the new \`ap\`, \`dp\`, \`tp\`, and \`cp\` values with that NPC's immediately previous tracker values after applying all changes for this turn.
+2. Classify increases to AP, DP, or TP as beneficial and decreases to those meters as detrimental.
+3. Treat CP as an inverse meter: a CP decrease is beneficial and a CP increase is detrimental.
+4. Consider both how many meters moved in each direction and the narrative significance/magnitude of those movements. This is a rough aggregate temperature, not a simple reaction to the final sentence of the scene.
+5. Set \`reaction\` to exactly one of:
+   - \`1\` when the turn's relationship changes are mostly beneficial overall.
+   - \`2\` when the turn's relationship changes are mostly detrimental overall.
+   - \`0\` when no relationship meter changed, when beneficial and detrimental movement is balanced, or when the overall direction is genuinely neutral/unclear.
+6. Recalculate from zero every turn. Do not preserve the previous turn's \`reaction\`. A positive mood or friendly dialogue without an actual meter change still produces \`reaction: 0\`.
 
 ## Relationship Meter Rules
 
@@ -11354,7 +11491,7 @@ Path options may describe only NPC actions and environmental changes. Never make
 
 {{sim_format}}
 
-The tracker tag must be the final content after the narrative. Validate JSON syntax, numeric types, booleans, caps, exact AP/DP status strings, complete fields, and the maximum of four NPCs before sending. As the final validation step, confirm that no entry is {{user}}, the resolved user name, the active player persona, or any alias of the player character. If any such entry exists, remove it before sending.
+The tracker tag must be the final content after the narrative. Validate JSON syntax, numeric types, booleans, caps, exact AP/DP status strings, complete fields, and the maximum of four NPCs before sending. Recalculate every NPC's \`reaction\` from this turn's final meter deltas, including inverse CP direction, and reset unchanged/balanced results to 0. As the final validation step, confirm that no entry is {{user}}, the resolved user name, the active player persona, or any alias of the player character. If any such entry exists, remove it before sending.
 `,
   customFields: [
     {
@@ -11383,7 +11520,7 @@ The tracker tag must be the final content after the narrative. Validate JSON syn
     },
     {
       key: "reaction",
-      description: "[number] Current reaction toward the user: 0=Neutral, 1=Like, 2=Dislike."
+      description: "[number] Recalculate every turn as the aggregate temperature of that turn's meter changes: 1=Mostly beneficial (AP/DP/TP gains and CP reductions dominate), 2=Mostly detrimental (AP/DP/TP losses and CP increases dominate), 0=No changes, balanced changes, or neutral/unclear. Never carry the previous reaction forward by default."
     },
     {
       key: "ap",
