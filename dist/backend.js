@@ -13508,12 +13508,23 @@ function sanitizeRetainCount(value) {
     return DEFAULT_CONFIG.retainTrackerCount;
   return Math.max(0, Math.min(20, Math.floor(value)));
 }
+function upgradeLegacyImportedPreset(preset) {
+  const html = preset.htmlTemplate || "";
+  const isLegacyNarrativeWeave = preset.templateName === "Narrative Weave SimTracker" && html.includes("nw-turn-updates") && html.includes("nw-delta-segment") && !html.includes("nw-stat-numbers");
+  if (!isLegacyNarrativeWeave)
+    return preset;
+  const bundled = getTemplatePresetById("narrative-weave-simtracker");
+  return {
+    ...preset,
+    htmlTemplate: bundled.htmlTemplate || preset.htmlTemplate
+  };
+}
 function sanitizePresetArray(value) {
   if (!Array.isArray(value))
     return [];
   return value.filter((item) => item && typeof item === "object").map((item, idx) => {
     const p = item;
-    return {
+    return upgradeLegacyImportedPreset({
       id: typeof p.id === "string" && p.id ? p.id : `user-preset-${idx}`,
       templateName: typeof p.templateName === "string" ? p.templateName : `User Preset ${idx + 1}`,
       templateAuthor: typeof p.templateAuthor === "string" ? p.templateAuthor : "User",
@@ -13522,7 +13533,7 @@ function sanitizePresetArray(value) {
       displayInstructions: typeof p.displayInstructions === "string" ? p.displayInstructions : "",
       customFields: Array.isArray(p.customFields) ? p.customFields : [],
       extSettings: p.extSettings && typeof p.extSettings === "object" ? p.extSettings : {}
-    };
+    });
   });
 }
 function sanitizeSinglePreset(value, fallbackId) {
