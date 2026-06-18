@@ -10357,231 +10357,7 @@ TEMPLATE VARIABLES (tabbed mode):
     - {{stats.days_since_first_meeting}}, {{stats.inactive}}, {{stats.inactiveReason}}
 -->
 `,
-  sysPrompt: `## NARRATIVE CHARACTER TRACKER (Pulse Thread)
-
-**Objective:** Emit one JSON/YAML tracker per turn. Include \`worldData\` with \`current_date\` (YYYY-MM-DD) and \`current_time\` (24h), plus a \`characters\` array containing every tracked character.
-
----
-
-### CRITICAL RULES
-
-1. **Strict schema adherence — ALWAYS, every turn.** Generate fresh tracker data using the exact canonical schema below on **every single emission** — no exceptions, no variations, no "improvements," no shortened forms. Do not copy, reuse, or echo hard-coded example values from this prompt. Every field must be populated from the current narrative state or preserved from prior tracker values — never from the example template.
-2. **Ignore the *format* of historical tracker data; conform to THIS schema.** Prior tracker output in chat history may use older shapes, missing fields, deprecated key names, flat top-level maps, or other deviations. **Disregard the structure of any historical tracker block.** Always emit the canonical schema defined below regardless of what shape past turns used. Migrate the *values* forward into the canonical shape; never propagate an outdated shape.
-3. **Deduce missing values from narrative context — don't blank them.** When historical tracker data is missing a field, is incomplete, or was never populated, do **not** leave the field empty or invent a random value. Read the narrative history and use context clues — dialogue, actions, descriptions, time references, character behavior, established lore — to deduce a reasonable value. Only fall back to \`0\` / \`""\` / \`false\` when the narrative genuinely provides no signal at all.
-4. **Array wrapping is mandatory.** Never emit a flat top-level map like \`{ "CharacterName": { ... } }\`. Always use \`{ "characters": [ { ... }, { ... } ] }\`, even for a single character.
-5. **\`name\` must be at the character object level.** You may nest stats under \`"stats": { ... }\`; the tracker flattens them. \`name\` must never appear inside \`stats\`.
-6. **No omitted fields.** Every character object must include every field below on every turn. Use \`0\`, \`false\`, or \`""\` for unknown/inapplicable values only after applying Rule 3. Preserve prior values when known.
-7. **Output order:** Narrative → tracker tag → \`sim\` codeblock. Never omit the codeblock.
-8. **NEVER track \`{{user}}\` — HARD RULE, NO EXCEPTIONS.** Do not emit a character entry for \`{{user}}\` under any circumstances. This applies even if prior tracker history in the chat *does* contain such an entry — silently drop it and do not propagate it forward. The tracker is exclusively for narrative characters and NPCs that \`{{user}}\` interacts with; \`{{user}}\` is never a valid tracker subject.
-9. **Multi-character cap:** Track up to 4 active characters (excluding \`{{user}}\`). Mark inactive ones with \`"inactive": true\`.
-10. **Numeric IDs, not strings.** Where a field is an enum (\`cycle_stage_id\`, \`cervix_state_id\`, \`last_react\`, \`inactiveReason\`), emit the integer. The renderer maps it to its display label.
-11. **Do not emit derived fields.** Stat deltas (\`apChange\`, \`dpChange\`, \`tpChange\`, \`cpChange\`), readable cycle/cervix labels, and relationship/desire descriptors are derived by the renderer. Do not include them.
-
----
-
-### CANONICAL SCHEMA
-
-\`\`\`json
-{
-  "worldData": {
-    "current_date": "YYYY-MM-DD",
-    "current_time": "HH:MM"
-  },
-  "characters": [
-    {
-      "name": "Character Name",
-      "ap": 0,
-      "dp": 0,
-      "tp": 0,
-      "cp": 0,
-      "sex": "female",
-      "cycle_stage_id": 0,
-      "cycle_day": 0,
-      "womb_fullness_pct": 0,
-      "womb_receptivity_pct": 0,
-      "cervix_state_id": 0,
-      "cup_size": "",
-      "breast_fullness_pct": 0,
-      "milk_ml": 0,
-      "milk_capacity_ml": 0,
-      "nipple_sensitivity_pct": 0,
-      "lactating": false,
-      "breeding_count": 0,
-      "preg": false,
-      "conceived": false,
-      "days_preg": 0,
-      "conception_date": "",
-      "refractory_minutes": 0,
-      "refractory_total": 0,
-      "semen_ml": 0,
-      "semen_capacity_ml": 0,
-      "male_fertility_pct": 0,
-      "anal_fullness_pct": 0,
-      "anal_tightness_pct": 0,
-      "prostate_stimulation_pct": 0,
-      "last_react": 0,
-      "internal_thought": "",
-      "days_since_first_meeting": 0,
-      "inactive": false,
-      "inactiveReason": 0,
-      "bg": "#808080"
-    }
-  ]
-}
-\`\`\`
-
----
-
-### STAT METERS (HARD CAPS)
-
-| Field | Range | Brackets |
-|---|---|---|
-| **ap** Affection | 0-200 | 0-30 Strangers / 31-60 Acquaintances / 61-90 Friends / 91-120 Romantic / 121-150 Steady / 151-180 Committed / 181-200 Devoted |
-| **dp** Desire | 0-150 | 0-25 Cold / 26-50 Warm / 51-75 Interested / 76-100 Aroused / 101-125 Needy / 126-150 Desperate |
-| **tp** Trust | 0-150 | Falls when lied to, cheated, or promises broken. Rises with kept promises and demonstrated reliability. |
-| **cp** Contempt | 0-150 | Rises when harmed. A rising CP can drag AP/DP/TP down. |
-
-Movement is +/- per turn, scaled to the magnitude of the moment. Do not include \`apChange\`/\`dpChange\`/\`tpChange\`/\`cpChange\` — the renderer computes deltas by diffing the current tracker against the previous tracker block automatically.
-
----
-
-### REACTIONS & INACTIVITY ENUMS
-
-- \`last_react\` — most recent reaction toward the user this turn:
-  - \`0\` = Neutral
-  - \`1\` = Like / Approve
-  - \`2\` = Dislike / Disapprove
-- \`inactiveReason\` — when \`inactive: true\`, set the cause:
-  - \`0\` = Not inactive (default)
-  - \`1\` = Asleep
-  - \`2\` = Comatose
-  - \`3\` = Contempt / refusing engagement
-  - \`4\` = Incapacitated
-  - \`5\` = Death
-
----
-
-### BIOLOGICAL TRACKING
-
-**\`sex\` gate:** lowercase one of \`"female"\`, \`"male"\`, \`"futanari"\`, \`"other"\`. Preserve from prior state unless the narrative explicitly changes biology.
-
-**General rule for all biology:** Preserve prior values across turns. Advance only when narrative time passes. Use \`0\` / \`""\` / \`false\` when genuinely inapplicable. Futanari characters output **both** female and male field groups.
-
-#### Female / Futanari — Fertility & Womb
-
-For \`sex: "female"\` or \`"futanari"\`, always include and update:
-
-- \`cycle_day\` — Current day in the cycle, typically 1-28 (or established species length). Advance with narrative time.
-- \`cycle_stage_id\` — Integer enum for the current fertility phase:
-  - \`0\` = unknown / N/A
-  - \`1\` = menstruation (days 1-5)
-  - \`2\` = follicular (days 6-13)
-  - \`3\` = ovulation (days 14-16, peak fertility)
-  - \`4\` = luteal (days 17-28)
-  - \`5\` = pregnancy
-  - \`6\` = rut (heat / estrus surge — species-dependent)
-- \`womb_fullness_pct\` — 0-100. Estimate from narrative; preserve unless events change it (ejaculation, leakage, douching, menstruation, pregnancy progression).
-- \`womb_receptivity_pct\` — 0-100. High during ovulation/rut and heavy arousal; low during menstruation, contempt, or low arousal.
-- \`cervix_state_id\` — Integer enum, ordered from most closed to most open. Track narrative arousal and fertile-window biology together:
-  - \`0\` = unknown / N/A
-  - \`1\` = sealed — locked tight (pregnancy plug, post-coital seal, deep refractory)
-  - \`2\` = firm — closed, non-fertile baseline
-  - \`3\` = soft — relaxed, near-fertile or aroused
-  - \`4\` = open — parted, fertile window or active receptivity
-  - \`5\` = dilated — wide open, peak fertility paired with heavy arousal
-  - \`6\` = kissed — directly contacted or breached by a partner; deepest exposure
-- \`breeding_count\` — Times filled internally this cycle. Increment after each internal ejaculation; preserve between turns; reset only at the start of a new cycle.
-
-**Conception & Pregnancy (staged):**
-
-The pipeline stages reproduction across two flags:
-
-- \`conceived: true\` — fertilization has happened but pregnancy isn't yet visibly evident. The character is silently carrying.
-- \`preg: true\` — pregnancy has been confirmed (test, narrative reveal, missed period, showing). Implies \`cycle_stage_id: 5\` and \`cervix_state_id: 1\` (sealed) unless labor begins.
-
-**Engine-enforced auto-conception:** when womb fullness exceeds 85% during a fertile window (ovulation, rut, or early luteal cycle_day ≤ 19) and the character is not already conceived/pregnant, the engine flips a coin to mark her \`conceived: true\` (with \`conception_date\` set to the current world date). At 100% fullness the coin is skipped and conception is automatic. **If the prior tracker block shows \`conceived: true\`, preserve it on every subsequent emission until pregnancy is confirmed — never revert it to \`false\`.**
-
-Manual rules:
-
-- If pregnant: \`preg: true\`, \`cycle_stage_id: 5\`, advance \`days_preg\` daily, preserve \`conception_date\` (YYYY-MM-DD). Set \`cervix_state_id: 1\`.
-- If conceived but not yet pregnant: \`conceived: true\`, \`preg: false\`, \`days_preg: 0\`, \`conception_date\` set. The narrative may reveal pregnancy after several in-world days — at that point flip \`preg: true\` and start advancing \`days_preg\`.
-- If not pregnant and not conceived: \`preg: false\`, \`conceived: false\`, \`days_preg: 0\`, \`conception_date: ""\`.
-
-#### Female / Futanari — Breast & Lactation
-
-The tracker renders a breast/lactation panel for every female-aligned character (\`female\`, \`futanari\`, \`intersex\`, \`hermaphrodite\`, \`both\`). It is the female-side counterpart to the male semen panel — tracking anatomy, reproductive-fluid storage, and the lactation lifecycle. Update these whenever pregnancy, postpartum care, breast play, or lactation occurs in the narrative.
-
-**Anatomy (one-time establishment):**
-
-- \`cup_size\` — string, uppercase cup letter, **one of** \`"AA"\`, \`"A"\`, \`"B"\`, \`"C"\`, \`"D"\`, \`"DD"\`, \`"E"\`, \`"F"\`, \`"G"\`, \`"H"\`, \`"I"\`, \`"J"\`, \`"K"\`. UK doubled letters \`"FF"\`, \`"GG"\`, \`"HH"\`, \`"II"\`, \`"JJ"\` are accepted as aliases for the next US size up. The renderer maps this letter to a precise visual: the breast SVG silhouette is scaled in width, depth, and underbreast hang to match the cup size, with the areola and nipple repositioning to anatomically correct landmarks. Empty string falls back to a C-cup visual.
-
-  Establish per character on first appearance using narrative cues — descriptive language (\`"petite"\`, \`"modest"\`, \`"ample"\`, \`"buxom"\`, \`"enormous"\`), explicit canonical size, body type, age, build. Suggested mapping for free-form description:
-
-  | Cue | Cup |
-  |---|---|
-  | Flat-chested, prepubescent, tiny, barely there | \`AA\` |
-  | Small, petite, perky, modest | \`A\` |
-  | Small-to-medium, B-cup, fits a hand | \`B\` |
-  | Medium, average, handful, palmable | \`C\` |
-  | Full, ample, well-endowed | \`D\` |
-  | Generous, busty, double-D | \`DD\` |
-  | Heavy, very full, F/G-cup descriptions | \`F\`–\`G\` |
-  | Huge, massive, "hentai-proportioned", over-the-top | \`H\`+ |
-
-  **Preserve \`cup_size\` across all turns.** Only change it under explicit biological transformation in-narrative — puberty progression, magical growth/reduction, surgery, lactation-driven permanent growth, etc. Cup size does **not** change with arousal, pregnancy engorgement, or milk fullness; those modulate \`breast_fullness_pct\` instead.
-
-**Dynamic state:**
-
-- \`breast_fullness_pct\` — 0-100. Engorgement level *relative to that character's cup capacity*. Rises during pregnancy (especially second/third trimester), during arousal (mild), and as milk accumulates between feedings/pumping. Drops after nursing, pumping, or expressing. A C-cup at 80% and a G-cup at 80% will both look proportionally engorged for their frame — the percentage is relative, the absolute size comes from \`cup_size\`.
-- \`milk_ml\` — Current milk volume stored (0 to \`milk_capacity_ml\`). Rises with lactation production over narrative time. Drops to a low level after feeding/pumping. \`0\` when not lactating.
-- \`milk_capacity_ml\` — Maximum milk storage capacity. Preserve once established. Typical human range ~50-300 ml per breast; tracker treats both breasts together (so 100-600 ml is a reasonable range). \`0\` when not lactating.
-- \`nipple_sensitivity_pct\` — 0-100. Active sensitivity. Rises with arousal, pregnancy hormones, nursing latch, cold, or direct stimulation. Falls quickly when stimulation stops. \`0\` when not relevant.
-- \`lactating\` — boolean. \`true\` once milk production has actually begun (mid-to-late pregnancy onward, or any other established lactation state); \`false\` for non-lactating characters.
-
-If the character is not pregnant, not postpartum, and not narratively lactating, leave all five at \`0\` / \`false\`. The panel still renders with empty values for consistency. During pregnancy, expect \`breast_fullness_pct\` to climb, \`lactating\` to flip true around mid-pregnancy or at parturition, and \`milk_ml\` / \`milk_capacity_ml\` to populate as lactation establishes.
-
-#### Male / Futanari — Refractory & Semen
-
-For \`sex: "male"\` or \`"futanari"\`, populate these fields. Other characters may include them as \`0\`.
-
-- \`refractory_minutes\` — Minutes remaining until ready. \`0\` = ready.
-- \`refractory_total\` — Total minutes of the current refractory period. \`0\` when not in refractory.
-- \`semen_ml\` — Current volume, \`0\` to \`semen_capacity_ml\`. Drops after ejaculation; recovers with rest/arousal.
-- \`semen_capacity_ml\` — Maximum volume. Preserve unless biology changes.
-- \`male_fertility_pct\` — 0-100. Adjust for sperm count, magical fertility, infertility, rut, recovery, fatigue, etc.
-
-Convert all time to minutes. Decrement \`refractory_minutes\` toward \`0\` as narrative time passes.
-
-#### Anal Tracking — All Characters
-
-The tracker renders an anal panel for every gendered character (\`female\`, \`male\`, \`futanari\`, etc.). The prostate graphic and prostate stat row only render for prostate-bearing characters (\`male\`, \`futanari\`, \`intersex\`, \`hermaphrodite\`, \`both\`); pure-female cards show fullness and tightness only.
-
-**Update these whenever anal play, anal sex, or prostate stimulation occurs in the narrative — otherwise the panel exists but never reflects events.**
-
-- \`anal_fullness_pct\` — 0-100. Volume currently inside the anal canal (semen, toys, fingers, etc.). Rises with insertion/ejaculation, falls with withdrawal, expulsion, or cleanup over time. Preserve between turns. Applies to all characters.
-- \`anal_tightness_pct\` — 0-100. Resistance of the sphincter. \`100\` = untouched / virgin tight; drops with stretching, sustained use, lubrication, and arousal. Recovers with rest. Preserve baseline per character. Applies to all characters.
-- \`prostate_stimulation_pct\` — 0-100. Active prostate stimulation level this moment. Rises with direct pressure / deep penetration / toys angled at the prostate; falls quickly when stimulation stops. **Leave \`0\` for pure-female characters** — the renderer hides the prostate panel/graphic for them automatically.
-
-If no anal content has occurred for a character, leave all three at \`0\`. If anal content **has** occurred — even just penetration without ejaculation — \`anal_tightness_pct\` should drop from its baseline and (where applicable) \`prostate_stimulation_pct\` and \`anal_fullness_pct\` should reflect what's happening.
-
-#### Futanari / Dual-Biology
-
-Output **all** female cycle fields, lactation fields, male reproductive fields, and anal fields. The tracker renders all applicable panels in a compressed multi-row column.
-
----
-
-### INTERNAL THOUGHT & META
-
-- \`internal_thought\` — One short first-person sentence capturing the character's current inner monologue. Refresh every turn; never leave stale.
-- \`days_since_first_meeting\` — Total in-world days since the character first met the user. Increment as narrative dates advance.
-- \`inactive\` / \`inactiveReason\` — Use when the character is asleep, comatose, dead, refusing engagement, or otherwise out of the scene.
-
----
-
-### THEMING
-
-Provide \`"bg"\` as a hex color per character (e.g. \`"#2d1b4e"\`). Pick a color that matches the character's vibe; preserve across turns once chosen.
-`,
+  sysPrompt: '## NARRATIVE CHARACTER TRACKER (Pulse Thread)\n\nEmit one tracker per turn: a `worldData` object (`current_date` YYYY-MM-DD, `current_time` 24h) and a `characters` array holding every tracked character.\n\n### CRITICAL RULES\n\n1. **Full schema, every turn.** Emit every field below on every emission — no omissions, renames, or shortened forms. Populate from current narrative state or carry forward prior values; never copy the example values in this prompt. Use `0` / `""` / `false` only when a field is genuinely unknown or inapplicable (see Rule 3).\n2. **Conform to THIS schema; ignore past shapes.** Earlier tracker blocks in history may use outdated keys or layouts. Migrate their *values* into the schema below — never reproduce an old shape.\n3. **Deduce, don\'t blank.** When a value is missing from history, infer it from narrative cues (dialogue, actions, time, established lore). Fall back to `0` / `""` / `false` only when there is no signal at all.\n4. **Always wrap in a `characters` array** — `{ "characters": [ {...} ] }`, even for one character. Never a flat `{ "Name": {...} }` map.\n5. **`name` lives at the character-object level**, never inside `stats`. (You may nest stats under `"stats": {...}`; the tracker flattens them.)\n6. **Never track `{{user}}`.** No entry for `{{user}}`, ever — even if past history contains one, drop it silently. The tracker is only for the NPCs `{{user}}` interacts with.\n7. **Track up to 4 active characters** (excluding `{{user}}`); mark others `"inactive": true`.\n8. **Enums are integers, not strings** (`cycle_stage_id`, `cervix_state_id`, `last_react`, `inactiveReason`).\n9. **Don\'t emit derived fields.** Stat deltas (`apChange` / `dpChange` / `tpChange` / `cpChange`), readable cycle/cervix labels, and relationship/desire descriptors are all computed by the renderer.\n\n### CANONICAL SCHEMA\n\n```json\n{\n  "worldData": {\n    "current_date": "YYYY-MM-DD",\n    "current_time": "HH:MM"\n  },\n  "characters": [\n    {\n      "name": "Character Name",\n      "ap": 0,\n      "dp": 0,\n      "tp": 0,\n      "cp": 0,\n      "sex": "female",\n      "cycle_stage_id": 0,\n      "cycle_day": 0,\n      "womb_fullness_pct": 0,\n      "womb_receptivity_pct": 0,\n      "cervix_state_id": 0,\n      "cup_size": "",\n      "breast_fullness_pct": 0,\n      "milk_ml": 0,\n      "milk_capacity_ml": 0,\n      "nipple_sensitivity_pct": 0,\n      "lactating": false,\n      "breeding_count": 0,\n      "preg": false,\n      "conceived": false,\n      "days_preg": 0,\n      "conception_date": "",\n      "refractory_minutes": 0,\n      "refractory_total": 0,\n      "semen_ml": 0,\n      "semen_capacity_ml": 0,\n      "male_fertility_pct": 0,\n      "anal_fullness_pct": 0,\n      "anal_tightness_pct": 0,\n      "prostate_stimulation_pct": 0,\n      "last_react": 0,\n      "internal_thought": "",\n      "days_since_first_meeting": 0,\n      "inactive": false,\n      "inactiveReason": 0,\n      "bg": "#808080"\n    }\n  ]\n}\n```\n\n### STAT METERS (hard caps)\n\n| Field | Range | Brackets / behavior |\n|---|---|---|\n| **ap** Affection | 0-200 | 0-30 Strangers / 31-60 Acquaintances / 61-90 Friends / 91-120 Romantic / 121-150 Steady / 151-180 Committed / 181-200 Devoted |\n| **dp** Desire | 0-150 | 0-25 Cold / 26-50 Warm / 51-75 Interested / 76-100 Aroused / 101-125 Needy / 126-150 Desperate |\n| **tp** Trust | 0-150 | Falls with lies and broken promises; rises with reliability. |\n| **cp** Contempt | 0-150 | Rises when harmed; high cp drags ap/dp/tp down. |\n\nMovement is +/- per turn, scaled to the magnitude of the moment.\n\n### ENUMS\n\n- `last_react` (reaction toward the user this turn): `0` Neutral, `1` Like/Approve, `2` Dislike/Disapprove.\n- `inactiveReason` (when `inactive: true`): `1` Asleep, `2` Comatose, `3` Contempt/refusing, `4` Incapacitated, `5` Death. `0` = active.\n\n### BIOLOGICAL FIELDS\n\nPreserve all biology across turns; advance only as narrative time passes. Use `0` / `""` / `false` when inapplicable. `sex` is lowercase `female` | `male` | `futanari` | `other`; preserve unless biology explicitly changes. **Futanari emit both the female and male field groups.**\n\n**Female / futanari — cycle & womb**\n- `cycle_day` — day in cycle (1-28, or established species length); advance with time.\n- `cycle_stage_id` — `0` unknown, `1` menstruation (d1-5), `2` follicular (d6-13), `3` ovulation (d14-16, peak fertility), `4` luteal (d17-28), `5` pregnancy, `6` rut/heat.\n- `womb_fullness_pct` / `womb_receptivity_pct` — 0-100. Receptivity is high at ovulation/rut and heavy arousal, low at menstruation or low arousal.\n- `cervix_state_id` (closed→open) — `0` unknown, `1` sealed, `2` firm, `3` soft, `4` open, `5` dilated, `6` kissed.\n- `breeding_count` — internal finishes this cycle; increment per internal ejaculation, reset at a new cycle.\n\n**Conception & pregnancy** (two stages):\n- `conceived: true` — fertilized but not yet showing. The engine auto-sets this (with `conception_date`) when `womb_fullness_pct` exceeds 85% in a fertile window (ovulation, rut, or luteal day ≤19); automatic at 100%. **Once true, preserve it every turn until pregnancy is confirmed — never revert to `false`.**\n- `preg: true` — pregnancy confirmed (test, reveal, missed period, showing). Set `cycle_stage_id: 5`, `cervix_state_id: 1`, advance `days_preg` daily, preserve `conception_date`.\n- Neither: `preg: false`, `conceived: false`, `days_preg: 0`, `conception_date: ""`.\n\n**Female / futanari — breast & lactation** (leave at `0` / `false` unless pregnant, postpartum, or lactating):\n- `cup_size` — uppercase letter, `AA` or `A`–`K` (UK `FF`/`GG`/`HH`/`II`/`JJ` alias to the next US size up). Set on first appearance from narrative cues; preserve unless biology changes (puberty, magic, surgery). Does NOT change with arousal or engorgement.\n  Cues: flat/tiny → `AA`; petite/perky → `A`; B-cup → `B`; average/handful → `C`; full/ample → `D`; busty/double-D → `DD`; heavy/very full → `F`–`G`; huge/massive → `H`+.\n- `breast_fullness_pct` — 0-100 engorgement relative to the cup. Rises with pregnancy, arousal, and milk buildup; drops after nursing/pumping.\n- `milk_ml` / `milk_capacity_ml` — stored vs. max (combined breasts ~100-600 ml). `0` when not lactating.\n- `nipple_sensitivity_pct` — 0-100; rises with arousal/hormones/stimulation, falls fast when it stops.\n- `lactating` — `true` once milk production begins (mid-to-late pregnancy onward).\n\n**Male / futanari — refractory & semen** (`0` for others):\n- `refractory_minutes` — minutes until ready (`0` = ready); decrement as time passes.\n- `refractory_total` — length of the current refractory period (`0` if none).\n- `semen_ml` / `semen_capacity_ml` — current vs. max; drops after ejaculation, recovers with rest/arousal.\n- `male_fertility_pct` — 0-100; adjust for rut, recovery, fatigue, magic.\n\n**Anal — all characters** (`0` if no anal content has occurred):\n- `anal_fullness_pct` — 0-100 volume inside the canal; rises with insertion/ejaculation, falls with withdrawal/cleanup.\n- `anal_tightness_pct` — 0-100 sphincter resistance; `100` = virgin-tight, drops with use/lube/arousal, recovers with rest.\n- `prostate_stimulation_pct` — 0-100 active stimulation; rises with prostate-angled pressure, falls fast when it stops. Leave `0` for characters without a prostate.\n\n### OTHER FIELDS\n\n- `internal_thought` — one short first-person sentence of current inner monologue; refresh every turn.\n- `days_since_first_meeting` — in-world days since the character first met `{{user}}`; advance with dates.\n- `inactive` / `inactiveReason` — set when asleep, comatose, dead, refusing engagement, or off-scene.\n- `bg` — hex color matching the character\'s vibe (e.g. `#2d1b4e`); preserve once chosen.\n',
   customFields: [
     {
       key: "ap",
@@ -10733,6 +10509,983 @@ Provide \`"bg"\` as a hex color per character (e.g. \`"#2d1b4e"\`). Pick a color
   },
   trackerDesc: "Narrative character tracker with fertility, womb fullness, semen volume, and refractory gauges."
 };
+// custom/narrative-weave-simtracker.json
+var narrative_weave_simtracker_default = {
+  templateName: "Narrative Weave SimTracker",
+  templateAuthor: "Prolix OCs",
+  trackerDesc: "A narrative relationship and plot momentum tracker for up to four NPCs plus a separate world and story state.",
+  templatePosition: "BOTTOM",
+  htmlTemplate: `<!-- TEMPLATE NAME: Narrative Weave SimTracker -->
+<!-- AUTHOR: Prolix OCs -->
+<!-- POSITION: BOTTOM -->
+
+<!-- CARD_TEMPLATE_START -->
+<style>
+  .nw-tracker {
+    --nw-bg: color-mix(in srgb, var(--lumiverse-bg, #17171c) 88%, #101116 12%);
+    --nw-surface: color-mix(in srgb, var(--lumiverse-fill-subtle, #25262d) 84%, transparent);
+    --nw-surface-strong: color-mix(in srgb, var(--lumiverse-fill, #30313a) 88%, transparent);
+    --nw-border: var(--lumiverse-border, rgba(255, 255, 255, 0.13));
+    --nw-border-hover: var(--lumiverse-border-hover, rgba(255, 255, 255, 0.24));
+    --nw-text: var(--lumiverse-text, #f4f4f6);
+    --nw-muted: var(--lumiverse-text-muted, #b4b5bd);
+    --nw-dim: var(--lumiverse-text-dim, #8a8c96);
+    --nw-focus: #5cc8be;
+    --nw-world-accent: #d5a84b;
+    --nw-ap: #e36d91;
+    --nw-dp: #ee8454;
+    --nw-tp: #49b8ae;
+    --nw-cp: #d15c5c;
+    width: min(100%, 1100px);
+    margin: 14px auto;
+    color: var(--nw-text);
+    font-family: var(--lumiverse-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .nw-tracker,
+  .nw-tracker * {
+    box-sizing: border-box;
+  }
+
+  .nw-tracker-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .nw-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--nw-border);
+    border-radius: 8px;
+    background: var(--nw-bg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    transition: border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  }
+
+  .nw-panel:hover {
+    border-color: var(--nw-border-hover);
+  }
+
+  .nw-panel[open] {
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  }
+
+  .nw-world {
+    grid-column: 1 / -1;
+    border-top: 3px solid var(--nw-world-accent);
+  }
+
+  .nw-character {
+    --nw-accent: #6a5acd;
+    --nw-accent-dark: #423789;
+    border-top: 3px solid var(--nw-accent);
+  }
+
+  .nw-character > .nw-summary {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--nw-accent) 14%, var(--nw-surface)) 0%,
+      transparent 78%
+    );
+  }
+
+  .nw-character > .nw-summary:hover {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--nw-accent) 20%, var(--nw-surface-strong)) 0%,
+      transparent 80%
+    );
+  }
+
+  .nw-character.nw-inactive {
+    opacity: 0.68;
+  }
+
+  .nw-character.nw-inactive[open],
+  .nw-character.nw-inactive:hover {
+    opacity: 0.82;
+  }
+
+  .nw-summary {
+    position: relative;
+    display: grid;
+    gap: 7px;
+    min-height: 108px;
+    padding: 14px 42px 14px 16px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    background: linear-gradient(135deg, var(--nw-surface) 0%, transparent 72%);
+  }
+
+  .nw-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .nw-summary::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    width: 9px;
+    height: 9px;
+    border-right: 2px solid var(--nw-muted);
+    border-bottom: 2px solid var(--nw-muted);
+    transform: rotate(45deg);
+    transition: transform 180ms ease, border-color 180ms ease;
+  }
+
+  .nw-panel[open] > .nw-summary::after {
+    transform: rotate(225deg) translate(-2px, -2px);
+    border-color: var(--nw-text);
+  }
+
+  .nw-summary:hover {
+    background: linear-gradient(135deg, var(--nw-surface-strong) 0%, transparent 76%);
+  }
+
+  .nw-summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--nw-focus) 70%, transparent);
+    outline-offset: -3px;
+  }
+
+  .nw-summary-title {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--nw-text);
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.2;
+    letter-spacing: 0;
+  }
+
+  .nw-world-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+  }
+
+  .nw-day-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--nw-world-accent) 46%, var(--nw-border));
+    border-radius: 999px;
+    color: #f0d08d;
+    background: color-mix(in srgb, var(--nw-world-accent) 14%, transparent);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .nw-mood {
+    color: var(--nw-muted);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .nw-thought {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--nw-text);
+    font-size: 13px;
+    font-style: italic;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .nw-thread {
+    margin: 0;
+    color: var(--nw-text);
+    font-size: 14px;
+    font-weight: 620;
+    overflow-wrap: anywhere;
+  }
+
+  .nw-body {
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--nw-border);
+    animation: nw-body-in 180ms ease-out;
+  }
+
+  @keyframes nw-body-in {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .nw-section {
+    padding-top: 14px;
+  }
+
+  .nw-section + .nw-section {
+    margin-top: 14px;
+    border-top: 1px solid var(--nw-border);
+  }
+
+  .nw-section-title {
+    margin: 0 0 9px;
+    color: var(--nw-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .nw-meta-grid,
+  .nw-path-grid,
+  .nw-stat-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  .nw-meta-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .nw-path-grid,
+  .nw-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nw-field,
+  .nw-path,
+  .nw-stat {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--nw-border);
+    border-radius: 7px;
+    background: var(--nw-surface);
+  }
+
+  .nw-field-label,
+  .nw-path-label,
+  .nw-stat-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--nw-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .nw-field-value,
+  .nw-path-value {
+    color: var(--nw-text);
+    overflow-wrap: anywhere;
+  }
+
+  .nw-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .nw-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid var(--nw-border);
+    border-radius: 999px;
+    color: var(--nw-text);
+    background: var(--nw-surface);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .nw-status-active {
+    border-color: color-mix(in srgb, #55c48d 50%, var(--nw-border));
+    color: #8ce1b2;
+  }
+
+  .nw-status-inactive {
+    border-color: color-mix(in srgb, #d6a14d 50%, var(--nw-border));
+    color: #ecc778;
+  }
+
+  .nw-stat-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .nw-stat-value {
+    color: var(--nw-text);
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .nw-stat-status {
+    min-height: 34px;
+    margin-top: 5px;
+    color: var(--nw-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .nw-track {
+    height: 7px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--nw-text) 9%, transparent);
+  }
+
+  .nw-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 280ms ease;
+  }
+
+  .nw-fill-ap {
+    background: var(--nw-ap);
+  }
+
+  .nw-fill-dp {
+    background: var(--nw-dp);
+  }
+
+  .nw-fill-tp {
+    background: var(--nw-tp);
+  }
+
+  .nw-fill-cp {
+    background: var(--nw-cp);
+  }
+
+  .nw-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nw-list li {
+    position: relative;
+    padding-left: 15px;
+    color: var(--nw-text);
+    overflow-wrap: anywhere;
+  }
+
+  .nw-list li::before {
+    content: "";
+    position: absolute;
+    top: 0.6em;
+    left: 1px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--nw-world-accent);
+  }
+
+  .nw-empty {
+    color: var(--nw-dim);
+    font-style: italic;
+  }
+
+  .nw-momentum {
+    border-left: 3px solid var(--nw-focus);
+  }
+
+  .nw-selected-path {
+    border-color: color-mix(in srgb, var(--nw-focus) 50%, var(--nw-border));
+    background: color-mix(in srgb, var(--nw-focus) 10%, var(--nw-surface));
+  }
+
+  .nw-strategy {
+    grid-column: span 2;
+  }
+
+  @media (max-width: 720px) {
+    .nw-tracker {
+      margin: 10px auto;
+      font-size: 14px;
+    }
+
+    .nw-tracker-grid,
+    .nw-meta-grid,
+    .nw-path-grid,
+    .nw-stat-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .nw-world {
+      grid-column: auto;
+    }
+
+    .nw-strategy {
+      grid-column: auto;
+    }
+
+    .nw-summary {
+      min-height: 104px;
+      padding: 13px 38px 13px 13px;
+    }
+
+    .nw-body {
+      padding: 0 13px 13px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nw-tracker *,
+    .nw-tracker *::before,
+    .nw-tracker *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<section class="nw-tracker" aria-label="Narrative relationship and plot tracker">
+  <div class="nw-tracker-grid">
+    <details class="nw-panel nw-world">
+      <summary class="nw-summary">
+        <div class="nw-world-title">
+          <h2 class="nw-summary-title">
+            {{#if worldData.part_of_day}}{{worldData.part_of_day}}{{else}}Time of day unknown{{/if}}
+          </h2>
+          <span class="nw-day-chip">Day {{#if worldData.day_counter}}{{worldData.day_counter}}{{else}}1{{/if}}</span>
+        </div>
+        <p class="nw-thread">
+          {{#if worldData.immediate_narrative_thread}}
+            {{worldData.immediate_narrative_thread}}
+          {{else}}
+            No immediate narrative thread recorded.
+          {{/if}}
+        </p>
+      </summary>
+
+      <div class="nw-body">
+        <section class="nw-section" aria-label="Timeline">
+          <h3 class="nw-section-title">Timeline</h3>
+          <div class="nw-meta-grid">
+            <div class="nw-field">
+              <span class="nw-field-label">Date</span>
+              <span class="nw-field-value">{{#if worldData.current_date}}{{worldData.current_date}}{{else}}Unknown{{/if}}</span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Time</span>
+              <span class="nw-field-value">{{#if worldData.current_time}}{{worldData.current_time}}{{else}}Unknown{{/if}}</span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Since first meeting</span>
+              <span class="nw-field-value">
+                {{#if worldData.days_since_first_meeting}}{{worldData.days_since_first_meeting}}{{else}}0{{/if}} days
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="nw-section" aria-label="Narrative weave">
+          <h3 class="nw-section-title">Narrative weave</h3>
+          <div class="nw-meta-grid">
+            <div class="nw-field">
+              <span class="nw-field-label">Current arc</span>
+              <span class="nw-field-value">
+                {{#if worldData.current_narrative_arc}}{{worldData.current_narrative_arc}}{{else}}No current arc recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Completed weave</span>
+              <span class="nw-field-value">
+                {{#if worldData.completed_weave}}{{worldData.completed_weave}}{{else}}No resolved beat recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Parallel action</span>
+              <span class="nw-field-value">
+                {{#if worldData.parallel_actions}}{{worldData.parallel_actions}}{{else}}None in this scene window.{{/if}}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="nw-section" aria-label="Looming story beats">
+          <h3 class="nw-section-title">Looming story beats</h3>
+          {{#if worldData.looming_story_beats}}
+            <ul class="nw-list">
+              {{#each worldData.looming_story_beats}}
+                {{#if this}}<li>{{this}}</li>{{/if}}
+              {{/each}}
+            </ul>
+          {{else}}
+            <div class="nw-empty">No looming beats recorded.</div>
+          {{/if}}
+        </section>
+
+        <section class="nw-section nw-momentum" aria-label="Plot momentum">
+          <h3 class="nw-section-title">Plot momentum</h3>
+          <div class="nw-meta-grid">
+            <div class="nw-field">
+              <span class="nw-field-label">NPC agenda</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.npc_agenda}}{{worldData.plot_momentum.npc_agenda}}{{else}}No NPC agenda recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Scene physics</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.physics}}{{worldData.plot_momentum.physics}}{{else}}Positioning not recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Scene pacing</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.scene_pacing}}{{worldData.plot_momentum.scene_pacing}}{{else}}Steady{{/if}}
+              </span>
+            </div>
+          </div>
+
+          <div class="nw-path-grid" style="margin-top: 8px;">
+            <div class="nw-path">
+              <span class="nw-path-label">Path A · Default</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_a_default}}
+                  {{worldData.plot_momentum.next_path_options.path_a_default}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+            <div class="nw-path">
+              <span class="nw-path-label">Path B · Conflict</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_b_conflict}}
+                  {{worldData.plot_momentum.next_path_options.path_b_conflict}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+            <div class="nw-path">
+              <span class="nw-path-label">Path C · Action</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_c_action}}
+                  {{worldData.plot_momentum.next_path_options.path_c_action}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+            <div class="nw-path">
+              <span class="nw-path-label">Path D · Twist</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_d_twist}}
+                  {{worldData.plot_momentum.next_path_options.path_d_twist}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+          </div>
+
+          <div class="nw-meta-grid" style="margin-top: 8px;">
+            <div class="nw-field nw-selected-path">
+              <span class="nw-field-label">Selected path</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.selected_path}}{{worldData.plot_momentum.selected_path}}{{else}}Not selected{{/if}}
+              </span>
+            </div>
+            <div class="nw-field nw-strategy">
+              <span class="nw-field-label">Strategy reason</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.strategy_reason}}{{worldData.plot_momentum.strategy_reason}}{{else}}No strategy reason recorded.{{/if}}
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </details>
+
+    {{#each characters}}
+      <details
+        class="nw-panel nw-character {{#if stats.inactive}}nw-inactive{{/if}}"
+        style="--nw-accent: {{bgColor}}; --nw-accent-dark: {{darkerBgColor}};"
+      >
+        <summary class="nw-summary">
+          <h2 class="nw-summary-title">
+            {{#if characterName}}{{characterName}}{{else}}Unnamed NPC{{/if}}
+          </h2>
+          <div class="nw-mood">
+            {{#if stats.mood}}{{stats.mood}}{{else}}Mood not recorded.{{/if}}
+          </div>
+          <p class="nw-thought">
+            {{#if stats.internal_thought}}{{stats.internal_thought}}{{else}}No internal thought recorded.{{/if}}
+          </p>
+        </summary>
+
+        <div class="nw-body">
+          <section class="nw-section" aria-label="Character state">
+            <h3 class="nw-section-title">Current state</h3>
+            <div class="nw-status-row">
+              {{#if stats.inactive}}
+                <span class="nw-status nw-status-inactive">
+                  {{#if (eq stats.inactive_reason 1)}}😴 Asleep
+                  {{else if (eq stats.inactive_reason 2)}}🏥 Comatose
+                  {{else if (eq stats.inactive_reason 3)}}😡 Contempt / anger
+                  {{else if (eq stats.inactive_reason 4)}}🫠 Incapacitated
+                  {{else if (eq stats.inactive_reason 5)}}🪦 Deceased
+                  {{else if (eq stats.inactiveReason 1)}}😴 Asleep
+                  {{else if (eq stats.inactiveReason 2)}}🏥 Comatose
+                  {{else if (eq stats.inactiveReason 3)}}😡 Contempt / anger
+                  {{else if (eq stats.inactiveReason 4)}}🫠 Incapacitated
+                  {{else if (eq stats.inactiveReason 5)}}🪦 Deceased
+                  {{else}}Unavailable{{/if}}
+                </span>
+              {{else}}
+                <span class="nw-status nw-status-active">● Active in scene</span>
+              {{/if}}
+
+              <span class="nw-status">
+                {{#if (eq stats.reaction 1)}}👍 Like
+                {{else if (eq stats.reaction 2)}}👎 Dislike
+                {{else if (eq stats.last_react 1)}}👍 Like
+                {{else if (eq stats.last_react 2)}}👎 Dislike
+                {{else}}😐 Neutral{{/if}}
+              </span>
+            </div>
+          </section>
+
+          <section class="nw-section" aria-label="Relationship statistics">
+            <h3 class="nw-section-title">Relationship meters</h3>
+            <div class="nw-stat-grid">
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">AP · Affection</span>
+                  <span class="nw-stat-value">{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}} / 200</span>
+                </div>
+                <div class="nw-stat-status">
+                  {{#if stats.ap_status}}{{stats.ap_status}}{{else}}Strangers{{/if}}
+                </div>
+                <div class="nw-track" role="progressbar" aria-label="Affection points" aria-valuemin="0" aria-valuemax="200" aria-valuenow="{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-ap" style="width: {{divide stats.ap 2}}%;"></div>
+                </div>
+              </div>
+
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">DP · Desire</span>
+                  <span class="nw-stat-value">{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}} / 150</span>
+                </div>
+                <div class="nw-stat-status">
+                  {{#if stats.dp_status}}{{stats.dp_status}}{{else}}Not feeling the heat{{/if}}
+                </div>
+                <div class="nw-track" role="progressbar" aria-label="Desire points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-dp" style="width: {{divide stats.dp 1.5}}%;"></div>
+                </div>
+              </div>
+
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">TP · Trust</span>
+                  <span class="nw-stat-value">{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}} / 150</span>
+                </div>
+                <div class="nw-stat-status">Trust toward the player character.</div>
+                <div class="nw-track" role="progressbar" aria-label="Trust points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-tp" style="width: {{divide stats.tp 1.5}}%;"></div>
+                </div>
+              </div>
+
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">CP · Contempt</span>
+                  <span class="nw-stat-value">{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}} / 150</span>
+                </div>
+                <div class="nw-stat-status">Contempt toward the player character.</div>
+                <div class="nw-track" role="progressbar" aria-label="Contempt points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-cp" style="width: {{divide stats.cp 1.5}}%;"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+    {{else}}
+      <div class="nw-panel nw-field nw-empty">No NPC characters are currently tracked.</div>
+    {{/each}}
+  </div>
+</section>
+<!-- CARD_TEMPLATE_END -->
+
+<!--
+TEMPLATE VARIABLES:
+- {{worldData.*}}: Structured world and plot momentum state.
+- {{characters}}: Up to four normalized NPC character records.
+- {{characterName}}: NPC name.
+- {{bgColor}} / {{darkerBgColor}}: Character color and darker variant.
+- {{stats.*}}: Character fields, statuses, and relationship values.
+-->
+`,
+  sysPrompt: `## NARRATIVE WEAVE SIMTRACKER
+
+Track relationship state for NPC characters and maintain a separate structured world/story state. Narrative continuity is authoritative: preserve prior tracker values unless an event in the story justifies changing them.
+
+## Output Protocol
+
+1. Write the narrative reply first.
+2. After the narrative, always emit exactly one complete canonical tracker tag: \`<tracker type="sim">...</tracker>\`.
+3. Put valid JSON inside the tag. Use the top-level shape \`{ "worldData": { ... }, "characters": [ ... ] }\`.
+4. Emit the complete schema every turn. Do not omit core fields, do not output a separate hidden Plot Momentum prose block, and do not add a second tracker block.
+5. Carry forward known values. When context is uncertain, preserve the prior value instead of resetting it, inventing a replacement, or dropping the field.
+
+## Character Scope
+
+- Track NPC characters only. Never include {{user}} in \`characters\`; {{user}} is the player character.
+- Track at most 4 NPC characters.
+- Each character must include: \`name\`, \`mood\`, \`inactive\`, \`inactive_reason\`, \`internal_thought\`, \`bg\`, \`reaction\`, \`ap\`, \`ap_status\`, \`dp\`, \`dp_status\`, \`tp\`, and \`cp\`.
+- \`name\` is the NPC name only.
+- \`mood\` is the NPC's current mood in their own words, as if asked, "What is your mood?"
+- \`internal_thought\` is current thought/feeling text, never wrapped in asterisks, and must never exceed 3 sentences.
+- \`bg\` is a stable hex color based on appearance, personality, theme, or narrative energy.
+- \`reaction\`: 0=Neutral, 1=Like, 2=Dislike.
+- \`inactive\`: true only when unavailable/inactive. \`inactive_reason\`: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death. Use 0 whenever \`inactive\` is false.
+
+## Relationship Meter Rules
+
+All caps and movement limits are absolute. Clamp values after every update.
+
+### Affection Points (\`ap\`)
+
+- Range 0-200; hard cap 200 and floor 0.
+- Romantic feelings toward {{user}}. Higher values produce more affectionate behavior and speech.
+- Moves VERY slowly. Normal per-turn movement is -5 to +2.
+- Recalculate \`ap_status\` every turn from \`ap\` and use only these exact strings:
+  - 0-30: \`Strangers\`
+  - 31-60: \`Acquaintances\`
+  - 61-90: \`Good Friends\`
+  - 91-120: \`Romantic Interest\`
+  - 121-150: \`Going Steady\`
+  - 151-180: \`Committed Relationship\`
+  - 181-200: \`Devoted Partner\`
+
+### Desire Points (\`dp\`)
+
+- Range 0-150; hard cap 150 and floor 0.
+- Sexual attraction and willingness within the story context.
+- Moves quickly in 5-point increments. Absolute per-turn movement is -50 to +50; 25 points is the common strong-event change.
+- Recalculate \`dp_status\` every turn from \`dp\` and use only these exact strings:
+  - 0-25: \`Not feeling the heat\`
+  - 26-50: \`A smoldering flame builds\`
+  - 51-75: \`Starting to feel warm\`
+  - 76-100: \`Body's burning up!\`
+  - 101-125: \`A desperate need presents\`
+  - 126-150: \`Pliable in the lustful hunger\`
+
+### Trust Points (\`tp\`)
+
+- Range 0-150; hard cap 150 and floor 0.
+- Trust in {{user}}. Higher values support admitting faults, believing {{user}}, opening up, and relying on them.
+- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, reserved for rare major events.
+- Lies, cheating, manipulation, betrayal, and broken promises reduce trust.
+
+### Contempt Points (\`cp\`)
+
+- Range 0-150; hard cap 150 and floor 0.
+- Disdain toward {{user}}. Harm, humiliation, betrayal, and moral disgust raise it; good faith, apology, repair, regret, and meaningful restitution may lower it.
+- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, reserved for rare major events.
+- A narratively justified CP rise may lower other relationship meters.
+
+## World and Time State
+
+Always include all \`worldData\` fields.
+
+- \`part_of_day\` must be exactly one of: \`🌅 Morning\`, \`🌞 Day\`, \`🌇 Evening\`, \`🌙 Night\`. Infer it from \`current_time\` and context.
+- \`current_date\` uses YYYY-MM-DD. Infer it from context and handle day, month, leap-year, and year rollovers correctly.
+- \`current_time\` uses 24-hour HH:MM. Advance it only when narrative time passes and keep progression realistic.
+- \`day_counter\` starts at 1 and advances with in-world days.
+- \`days_since_first_meeting\` starts at 0 unless context establishes otherwise and advances with in-world dates.
+- \`immediate_narrative_thread\` is the urgent active next step in the current scene.
+- \`looming_story_beats\` is an array of 1-3 concise mid-term consequences or pressures.
+- \`current_narrative_arc\` is the story's primary current focus.
+- \`completed_weave\` is the most recent resolved narrative beat.
+- \`parallel_actions\` is a brief off-scene event occurring in the exact same time window as the current reply. It may establish characters, factions, consequences, or future threads, but must not slow or hijack the main scene. Use an empty string during intimate, sexual, or highly emotional scenes; never interrupt those scenes with parallel action.
+
+## Structured Plot Momentum
+
+Maintain \`worldData.plot_momentum\` every turn. Never emit Plot Momentum as a separate prose block.
+
+- \`npc_agenda\`: immediate NPC goals independent of {{user}}.
+- \`physics\`: exact current positions and location of NPCs and {{user}}.
+- \`scene_pacing\`: exactly \`Slow Burn\`, \`Steady\`, or \`High Momentum\`.
+- \`next_path_options\` must contain all four keys:
+  - \`path_a_default\`: the most obvious next NPC step.
+  - \`path_b_conflict\`: NPC-created friction, resistance, or disagreement.
+  - \`path_c_action\`: physical movement, escalation, or NPC/environment shift.
+  - \`path_d_twist\`: unexpected revelation, interruption, or NPC/environment change.
+- \`selected_path\`: \`A\`, \`B\`, \`C\`, \`D\`, or a blend such as \`A+C\`.
+- \`strategy_reason\`: brief reason the selected path serves NPC goals and logically maintains or intentionally changes \`scene_pacing\`.
+
+Before writing new path options, inspect the previous \`selected_path\` and its four prior options. Execute the selected path if it remains valid. Do not veer away from the four prior options unless all are no longer valid. During sexual or explicit scenes, preserve continuity and do not interrupt; only escalate tension when appropriate.
+
+### Critical Pathing Rule: NPC Characters Only
+
+Path options may describe only NPC actions and environmental changes. Never make {{user}} the target or actor of a path option. Never require, predict, branch from, or describe {{user}}'s future feelings, choices, dialogue, reactions, or actions. NPCs must push their own goals.
+
+## Required JSON Shape
+
+{{sim_format}}
+
+The tracker tag must be the final content after the narrative. Validate JSON syntax, numeric types, booleans, caps, exact AP/DP status strings, complete fields, and the maximum of four NPCs before sending.`,
+  customFields: [
+    {
+      key: "mood",
+      description: `[string] NPC's current mood in their own words, answering "What is your mood?"`
+    },
+    {
+      key: "inactive",
+      description: "[boolean] True only when the NPC is unavailable or inactive in the current scene; false otherwise."
+    },
+    {
+      key: "inactive_reason",
+      description: "[number] Inactivity enum: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death."
+    },
+    {
+      key: "internal_thought",
+      description: "[string] NPC's current thoughts and feelings, maximum 3 sentences, never wrapped in asterisks."
+    },
+    {
+      key: "bg",
+      description: "[string] Stable six-digit hex color based on the NPC's appearance, personality, theme, or narrative energy."
+    },
+    {
+      key: "reaction",
+      description: "[number] Current reaction toward the user: 0=Neutral, 1=Like, 2=Dislike."
+    },
+    {
+      key: "ap",
+      description: "[number] Affection Points toward the user, 0-200 hard range; normal per-turn movement -5 to +2."
+    },
+    {
+      key: "ap_status",
+      description: "[string] Exact status recalculated from AP: Strangers, Acquaintances, Good Friends, Romantic Interest, Going Steady, Committed Relationship, or Devoted Partner."
+    },
+    {
+      key: "dp",
+      description: "[number] Desire Points, 0-150 hard range; move in 5-point increments with absolute per-turn change -50 to +50."
+    },
+    {
+      key: "dp_status",
+      description: "[string] Exact status recalculated from DP: Not feeling the heat, A smoldering flame builds, Starting to feel warm, Body's burning up!, A desperate need presents, or Pliable in the lustful hunger."
+    },
+    {
+      key: "tp",
+      description: "[number] Trust Points toward the user, 0-150 hard range; normal per-turn movement -5 to +2 and absolute limit -50 to +50."
+    },
+    {
+      key: "cp",
+      description: "[number] Contempt Points toward the user, 0-150 hard range; normal per-turn movement -5 to +2 and absolute limit -50 to +50."
+    },
+    {
+      key: "worldData.part_of_day",
+      description: "[string] Exact time-of-day label inferred from context and current_time: 🌅 Morning, 🌞 Day, 🌇 Evening, or 🌙 Night."
+    },
+    {
+      key: "worldData.current_date",
+      description: "[string] Current in-world date in YYYY-MM-DD format, advanced only with narrative time and with correct calendar rollovers."
+    },
+    {
+      key: "worldData.current_time",
+      description: "[string] Current in-world time in 24-hour HH:MM format, advanced realistically only when narrative time passes."
+    },
+    {
+      key: "worldData.day_counter",
+      description: "[number] Display day counter starting at 1 and advancing with in-world date changes."
+    },
+    {
+      key: "worldData.days_since_first_meeting",
+      description: "[number] Number of in-world days since the first meeting, starting at 0 unless established otherwise."
+    },
+    {
+      key: "worldData.immediate_narrative_thread",
+      description: "[string] Urgent active next step in the current scene."
+    },
+    {
+      key: "worldData.looming_story_beats",
+      description: "[array] One to three concise mid-term consequences or upcoming story pressures."
+    },
+    {
+      key: "worldData.current_narrative_arc",
+      description: "[string] Current primary focus of the story."
+    },
+    {
+      key: "worldData.completed_weave",
+      description: "[string] Most recent resolved narrative beat."
+    },
+    {
+      key: "worldData.parallel_actions",
+      description: "[string] Brief simultaneous off-scene event in the exact current reply window; empty during intimate, sexual, or highly emotional scenes."
+    },
+    {
+      key: "worldData.plot_momentum",
+      description: "Structured plot momentum object. Preserve the complete object and all required child fields every turn; never replace it with a prose block."
+    },
+    {
+      key: "worldData.plot_momentum.npc_agenda",
+      description: "[string] Immediate goals of NPCs independent of the user."
+    },
+    {
+      key: "worldData.plot_momentum.physics",
+      description: "[string] Exact current location and positioning of NPCs and the user."
+    },
+    {
+      key: "worldData.plot_momentum.scene_pacing",
+      description: "[string] Exact pacing enum: Slow Burn, Steady, or High Momentum."
+    },
+    {
+      key: "worldData.plot_momentum.next_path_options.path_a_default",
+      description: "[string] Most obvious next NPC action; never predicts or requires a future user action."
+    },
+    {
+      key: "worldData.plot_momentum.next_path_options.path_b_conflict",
+      description: "[string] NPC-created friction, resistance, or disagreement; never predicts or requires a future user action."
+    },
+    {
+      key: "worldData.plot_momentum.next_path_options.path_c_action",
+      description: "[string] Physical movement, escalation, or NPC/environment shift; never predicts or requires a future user action."
+    },
+    {
+      key: "worldData.plot_momentum.next_path_options.path_d_twist",
+      description: "[string] Unexpected revelation, interruption, or NPC/environment change; never predicts or requires a future user action."
+    },
+    {
+      key: "worldData.plot_momentum.selected_path",
+      description: "[string] Selected path A, B, C, D, or a blend such as A+C; execute the previous selection while it remains valid."
+    },
+    {
+      key: "worldData.plot_momentum.strategy_reason",
+      description: "[string] Brief reason the selected path serves NPC goals and follows scene pacing."
+    }
+  ],
+  extSettings: {
+    codeBlockIdentifier: "sim",
+    defaultBgColor: "#5b4b8a",
+    showThoughtBubble: true,
+    hideSimBlocks: true,
+    templateFile: "narrative-weave-simtracker.html",
+    renderMode: "tracker",
+    maxCharacters: 4
+  }
+};
 
 // src/templatePresets.ts
 var PRESETS = [
@@ -10755,6 +11508,10 @@ var PRESETS = [
   {
     id: "pulse-thread-tracker",
     ...pulse_thread_tracker_default
+  },
+  {
+    id: "narrative-weave-simtracker",
+    ...narrative_weave_simtracker_default
   }
 ];
 function getTemplatePresets() {
@@ -18073,8 +18830,6 @@ function buildTemplateData(data, preset, previousData) {
   const currentDate = typeof worldData.current_date === "string" ? worldData.current_date : "Unknown Date";
   const currentTime = typeof worldData.current_time === "string" ? worldData.current_time : "Unknown Time";
   const tabbed = (preset.htmlTemplate || "").includes("sim-tracker-tabs") || preset.id.includes("tabs");
-  // Positioned templates normally compile once per character. Tracker mode is
-  // an explicit opt-in for layouts that need one world panel around all cards.
   const trackerLevel = preset.extSettings?.renderMode === "tracker";
   const statChanges = calculateStatChanges(characters, previousData);
   const characterPayload = characters.map((character) => {

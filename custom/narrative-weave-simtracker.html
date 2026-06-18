@@ -1,0 +1,720 @@
+<!-- TEMPLATE NAME: Narrative Weave SimTracker -->
+<!-- AUTHOR: Prolix OCs -->
+<!-- POSITION: BOTTOM -->
+
+<!-- CARD_TEMPLATE_START -->
+<style>
+  .nw-tracker {
+    --nw-bg: color-mix(in srgb, var(--lumiverse-bg, #17171c) 88%, #101116 12%);
+    --nw-surface: color-mix(in srgb, var(--lumiverse-fill-subtle, #25262d) 84%, transparent);
+    --nw-surface-strong: color-mix(in srgb, var(--lumiverse-fill, #30313a) 88%, transparent);
+    --nw-border: var(--lumiverse-border, rgba(255, 255, 255, 0.13));
+    --nw-border-hover: var(--lumiverse-border-hover, rgba(255, 255, 255, 0.24));
+    --nw-text: var(--lumiverse-text, #f4f4f6);
+    --nw-muted: var(--lumiverse-text-muted, #b4b5bd);
+    --nw-dim: var(--lumiverse-text-dim, #8a8c96);
+    --nw-focus: #5cc8be;
+    --nw-world-accent: #d5a84b;
+    --nw-ap: #e36d91;
+    --nw-dp: #ee8454;
+    --nw-tp: #49b8ae;
+    --nw-cp: #d15c5c;
+    width: min(100%, 1100px);
+    margin: 14px auto;
+    color: var(--nw-text);
+    font-family: var(--lumiverse-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .nw-tracker,
+  .nw-tracker * {
+    box-sizing: border-box;
+  }
+
+  .nw-tracker-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .nw-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--nw-border);
+    border-radius: 8px;
+    background: var(--nw-bg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    transition: border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  }
+
+  .nw-panel:hover {
+    border-color: var(--nw-border-hover);
+  }
+
+  .nw-panel[open] {
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  }
+
+  .nw-world {
+    grid-column: 1 / -1;
+    border-top: 3px solid var(--nw-world-accent);
+  }
+
+  .nw-character {
+    --nw-accent: #6a5acd;
+    --nw-accent-dark: #423789;
+    border-top: 3px solid var(--nw-accent);
+  }
+
+  .nw-character > .nw-summary {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--nw-accent) 14%, var(--nw-surface)) 0%,
+      transparent 78%
+    );
+  }
+
+  .nw-character > .nw-summary:hover {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--nw-accent) 20%, var(--nw-surface-strong)) 0%,
+      transparent 80%
+    );
+  }
+
+  .nw-character.nw-inactive {
+    opacity: 0.68;
+  }
+
+  .nw-character.nw-inactive[open],
+  .nw-character.nw-inactive:hover {
+    opacity: 0.82;
+  }
+
+  .nw-summary {
+    position: relative;
+    display: grid;
+    gap: 7px;
+    min-height: 108px;
+    padding: 14px 42px 14px 16px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    background: linear-gradient(135deg, var(--nw-surface) 0%, transparent 72%);
+  }
+
+  .nw-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .nw-summary::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    width: 9px;
+    height: 9px;
+    border-right: 2px solid var(--nw-muted);
+    border-bottom: 2px solid var(--nw-muted);
+    transform: rotate(45deg);
+    transition: transform 180ms ease, border-color 180ms ease;
+  }
+
+  .nw-panel[open] > .nw-summary::after {
+    transform: rotate(225deg) translate(-2px, -2px);
+    border-color: var(--nw-text);
+  }
+
+  .nw-summary:hover {
+    background: linear-gradient(135deg, var(--nw-surface-strong) 0%, transparent 76%);
+  }
+
+  .nw-summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--nw-focus) 70%, transparent);
+    outline-offset: -3px;
+  }
+
+  .nw-summary-title {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--nw-text);
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.2;
+    letter-spacing: 0;
+  }
+
+  .nw-world-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+  }
+
+  .nw-day-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--nw-world-accent) 46%, var(--nw-border));
+    border-radius: 999px;
+    color: #f0d08d;
+    background: color-mix(in srgb, var(--nw-world-accent) 14%, transparent);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .nw-mood {
+    color: var(--nw-muted);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .nw-thought {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--nw-text);
+    font-size: 13px;
+    font-style: italic;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .nw-thread {
+    margin: 0;
+    color: var(--nw-text);
+    font-size: 14px;
+    font-weight: 620;
+    overflow-wrap: anywhere;
+  }
+
+  .nw-body {
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--nw-border);
+    animation: nw-body-in 180ms ease-out;
+  }
+
+  @keyframes nw-body-in {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .nw-section {
+    padding-top: 14px;
+  }
+
+  .nw-section + .nw-section {
+    margin-top: 14px;
+    border-top: 1px solid var(--nw-border);
+  }
+
+  .nw-section-title {
+    margin: 0 0 9px;
+    color: var(--nw-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .nw-meta-grid,
+  .nw-path-grid,
+  .nw-stat-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  .nw-meta-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .nw-path-grid,
+  .nw-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nw-field,
+  .nw-path,
+  .nw-stat {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--nw-border);
+    border-radius: 7px;
+    background: var(--nw-surface);
+  }
+
+  .nw-field-label,
+  .nw-path-label,
+  .nw-stat-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--nw-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .nw-field-value,
+  .nw-path-value {
+    color: var(--nw-text);
+    overflow-wrap: anywhere;
+  }
+
+  .nw-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .nw-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 9px;
+    border: 1px solid var(--nw-border);
+    border-radius: 999px;
+    color: var(--nw-text);
+    background: var(--nw-surface);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .nw-status-active {
+    border-color: color-mix(in srgb, #55c48d 50%, var(--nw-border));
+    color: #8ce1b2;
+  }
+
+  .nw-status-inactive {
+    border-color: color-mix(in srgb, #d6a14d 50%, var(--nw-border));
+    color: #ecc778;
+  }
+
+  .nw-stat-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .nw-stat-value {
+    color: var(--nw-text);
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .nw-stat-status {
+    min-height: 34px;
+    margin-top: 5px;
+    color: var(--nw-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .nw-track {
+    height: 7px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--nw-text) 9%, transparent);
+  }
+
+  .nw-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 280ms ease;
+  }
+
+  .nw-fill-ap {
+    background: var(--nw-ap);
+  }
+
+  .nw-fill-dp {
+    background: var(--nw-dp);
+  }
+
+  .nw-fill-tp {
+    background: var(--nw-tp);
+  }
+
+  .nw-fill-cp {
+    background: var(--nw-cp);
+  }
+
+  .nw-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nw-list li {
+    position: relative;
+    padding-left: 15px;
+    color: var(--nw-text);
+    overflow-wrap: anywhere;
+  }
+
+  .nw-list li::before {
+    content: "";
+    position: absolute;
+    top: 0.6em;
+    left: 1px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--nw-world-accent);
+  }
+
+  .nw-empty {
+    color: var(--nw-dim);
+    font-style: italic;
+  }
+
+  .nw-momentum {
+    border-left: 3px solid var(--nw-focus);
+  }
+
+  .nw-selected-path {
+    border-color: color-mix(in srgb, var(--nw-focus) 50%, var(--nw-border));
+    background: color-mix(in srgb, var(--nw-focus) 10%, var(--nw-surface));
+  }
+
+  .nw-strategy {
+    grid-column: span 2;
+  }
+
+  @media (max-width: 720px) {
+    .nw-tracker {
+      margin: 10px auto;
+      font-size: 14px;
+    }
+
+    .nw-tracker-grid,
+    .nw-meta-grid,
+    .nw-path-grid,
+    .nw-stat-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .nw-world {
+      grid-column: auto;
+    }
+
+    .nw-strategy {
+      grid-column: auto;
+    }
+
+    .nw-summary {
+      min-height: 104px;
+      padding: 13px 38px 13px 13px;
+    }
+
+    .nw-body {
+      padding: 0 13px 13px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nw-tracker *,
+    .nw-tracker *::before,
+    .nw-tracker *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<section class="nw-tracker" aria-label="Narrative relationship and plot tracker">
+  <div class="nw-tracker-grid">
+    <details class="nw-panel nw-world">
+      <summary class="nw-summary">
+        <div class="nw-world-title">
+          <h2 class="nw-summary-title">
+            {{#if worldData.part_of_day}}{{worldData.part_of_day}}{{else}}Time of day unknown{{/if}}
+          </h2>
+          <span class="nw-day-chip">Day {{#if worldData.day_counter}}{{worldData.day_counter}}{{else}}1{{/if}}</span>
+        </div>
+        <p class="nw-thread">
+          {{#if worldData.immediate_narrative_thread}}
+            {{worldData.immediate_narrative_thread}}
+          {{else}}
+            No immediate narrative thread recorded.
+          {{/if}}
+        </p>
+      </summary>
+
+      <div class="nw-body">
+        <section class="nw-section" aria-label="Timeline">
+          <h3 class="nw-section-title">Timeline</h3>
+          <div class="nw-meta-grid">
+            <div class="nw-field">
+              <span class="nw-field-label">Date</span>
+              <span class="nw-field-value">{{#if worldData.current_date}}{{worldData.current_date}}{{else}}Unknown{{/if}}</span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Time</span>
+              <span class="nw-field-value">{{#if worldData.current_time}}{{worldData.current_time}}{{else}}Unknown{{/if}}</span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Since first meeting</span>
+              <span class="nw-field-value">
+                {{#if worldData.days_since_first_meeting}}{{worldData.days_since_first_meeting}}{{else}}0{{/if}} days
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="nw-section" aria-label="Narrative weave">
+          <h3 class="nw-section-title">Narrative weave</h3>
+          <div class="nw-meta-grid">
+            <div class="nw-field">
+              <span class="nw-field-label">Current arc</span>
+              <span class="nw-field-value">
+                {{#if worldData.current_narrative_arc}}{{worldData.current_narrative_arc}}{{else}}No current arc recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Completed weave</span>
+              <span class="nw-field-value">
+                {{#if worldData.completed_weave}}{{worldData.completed_weave}}{{else}}No resolved beat recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Parallel action</span>
+              <span class="nw-field-value">
+                {{#if worldData.parallel_actions}}{{worldData.parallel_actions}}{{else}}None in this scene window.{{/if}}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="nw-section" aria-label="Looming story beats">
+          <h3 class="nw-section-title">Looming story beats</h3>
+          {{#if worldData.looming_story_beats}}
+            <ul class="nw-list">
+              {{#each worldData.looming_story_beats}}
+                {{#if this}}<li>{{this}}</li>{{/if}}
+              {{/each}}
+            </ul>
+          {{else}}
+            <div class="nw-empty">No looming beats recorded.</div>
+          {{/if}}
+        </section>
+
+        <section class="nw-section nw-momentum" aria-label="Plot momentum">
+          <h3 class="nw-section-title">Plot momentum</h3>
+          <div class="nw-meta-grid">
+            <div class="nw-field">
+              <span class="nw-field-label">NPC agenda</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.npc_agenda}}{{worldData.plot_momentum.npc_agenda}}{{else}}No NPC agenda recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Scene physics</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.physics}}{{worldData.plot_momentum.physics}}{{else}}Positioning not recorded.{{/if}}
+              </span>
+            </div>
+            <div class="nw-field">
+              <span class="nw-field-label">Scene pacing</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.scene_pacing}}{{worldData.plot_momentum.scene_pacing}}{{else}}Steady{{/if}}
+              </span>
+            </div>
+          </div>
+
+          <div class="nw-path-grid" style="margin-top: 8px;">
+            <div class="nw-path">
+              <span class="nw-path-label">Path A · Default</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_a_default}}
+                  {{worldData.plot_momentum.next_path_options.path_a_default}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+            <div class="nw-path">
+              <span class="nw-path-label">Path B · Conflict</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_b_conflict}}
+                  {{worldData.plot_momentum.next_path_options.path_b_conflict}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+            <div class="nw-path">
+              <span class="nw-path-label">Path C · Action</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_c_action}}
+                  {{worldData.plot_momentum.next_path_options.path_c_action}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+            <div class="nw-path">
+              <span class="nw-path-label">Path D · Twist</span>
+              <span class="nw-path-value">
+                {{#if worldData.plot_momentum.next_path_options.path_d_twist}}
+                  {{worldData.plot_momentum.next_path_options.path_d_twist}}
+                {{else}}
+                  No path recorded.
+                {{/if}}
+              </span>
+            </div>
+          </div>
+
+          <div class="nw-meta-grid" style="margin-top: 8px;">
+            <div class="nw-field nw-selected-path">
+              <span class="nw-field-label">Selected path</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.selected_path}}{{worldData.plot_momentum.selected_path}}{{else}}Not selected{{/if}}
+              </span>
+            </div>
+            <div class="nw-field nw-strategy">
+              <span class="nw-field-label">Strategy reason</span>
+              <span class="nw-field-value">
+                {{#if worldData.plot_momentum.strategy_reason}}{{worldData.plot_momentum.strategy_reason}}{{else}}No strategy reason recorded.{{/if}}
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </details>
+
+    {{#each characters}}
+      <details
+        class="nw-panel nw-character {{#if stats.inactive}}nw-inactive{{/if}}"
+        style="--nw-accent: {{bgColor}}; --nw-accent-dark: {{darkerBgColor}};"
+      >
+        <summary class="nw-summary">
+          <h2 class="nw-summary-title">
+            {{#if characterName}}{{characterName}}{{else}}Unnamed NPC{{/if}}
+          </h2>
+          <div class="nw-mood">
+            {{#if stats.mood}}{{stats.mood}}{{else}}Mood not recorded.{{/if}}
+          </div>
+          <p class="nw-thought">
+            {{#if stats.internal_thought}}{{stats.internal_thought}}{{else}}No internal thought recorded.{{/if}}
+          </p>
+        </summary>
+
+        <div class="nw-body">
+          <section class="nw-section" aria-label="Character state">
+            <h3 class="nw-section-title">Current state</h3>
+            <div class="nw-status-row">
+              {{#if stats.inactive}}
+                <span class="nw-status nw-status-inactive">
+                  {{#if (eq stats.inactive_reason 1)}}😴 Asleep
+                  {{else if (eq stats.inactive_reason 2)}}🏥 Comatose
+                  {{else if (eq stats.inactive_reason 3)}}😡 Contempt / anger
+                  {{else if (eq stats.inactive_reason 4)}}🫠 Incapacitated
+                  {{else if (eq stats.inactive_reason 5)}}🪦 Deceased
+                  {{else if (eq stats.inactiveReason 1)}}😴 Asleep
+                  {{else if (eq stats.inactiveReason 2)}}🏥 Comatose
+                  {{else if (eq stats.inactiveReason 3)}}😡 Contempt / anger
+                  {{else if (eq stats.inactiveReason 4)}}🫠 Incapacitated
+                  {{else if (eq stats.inactiveReason 5)}}🪦 Deceased
+                  {{else}}Unavailable{{/if}}
+                </span>
+              {{else}}
+                <span class="nw-status nw-status-active">● Active in scene</span>
+              {{/if}}
+
+              <span class="nw-status">
+                {{#if (eq stats.reaction 1)}}👍 Like
+                {{else if (eq stats.reaction 2)}}👎 Dislike
+                {{else if (eq stats.last_react 1)}}👍 Like
+                {{else if (eq stats.last_react 2)}}👎 Dislike
+                {{else}}😐 Neutral{{/if}}
+              </span>
+            </div>
+          </section>
+
+          <section class="nw-section" aria-label="Relationship statistics">
+            <h3 class="nw-section-title">Relationship meters</h3>
+            <div class="nw-stat-grid">
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">AP · Affection</span>
+                  <span class="nw-stat-value">{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}} / 200</span>
+                </div>
+                <div class="nw-stat-status">
+                  {{#if stats.ap_status}}{{stats.ap_status}}{{else}}Strangers{{/if}}
+                </div>
+                <div class="nw-track" role="progressbar" aria-label="Affection points" aria-valuemin="0" aria-valuemax="200" aria-valuenow="{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-ap" style="width: {{divide stats.ap 2}}%;"></div>
+                </div>
+              </div>
+
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">DP · Desire</span>
+                  <span class="nw-stat-value">{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}} / 150</span>
+                </div>
+                <div class="nw-stat-status">
+                  {{#if stats.dp_status}}{{stats.dp_status}}{{else}}Not feeling the heat{{/if}}
+                </div>
+                <div class="nw-track" role="progressbar" aria-label="Desire points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-dp" style="width: {{divide stats.dp 1.5}}%;"></div>
+                </div>
+              </div>
+
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">TP · Trust</span>
+                  <span class="nw-stat-value">{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}} / 150</span>
+                </div>
+                <div class="nw-stat-status">Trust toward the player character.</div>
+                <div class="nw-track" role="progressbar" aria-label="Trust points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-tp" style="width: {{divide stats.tp 1.5}}%;"></div>
+                </div>
+              </div>
+
+              <div class="nw-stat">
+                <div class="nw-stat-head">
+                  <span class="nw-stat-label">CP · Contempt</span>
+                  <span class="nw-stat-value">{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}} / 150</span>
+                </div>
+                <div class="nw-stat-status">Contempt toward the player character.</div>
+                <div class="nw-track" role="progressbar" aria-label="Contempt points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}}">
+                  <div class="nw-fill nw-fill-cp" style="width: {{divide stats.cp 1.5}}%;"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+    {{else}}
+      <div class="nw-panel nw-field nw-empty">No NPC characters are currently tracked.</div>
+    {{/each}}
+  </div>
+</section>
+<!-- CARD_TEMPLATE_END -->
+
+<!--
+TEMPLATE VARIABLES:
+- {{worldData.*}}: Structured world and plot momentum state.
+- {{characters}}: Up to four normalized NPC character records.
+- {{characterName}}: NPC name.
+- {{bgColor}} / {{darkerBgColor}}: Character color and darker variant.
+- {{stats.*}}: Character fields, statuses, and relationship values.
+-->

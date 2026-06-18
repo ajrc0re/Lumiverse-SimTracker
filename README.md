@@ -132,6 +132,7 @@ Settings live in the Lumiverse extension panel:
 | Bento Style Tracker (default) | Card grid | Bottom |
 | Dating Sim Tracker (variants) | Card / sidebar | Top / Bottom / Left / Right / Tabbed |
 | Pulse Thread Tracker | Compact narrative panel with fertility/biology gauges | Bottom |
+| Narrative Weave SimTracker | Relationship and structured plot-momentum tracker | Bottom |
 | Omni-Tracker: RPG Edition | RPG-style stat sidebar | Right (sidebar, tabbed) |
 | Tactical Combat HUD | HUD-style combat panel | Right (sidebar, tabbed) |
 | Wide Style Tracker | Wide card | Bottom |
