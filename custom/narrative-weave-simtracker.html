@@ -322,6 +322,15 @@
     gap: 7px;
   }
 
+  .nw-attire {
+    margin-top: 10px;
+  }
+
+  .nw-attire .nw-field-value {
+    display: block;
+    line-height: 1.45;
+  }
+
   .nw-status {
     display: inline-flex;
     align-items: center;
@@ -748,6 +757,13 @@
                 {{else if (eq stats.last_react 1)}}👍 Positive turn
                 {{else if (eq stats.last_react 2)}}👎 Negative turn
                 {{else}}😐 Neutral turn{{/if}}
+              </span>
+            </div>
+
+            <div class="nw-field nw-attire">
+              <span class="nw-field-label">Attire</span>
+              <span class="nw-field-value">
+                {{#if stats.attire}}{{stats.attire}}{{else}}Attire not recorded.{{/if}}
               </span>
             </div>
           </section>

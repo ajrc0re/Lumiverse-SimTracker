@@ -306,20 +306,27 @@ function sanitizeRetainCount(value: unknown): number {
 
 function upgradeLegacyImportedPreset(preset: TemplatePreset): TemplatePreset {
   const html = preset.htmlTemplate || "";
+  const isMissingAttire = !html.includes("nw-attire");
   const isLegacyNarrativeWeave =
     preset.templateName === "Narrative Weave SimTracker"
     && html.includes("nw-turn-updates")
     && html.includes("nw-delta-segment")
-    && !html.includes("nw-stat-numbers");
+    && (!html.includes("nw-stat-numbers") || isMissingAttire);
 
   if (!isLegacyNarrativeWeave) return preset;
 
   // Early Narrative Weave imports received timestamp IDs, so selecting one
-  // bypasses later bundled HTML updates. Upgrade only that known revision.
+  // bypasses later bundled updates. Upgrade only that known revision.
   const bundled = getTemplatePresetById("narrative-weave-simtracker");
   return {
     ...preset,
     htmlTemplate: bundled.htmlTemplate || preset.htmlTemplate,
+    ...(isMissingAttire
+      ? {
+          sysPrompt: bundled.sysPrompt || preset.sysPrompt,
+          customFields: bundled.customFields || preset.customFields,
+        }
+      : {}),
   };
 }
 

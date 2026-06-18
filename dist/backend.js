@@ -12365,6 +12365,15 @@ var narrative_weave_simtracker_default = {
     gap: 7px;
   }
 
+  .nw-attire {
+    margin-top: 10px;
+  }
+
+  .nw-attire .nw-field-value {
+    display: block;
+    line-height: 1.45;
+  }
+
   .nw-status {
     display: inline-flex;
     align-items: center;
@@ -12793,6 +12802,13 @@ var narrative_weave_simtracker_default = {
                 {{else}}\uD83D\uDE10 Neutral turn{{/if}}
               </span>
             </div>
+
+            <div class="nw-field nw-attire">
+              <span class="nw-field-label">Attire</span>
+              <span class="nw-field-value">
+                {{#if stats.attire}}{{stats.attire}}{{else}}Attire not recorded.{{/if}}
+              </span>
+            </div>
           </section>
 
           <section class="nw-section" aria-label="Relationship statistics">
@@ -12955,14 +12971,15 @@ Track relationship state for NPC characters and maintain a separate structured w
 - \`characters\` is an NPC-only allow-list, not a list of every person present in the scene.
 - NEVER include the player character in \`characters\`. {{user}} is the human-controlled player character, not an NPC, and is permanently forbidden from character tracking.
 - Treat \`{{user}}\`, the resolved user display name, the active player persona name, and any established aliases for that same player character as one forbidden identity. Changing the label does not make the player an NPC.
-- Do not create relationship stats, mood, internal thoughts, reaction, inactivity state, or a card entry for the player character.
+- Do not create relationship stats, mood, attire, internal thoughts, reaction, inactivity state, or a card entry for the player character.
 - If a previous tracker contains the player in \`characters\`, delete that entire entry. Do not preserve, migrate, rename, or replace it.
 - If no NPC currently qualifies for tracking, emit \`"characters": []\`. Never add the player merely to avoid an empty array.
 - Track at most 4 NPC characters.
-- Each character must include: \`name\`, \`mood\`, \`inactive\`, \`inactive_reason\`, \`internal_thought\`, \`bg\`, \`reaction\`, \`ap\`, \`ap_status\`, \`dp\`, \`dp_status\`, \`tp\`, and \`cp\`.
+- Each character must include: \`name\`, \`mood\`, \`inactive\`, \`inactive_reason\`, \`internal_thought\`, \`attire\`, \`bg\`, \`reaction\`, \`ap\`, \`ap_status\`, \`dp\`, \`dp_status\`, \`tp\`, and \`cp\`.
 - \`name\` is the NPC name only.
 - \`mood\` is the NPC's current mood in their own words, as if asked, "What is your mood?"
 - \`internal_thought\` is current thought/feeling text, never wrapped in asterisks, and must never exceed 3 sentences.
+- \`attire\` is an exhaustive list of every item currently worn across outerwear, top, bottom, underwear, accessories, and footwear. State each exact item, color, and material. This list is authoritative and complete: anything absent is not worn. Preserve it unchanged unless a narrative event changes the NPC's clothing.
 - \`bg\` is a stable hex color based on appearance, personality, theme, or narrative energy.
 - \`reaction\` is the aggregate temperature of this turn's relationship-meter changes. Recalculate it every turn using the procedure below; never carry it forward unchanged by default.
 - \`inactive\`: true only when unavailable/inactive. \`inactive_reason\`: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death. Use 0 whenever \`inactive\` is false.
@@ -13092,6 +13109,10 @@ The tracker tag must be the final content after the narrative. Validate JSON syn
     {
       key: "internal_thought",
       description: "[string] NPC's current thoughts and feelings, maximum 3 sentences, never wrapped in asterisks."
+    },
+    {
+      key: "attire",
+      description: "[string] Exhaustive authoritative list of every worn outerwear, top, bottom, underwear, accessory, and footwear item, including each exact item, color, and material. Anything absent is not worn; preserve unchanged until a narrative event changes the NPC's clothing."
     },
     {
       key: "bg",
@@ -13510,13 +13531,18 @@ function sanitizeRetainCount(value) {
 }
 function upgradeLegacyImportedPreset(preset) {
   const html = preset.htmlTemplate || "";
-  const isLegacyNarrativeWeave = preset.templateName === "Narrative Weave SimTracker" && html.includes("nw-turn-updates") && html.includes("nw-delta-segment") && !html.includes("nw-stat-numbers");
+  const isMissingAttire = !html.includes("nw-attire");
+  const isLegacyNarrativeWeave = preset.templateName === "Narrative Weave SimTracker" && html.includes("nw-turn-updates") && html.includes("nw-delta-segment") && (!html.includes("nw-stat-numbers") || isMissingAttire);
   if (!isLegacyNarrativeWeave)
     return preset;
   const bundled = getTemplatePresetById("narrative-weave-simtracker");
   return {
     ...preset,
-    htmlTemplate: bundled.htmlTemplate || preset.htmlTemplate
+    htmlTemplate: bundled.htmlTemplate || preset.htmlTemplate,
+    ...isMissingAttire ? {
+      sysPrompt: bundled.sysPrompt || preset.sysPrompt,
+      customFields: bundled.customFields || preset.customFields
+    } : {}
   };
 }
 function sanitizePresetArray(value) {
