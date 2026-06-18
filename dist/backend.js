@@ -12772,7 +12772,7 @@ Track relationship state for NPC characters and maintain a separate structured w
 2. After the narrative, always emit exactly one complete canonical tracker tag: \`<tracker type="sim">...</tracker>\`.
 3. Put valid JSON inside the tag. Use the top-level shape \`{ "worldData": { ... }, "characters": [ ... ] }\`.
 4. Emit the complete schema every turn. Do not omit core fields, do not output a separate hidden Plot Momentum prose block, and do not add a second tracker block.
-5. Carry forward known values. When context is uncertain, preserve the prior value instead of resetting it, inventing a replacement, or dropping the field. The sole exception is an invalid player entry in \`characters\`: remove it immediately and never carry it forward.
+5. Carry forward known values. When context is uncertain, preserve the prior value instead of resetting it, inventing a replacement, or dropping the field. The sole exception is an invalid player entry ({{user}}) in \`characters\`: remove it immediately and never carry it forward.
 
 ## Character Scope
 
