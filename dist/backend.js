@@ -12401,6 +12401,27 @@ var narrative_weave_simtracker_default = {
     font-weight: 800;
   }
 
+  .nw-stat-numbers {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .nw-stat-delta {
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .nw-stat-delta-beneficial {
+    color: var(--nw-beneficial);
+  }
+
+  .nw-stat-delta-detrimental {
+    color: var(--nw-detrimental);
+  }
+
   .nw-stat-status {
     min-height: 34px;
     margin-top: 5px;
@@ -12780,7 +12801,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">AP \xB7 Affection</span>
-                  <span class="nw-stat-value">{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}} / 200</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.apChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.apChange 0)}}nw-stat-delta-beneficial{{else}}nw-stat-delta-detrimental{{/if}}"
+                        title="Affection changed by {{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}"
+                      >{{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}} / 200</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">
                   {{#if stats.ap_status}}{{stats.ap_status}}{{else}}Strangers{{/if}}
@@ -12803,7 +12832,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">DP \xB7 Desire</span>
-                  <span class="nw-stat-value">{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}} / 150</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.dpChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.dpChange 0)}}nw-stat-delta-beneficial{{else}}nw-stat-delta-detrimental{{/if}}"
+                        title="Desire changed by {{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}"
+                      >{{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}} / 150</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">
                   {{#if stats.dp_status}}{{stats.dp_status}}{{else}}Not feeling the heat{{/if}}
@@ -12826,7 +12863,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">TP \xB7 Trust</span>
-                  <span class="nw-stat-value">{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}} / 150</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.tpChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.tpChange 0)}}nw-stat-delta-beneficial{{else}}nw-stat-delta-detrimental{{/if}}"
+                        title="Trust changed by {{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}"
+                      >{{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}} / 150</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">Trust toward the player character.</div>
                 <div class="nw-track" role="progressbar" aria-label="Trust points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}}">
@@ -12847,7 +12892,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">CP \xB7 Contempt</span>
-                  <span class="nw-stat-value">{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}} / 150</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.cpChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.cpChange 0)}}nw-stat-delta-detrimental{{else}}nw-stat-delta-beneficial{{/if}}"
+                        title="Contempt changed by {{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}"
+                      >{{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}} / 150</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">Contempt toward the player character.</div>
                 <div class="nw-track" role="progressbar" aria-label="Contempt points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}}">
@@ -15236,10 +15289,15 @@ spindle.onFrontendMessage(async (payload, userId) => {
     await rehydrateChatTrackerHistory(chatId);
     const history = getChatTrackerHistory(chatId);
     const entry = history.length > 0 ? history[history.length - 1] : null;
+    const previousEntry = history.length > 1 ? history[history.length - 2] : null;
     spindle.sendToFrontend({
       type: "tracker_history_latest",
       chatId,
-      entry: entry ? { messageId: entry.messageId, payload: entry.payload } : null
+      entry: entry ? {
+        messageId: entry.messageId,
+        payload: entry.payload,
+        previousPayload: previousEntry?.payload || null
+      } : null
     }, userId);
     return;
   }

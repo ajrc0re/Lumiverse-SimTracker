@@ -1345,6 +1345,9 @@ export function setup(ctx: SpindleFrontendContext) {
     mode: TrackerMountMode;
   };
   const trackerMessageRenders = new Map<string, TrackerRenderInputs>();
+  // Streaming may deliver the same message's tracker several times. Freeze
+  // its baseline so final-chunk re-renders do not compare the payload to itself.
+  const trackerComparisonBaselines = new Map<string, TrackerData | null>();
   const trackerGeneratingIndicators = new Map<string, Element>();
   const inlineProcessor = createInlineTemplateProcessor({
     getConfig: () => ({
@@ -1837,7 +1840,13 @@ export function setup(ctx: SpindleFrontendContext) {
       pendingTrackerPayload = { raw, sourceContent, messageId };
       return;
     }
+    let comparisonData = previousTrackerData;
     if (messageId) {
+      if (!trackerComparisonBaselines.has(messageId)) {
+        trackerComparisonBaselines.clear();
+        trackerComparisonBaselines.set(messageId, previousTrackerData);
+      }
+      comparisonData = trackerComparisonBaselines.get(messageId) || null;
       trackerMessageIds.add(messageId);
       latestTrackerMessageId = messageId;
       updateRegenerateButton();
@@ -1855,7 +1864,7 @@ export function setup(ctx: SpindleFrontendContext) {
     latestTrackerRaw = raw;
     latestTrackerSourceContent = sourceContent;
     setStatus(`Tracker updated (${preset.templateName})`);
-    renderTracker(parsed, raw, preset, previousTrackerData, (html) => {
+    renderTracker(parsed, raw, preset, comparisonData, (html) => {
       injectIntoPanelBody(html);
     });
     // In-message rendering MUST use the messageId for *this* payload. The
@@ -1869,11 +1878,11 @@ export function setup(ctx: SpindleFrontendContext) {
     // Re-applications of an already-mounted tracker (config reload,
     // template switch) must now pass the messageId explicitly.
     if (mountMode === "side_left" || mountMode === "side_right") {
-      renderTrackerInSidebar(parsed, preset, previousTrackerData, mountMode);
+      renderTrackerInSidebar(parsed, preset, comparisonData, mountMode);
       if (messageId) clearMessageTrackerRender(messageId);
     } else if (messageId) {
       clearSideTrackerRender();
-      renderTrackerIntoMessage(messageId, parsed, preset, previousTrackerData, mountMode);
+      renderTrackerIntoMessage(messageId, parsed, preset, comparisonData, mountMode);
       pruneNonLatestMessageTrackers();
     }
 
@@ -1896,6 +1905,7 @@ export function setup(ctx: SpindleFrontendContext) {
       }
       if (wasLatest) {
         previousTrackerData = null;
+        trackerComparisonBaselines.clear();
         setStatus("No tracker tag in active swipe/edit");
         renderEmpty("No tracker tag found in this message version.");
       }
@@ -1972,7 +1982,7 @@ export function setup(ctx: SpindleFrontendContext) {
       return;
     }
     if (obj?.type === "tracker_history_latest") {
-      const entry = obj.entry as { messageId?: unknown; payload?: unknown } | null;
+      const entry = obj.entry as { messageId?: unknown; payload?: unknown; previousPayload?: unknown } | null;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
         // Hydration safety net: only useful when the latest tracker-bearing
@@ -1981,6 +1991,13 @@ export function setup(ctx: SpindleFrontendContext) {
         // messageId, skip — otherwise we'd flash the message-level render
         // with `previousData` now equal to the latest data (no diffs).
         if (msgId && trackerMessageIds.has(msgId)) return;
+        if (msgId) {
+          const previous = typeof entry.previousPayload === "string"
+            ? parseTrackerBlock(entry.previousPayload)
+            : null;
+          trackerComparisonBaselines.clear();
+          trackerComparisonBaselines.set(msgId, previous);
+        }
         handleTrackerPayload(entry.payload, entry.payload, msgId);
       }
       return;
@@ -2110,6 +2127,7 @@ export function setup(ctx: SpindleFrontendContext) {
     }
     if (context.messageId) inlineProcessor.clearMessage(context.messageId);
     previousTrackerData = null;
+    trackerComparisonBaselines.clear();
     latestTrackerRaw = null;
     latestTrackerSourceContent = null;
     latestContent = null;
@@ -2138,11 +2156,13 @@ export function setup(ctx: SpindleFrontendContext) {
       trackerMessageIds.delete(context.messageId);
       clearMessageTrackerRender(context.messageId);
     }
+    trackerComparisonBaselines.delete(context.messageId);
     hideGeneratingIndicator(context.messageId);
     inlineProcessor.clearMessage(context.messageId);
     if (latestTrackerMessageId === context.messageId) {
       latestTrackerMessageId = null;
       previousTrackerData = null;
+      trackerComparisonBaselines.clear();
       latestTrackerRaw = null;
       latestTrackerSourceContent = null;
       latestContent = null;
@@ -2174,6 +2194,7 @@ export function setup(ctx: SpindleFrontendContext) {
 
   const resetChatState = () => {
     previousTrackerData = null;
+    trackerComparisonBaselines.clear();
     latestTrackerMessageId = null;
     latestTrackerRaw = null;
     latestTrackerSourceContent = null;

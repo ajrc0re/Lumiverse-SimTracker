@@ -2668,10 +2668,17 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
     await rehydrateChatTrackerHistory(chatId);
     const history = getChatTrackerHistory(chatId);
     const entry = history.length > 0 ? history[history.length - 1] : null;
+    const previousEntry = history.length > 1 ? history[history.length - 2] : null;
     spindle.sendToFrontend({
       type: "tracker_history_latest",
       chatId,
-      entry: entry ? { messageId: entry.messageId, payload: entry.payload } : null,
+      entry: entry
+        ? {
+            messageId: entry.messageId,
+            payload: entry.payload,
+            previousPayload: previousEntry?.payload || null,
+          }
+        : null,
     }, userId);
     return;
   }

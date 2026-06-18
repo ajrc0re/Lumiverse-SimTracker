@@ -10875,6 +10875,27 @@ var narrative_weave_simtracker_default = {
     font-weight: 800;
   }
 
+  .nw-stat-numbers {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .nw-stat-delta {
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .nw-stat-delta-beneficial {
+    color: var(--nw-beneficial);
+  }
+
+  .nw-stat-delta-detrimental {
+    color: var(--nw-detrimental);
+  }
+
   .nw-stat-status {
     min-height: 34px;
     margin-top: 5px;
@@ -11254,7 +11275,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">AP · Affection</span>
-                  <span class="nw-stat-value">{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}} / 200</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.apChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.apChange 0)}}nw-stat-delta-beneficial{{else}}nw-stat-delta-detrimental{{/if}}"
+                        title="Affection changed by {{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}"
+                      >{{#if (gt stats.apChange 0)}}+{{/if}}{{stats.apChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.ap}}{{stats.ap}}{{else}}0{{/if}} / 200</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">
                   {{#if stats.ap_status}}{{stats.ap_status}}{{else}}Strangers{{/if}}
@@ -11277,7 +11306,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">DP · Desire</span>
-                  <span class="nw-stat-value">{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}} / 150</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.dpChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.dpChange 0)}}nw-stat-delta-beneficial{{else}}nw-stat-delta-detrimental{{/if}}"
+                        title="Desire changed by {{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}"
+                      >{{#if (gt stats.dpChange 0)}}+{{/if}}{{stats.dpChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.dp}}{{stats.dp}}{{else}}0{{/if}} / 150</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">
                   {{#if stats.dp_status}}{{stats.dp_status}}{{else}}Not feeling the heat{{/if}}
@@ -11300,7 +11337,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">TP · Trust</span>
-                  <span class="nw-stat-value">{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}} / 150</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.tpChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.tpChange 0)}}nw-stat-delta-beneficial{{else}}nw-stat-delta-detrimental{{/if}}"
+                        title="Trust changed by {{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}"
+                      >{{#if (gt stats.tpChange 0)}}+{{/if}}{{stats.tpChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}} / 150</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">Trust toward the player character.</div>
                 <div class="nw-track" role="progressbar" aria-label="Trust points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.tp}}{{stats.tp}}{{else}}0{{/if}}">
@@ -11321,7 +11366,15 @@ var narrative_weave_simtracker_default = {
               <div class="nw-stat">
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">CP · Contempt</span>
-                  <span class="nw-stat-value">{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}} / 150</span>
+                  <span class="nw-stat-numbers">
+                    {{#if stats.cpChange}}
+                      <span
+                        class="nw-stat-delta {{#if (gt stats.cpChange 0)}}nw-stat-delta-detrimental{{else}}nw-stat-delta-beneficial{{/if}}"
+                        title="Contempt changed by {{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}"
+                      >{{#if (gt stats.cpChange 0)}}+{{/if}}{{stats.cpChange}}</span>
+                    {{/if}}
+                    <span class="nw-stat-value">{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}} / 150</span>
+                  </span>
                 </div>
                 <div class="nw-stat-status">Contempt toward the player character.</div>
                 <div class="nw-track" role="progressbar" aria-label="Contempt points" aria-valuemin="0" aria-valuemax="150" aria-valuenow="{{#if stats.cp}}{{stats.cp}}{{else}}0{{/if}}">
@@ -19174,6 +19227,7 @@ function setup(ctx) {
   const trackerMessageIds = new Set;
   const trackerMessageMounts = new Map;
   const trackerMessageRenders = new Map;
+  const trackerComparisonBaselines = new Map;
   const trackerGeneratingIndicators = new Map;
   const inlineProcessor = createInlineTemplateProcessor({
     getConfig: () => ({
@@ -19601,7 +19655,13 @@ function setup(ctx) {
       pendingTrackerPayload = { raw, sourceContent, messageId };
       return;
     }
+    let comparisonData = previousTrackerData;
     if (messageId) {
+      if (!trackerComparisonBaselines.has(messageId)) {
+        trackerComparisonBaselines.clear();
+        trackerComparisonBaselines.set(messageId, previousTrackerData);
+      }
+      comparisonData = trackerComparisonBaselines.get(messageId) || null;
       trackerMessageIds.add(messageId);
       latestTrackerMessageId = messageId;
       updateRegenerateButton();
@@ -19620,16 +19680,16 @@ function setup(ctx) {
     latestTrackerRaw = raw;
     latestTrackerSourceContent = sourceContent;
     setStatus(`Tracker updated (${preset.templateName})`);
-    renderTracker(parsed, raw, preset, previousTrackerData, (html) => {
+    renderTracker(parsed, raw, preset, comparisonData, (html) => {
       injectIntoPanelBody(html);
     });
     if (mountMode === "side_left" || mountMode === "side_right") {
-      renderTrackerInSidebar(parsed, preset, previousTrackerData, mountMode);
+      renderTrackerInSidebar(parsed, preset, comparisonData, mountMode);
       if (messageId)
         clearMessageTrackerRender(messageId);
     } else if (messageId) {
       clearSideTrackerRender();
-      renderTrackerIntoMessage(messageId, parsed, preset, previousTrackerData, mountMode);
+      renderTrackerIntoMessage(messageId, parsed, preset, comparisonData, mountMode);
       pruneNonLatestMessageTrackers();
     }
     previousTrackerData = parsed;
@@ -19650,6 +19710,7 @@ function setup(ctx) {
       }
       if (wasLatest) {
         previousTrackerData = null;
+        trackerComparisonBaselines.clear();
         setStatus("No tracker tag in active swipe/edit");
         renderEmpty("No tracker tag found in this message version.");
       }
@@ -19731,6 +19792,11 @@ function setup(ctx) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
         if (msgId && trackerMessageIds.has(msgId))
           return;
+        if (msgId) {
+          const previous = typeof entry.previousPayload === "string" ? parseTrackerBlock(entry.previousPayload) : null;
+          trackerComparisonBaselines.clear();
+          trackerComparisonBaselines.set(msgId, previous);
+        }
         handleTrackerPayload(entry.payload, entry.payload, msgId);
       }
       return;
@@ -19849,6 +19915,7 @@ function setup(ctx) {
     if (context.messageId)
       inlineProcessor.clearMessage(context.messageId);
     previousTrackerData = null;
+    trackerComparisonBaselines.clear();
     latestTrackerRaw = null;
     latestTrackerSourceContent = null;
     latestContent = null;
@@ -19873,11 +19940,13 @@ function setup(ctx) {
       trackerMessageIds.delete(context.messageId);
       clearMessageTrackerRender(context.messageId);
     }
+    trackerComparisonBaselines.delete(context.messageId);
     hideGeneratingIndicator(context.messageId);
     inlineProcessor.clearMessage(context.messageId);
     if (latestTrackerMessageId === context.messageId) {
       latestTrackerMessageId = null;
       previousTrackerData = null;
+      trackerComparisonBaselines.clear();
       latestTrackerRaw = null;
       latestTrackerSourceContent = null;
       latestContent = null;
@@ -19900,6 +19969,7 @@ function setup(ctx) {
   };
   const resetChatState = () => {
     previousTrackerData = null;
+    trackerComparisonBaselines.clear();
     latestTrackerMessageId = null;
     latestTrackerRaw = null;
     latestTrackerSourceContent = null;
