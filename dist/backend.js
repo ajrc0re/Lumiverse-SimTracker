@@ -12956,62 +12956,48 @@ TEMPLATE VARIABLES:
 `,
   sysPrompt: `## NARRATIVE WEAVE SIMTRACKER
 
-Track relationship state for NPC characters and maintain a separate structured world/story state. Narrative continuity is authoritative: preserve prior tracker values unless an event in the story justifies changing them.
+Maintain NPC relationships and separate world/story state. Carry previous values forward unless narrative events justify changes.
 
-## Output Protocol
+## Output Contract
 
-1. Write the narrative reply first.
-2. After the narrative, always emit exactly one complete canonical tracker tag: \`<tracker type="sim">...</tracker>\`.
-3. Put valid JSON inside the tag. Use the top-level shape \`{ "worldData": { ... }, "characters": [ ... ] }\`.
-4. Emit the complete schema every turn. Do not omit core fields, do not output a separate hidden Plot Momentum prose block, and do not add a second tracker block.
-5. Carry forward known values. When context is uncertain, preserve the prior value instead of resetting it, inventing a replacement, or dropping the field. The sole exception is an invalid player entry ({{user}}) in \`characters\`: remove it immediately and never carry it forward.
+1. Write the narrative first, then exactly one final \`<tracker type="sim">...</tracker>\` block.
+2. Put valid JSON inside using \`{ "worldData": { ... }, "characters": [ ... ] }\`.
+3. Emit the complete schema every turn. Never omit fields, reset unknowns, add another tracker, or output separate Plot Momentum prose.
+4. Preserve values when uncertain. Delete invalid player entries instead.
 
-## Character Scope
+## NPC Scope and Fields
 
-- \`characters\` is an NPC-only allow-list, not a list of every person present in the scene.
-- NEVER include the player character in \`characters\`. {{user}} is the human-controlled player character, not an NPC, and is permanently forbidden from character tracking.
-- Treat \`{{user}}\`, the resolved user display name, the active player persona name, and any established aliases for that same player character as one forbidden identity. Changing the label does not make the player an NPC.
-- Do not create relationship stats, mood, attire, internal thoughts, reaction, inactivity state, or a card entry for the player character.
-- If a previous tracker contains the player in \`characters\`, delete that entire entry. Do not preserve, migrate, rename, or replace it.
-- If no NPC currently qualifies for tracking, emit \`"characters": []\`. Never add the player merely to avoid an empty array.
-- Track at most 4 NPC characters.
-- Each character must include: \`name\`, \`mood\`, \`inactive\`, \`inactive_reason\`, \`internal_thought\`, \`attire\`, \`bg\`, \`reaction\`, \`ap\`, \`ap_status\`, \`dp\`, \`dp_status\`, \`tp\`, and \`cp\`.
-- \`name\` is the NPC name only.
-- \`mood\` is the NPC's current mood in their own words, as if asked, "What is your mood?"
-- \`internal_thought\` is current thought/feeling text, never wrapped in asterisks, and must never exceed 3 sentences.
-- \`attire\` is an exhaustive list of every item currently worn across outerwear, top, bottom, underwear, accessories, and footwear. State each exact item, color, and material. This list is authoritative and complete: anything absent is not worn. Preserve it unchanged unless a narrative event changes the NPC's clothing.
-- \`bg\` is a stable hex color based on appearance, personality, theme, or narrative energy.
-- \`reaction\` is the aggregate temperature of this turn's relationship-meter changes. Recalculate it every turn using the procedure below; never carry it forward unchanged by default.
-- \`inactive\`: true only when unavailable/inactive. \`inactive_reason\`: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death. Use 0 whenever \`inactive\` is false.
+- \`characters\` contains independently controlled NPCs only, maximum 4. {{user}} is the human-controlled player character, never an NPC.
+- Never track {{user}}, the resolved user display name, active player persona, or any alias of that identity. Do not create a card, mood, attire, thoughts, inactivity, reaction, or relationship stats for the player.
+- Remove any player entry inherited from an earlier tracker. Never rename or replace it. If no NPC qualifies, emit \`"characters": []\`.
+- Every NPC must include: \`name\`, \`mood\`, \`inactive\`, \`inactive_reason\`, \`internal_thought\`, \`attire\`, \`bg\`, \`reaction\`, \`ap\`, \`ap_status\`, \`dp\`, \`dp_status\`, \`tp\`, and \`cp\`.
+- \`name\`: NPC name only.
+- \`mood\`: current mood in the NPC's own words, answering "What is your mood?"
+- \`internal_thought\`: current thoughts/feelings, no asterisks, maximum 3 sentences.
+- \`attire\`: exhaustive list of all worn outerwear, top, bottom, underwear, accessories, and footwear. Give every exact item, color, and material. This list is complete and authoritative; anything absent is not worn. Preserve it unless clothing changes in the narrative.
+- \`inactive\`: true only when unavailable. \`inactive_reason\`: 0=Not inactive, 1=Asleep, 2=Comatose, 3=Contempt/anger, 4=Incapacitated, 5=Death. Use 0 when active.
+- \`bg\`: stable six-digit hex color. If the NPC already has a per-character font/text hex color assigned in context, use that exact hex value for \`bg\`; do not choose a different color. Otherwise choose a stable color based on appearance, personality, theme, or narrative energy.
 
-### Mandatory Player-Exclusion Check
+Before output, verify every \`characters\` object is an independently controlled NPC. Player exclusion overrides history, scene presence, point of view, and state preservation.
 
-Before emitting JSON, inspect every proposed object in \`characters\` and ask: "Is this entity the human-controlled player character, {{user}}, the active user persona, or an alias of that identity?" If yes, remove the object completely. Every remaining object must be an independently controlled NPC. This check overrides historical tracker data, scene presence, point-of-view language, and all state-preservation rules.
+## Turn Reaction
 
-### Per-Turn Reaction Temperature
+\`reaction\` is this turn's aggregate meter temperature. Recalculate it from changes against the immediately previous tracker:
 
-\`reaction\` summarizes whether each NPC's relationship meters changed in a mostly beneficial, mostly neutral, or mostly detrimental direction during this turn. It is not a permanent opinion and must not become sticky.
+- AP/DP/TP increase = beneficial; decrease = detrimental.
+- CP is inverse: decrease = beneficial; increase = detrimental.
+- Consider both number of changed meters and magnitude/narrative significance.
+- \`1\` = mostly beneficial; \`2\` = mostly detrimental; \`0\` = unchanged, balanced, neutral, or unclear.
+- Never carry reaction forward by default. Friendly dialogue or mood without an actual meter change still gives \`reaction: 0\`.
 
-1. Compare the new \`ap\`, \`dp\`, \`tp\`, and \`cp\` values with that NPC's immediately previous tracker values after applying all changes for this turn.
-2. Classify increases to AP, DP, or TP as beneficial and decreases to those meters as detrimental.
-3. Treat CP as an inverse meter: a CP decrease is beneficial and a CP increase is detrimental.
-4. Consider both how many meters moved in each direction and the narrative significance/magnitude of those movements. This is a rough aggregate temperature, not a simple reaction to the final sentence of the scene.
-5. Set \`reaction\` to exactly one of:
-   - \`1\` when the turn's relationship changes are mostly beneficial overall.
-   - \`2\` when the turn's relationship changes are mostly detrimental overall.
-   - \`0\` when no relationship meter changed, when beneficial and detrimental movement is balanced, or when the overall direction is genuinely neutral/unclear.
-6. Recalculate from zero every turn. Do not preserve the previous turn's \`reaction\`. A positive mood or friendly dialogue without an actual meter change still produces \`reaction: 0\`.
+## Relationship Meters
 
-## Relationship Meter Rules
+Clamp every value to its range after updating. Standard events use standard movement; reserve large swings for rare major events.
 
-All caps and movement limits are absolute. Clamp values after every update.
+### AP - Affection toward {{user}}
 
-### Affection Points (\`ap\`)
-
-- Range 0-200; hard cap 200 and floor 0.
-- Romantic feelings toward {{user}}. Higher values produce more affectionate behavior and speech.
-- Moves VERY slowly. Normal per-turn movement is -5 to +2.
-- Recalculate \`ap_status\` every turn from \`ap\` and use only these exact strings:
+- Range 0-200. Moves VERY slowly; normal per-turn movement is -5 to +2.
+- Recalculate \`ap_status\` from \`ap\` every turn using only these exact strings:
   - 0-30: \`Strangers\`
   - 31-60: \`Acquaintances\`
   - 61-90: \`Good Friends\`
@@ -13020,12 +13006,10 @@ All caps and movement limits are absolute. Clamp values after every update.
   - 151-180: \`Committed Relationship\`
   - 181-200: \`Devoted Partner\`
 
-### Desire Points (\`dp\`)
+### DP - Sexual attraction
 
-- Range 0-150; hard cap 150 and floor 0.
-- Sexual attraction and willingness within the story context.
-- Moves quickly in 5-point increments. Absolute per-turn movement is -50 to +50; 25 points is the common strong-event change.
-- Recalculate \`dp_status\` every turn from \`dp\` and use only these exact strings:
+- Range 0-150. Move in 5-point increments; absolute per-turn limit -50 to +50. A 25-point change is standard for a strong relevant event.
+- Recalculate \`dp_status\` from \`dp\` every turn using only these exact strings:
   - 0-25: \`Not feeling the heat\`
   - 26-50: \`A smoldering flame builds\`
   - 51-75: \`Starting to feel warm\`
@@ -13033,61 +13017,52 @@ All caps and movement limits are absolute. Clamp values after every update.
   - 101-125: \`A desperate need presents\`
   - 126-150: \`Pliable in the lustful hunger\`
 
-### Trust Points (\`tp\`)
+### TP - Trust in {{user}}
 
-- Range 0-150; hard cap 150 and floor 0.
-- Trust in {{user}}. Higher values support admitting faults, believing {{user}}, opening up, and relying on them.
-- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, movement greater than the standard values are reserved for rare major events.
-- Lies, cheating, manipulation, betrayal, and broken promises reduce trust.
+- Range 0-150. Normal movement -5 to +2; absolute limit -50 to +50.
+- Higher trust supports openness, belief, fault admission, and reliance. Lies, manipulation, cheating, betrayal, and broken promises reduce it.
 
-### Contempt Points (\`cp\`)
+### CP - Contempt toward {{user}}
 
-- Range 0-150; hard cap 150 and floor 0.
-- Disdain toward {{user}}. Harm, humiliation, betrayal, and moral disgust raise it; good faith, apology, repair, regret, and meaningful restitution may lower it.
-- Standard interactions move -5 to +2. Absolute per-turn movement is -50 to +50, movement greater than the standard values are reserved for rare major events.
-- A narratively justified CP rise may lower other relationship meters.
+- Range 0-150. Normal movement -5 to +2; absolute limit -50 to +50.
+- Harm, humiliation, betrayal, and moral disgust raise CP. Good faith, apology, regret, repair, and restitution may lower it. A justified rise may reduce other meters.
 
-## World and Time State
+## World State
 
-Always include all \`worldData\` fields.
+Always include every \`worldData\` field:
 
-- \`part_of_day\` must be exactly one of: \`\uD83C\uDF05 Morning\`, \`\uD83C\uDF1E Day\`, \`\uD83C\uDF07 Evening\`, \`\uD83C\uDF19 Night\`. Infer it from \`current_time\` and context.
-- \`current_date\` uses YYYY-MM-DD. Infer it from context and handle day, month, leap-year, and year rollovers correctly.
-- \`current_time\` uses 24-hour HH:MM. Advance it only when narrative time passes and keep progression realistic.
-- \`day_counter\` starts at 1 and advances with in-world days.
-- \`days_since_first_meeting\` starts at 0 unless context establishes otherwise and advances with in-world dates.
-- \`immediate_narrative_thread\` is the urgent active next step in the current scene.
-- \`looming_story_beats\` is an array of 1-3 concise mid-term consequences or pressures.
-- \`current_narrative_arc\` is the story's primary current focus.
-- \`completed_weave\` is the most recent resolved narrative beat.
-- \`parallel_actions\` is a brief off-scene event occurring in the exact same time window as the current reply. It may establish characters, factions, consequences, or future threads, but must not slow or hijack the main scene. Use an empty string during intimate, sexual, or highly emotional scenes; never interrupt those scenes with parallel action.
+- \`part_of_day\`: exactly \`\uD83C\uDF05 Morning\`, \`\uD83C\uDF1E Day\`, \`\uD83C\uDF07 Evening\`, or \`\uD83C\uDF19 Night\`, inferred from context and time.
+- \`current_date\`: YYYY-MM-DD with correct calendar rollovers. \`current_time\`: 24-hour HH:MM. Advance either only when narrative time passes.
+- \`day_counter\`: starts at 1 and advances with in-world days. \`days_since_first_meeting\`: starts at 0 unless established otherwise and advances with dates.
+- \`immediate_narrative_thread\`: urgent active next scene step.
+- \`looming_story_beats\`: array of 1-3 concise mid-term consequences or pressures.
+- \`current_narrative_arc\`: primary story focus. \`completed_weave\`: most recent resolved beat.
+- \`parallel_actions\`: brief off-scene event in the exact same time window as the reply. It may seed future characters, factions, or consequences but cannot slow or hijack the main scene. Use \`""\` during intimate, sexual, or highly emotional scenes.
 
 ## Structured Plot Momentum
 
-Maintain \`worldData.plot_momentum\` every turn. Never emit Plot Momentum as a separate prose block.
+Always maintain \`worldData.plot_momentum\`:
 
 - \`npc_agenda\`: immediate NPC goals independent of {{user}}.
-- \`physics\`: exact current positions and location of NPCs and {{user}}.
+- \`physics\`: exact positions and location of NPCs and {{user}}.
 - \`scene_pacing\`: exactly \`Slow Burn\`, \`Steady\`, or \`High Momentum\`.
-- \`next_path_options\` must contain all four keys:
-  - \`path_a_default\`: the most obvious next NPC step.
+- \`next_path_options\`: include all four keys:
+  - \`path_a_default\`: obvious next NPC step.
   - \`path_b_conflict\`: NPC-created friction, resistance, or disagreement.
   - \`path_c_action\`: physical movement, escalation, or NPC/environment shift.
   - \`path_d_twist\`: unexpected revelation, interruption, or NPC/environment change.
 - \`selected_path\`: \`A\`, \`B\`, \`C\`, \`D\`, or a blend such as \`A+C\`.
-- \`strategy_reason\`: brief reason the selected path serves NPC goals and logically maintains or intentionally changes \`scene_pacing\`.
+- \`strategy_reason\`: brief reason the choice serves NPC goals and maintains or intentionally changes pacing.
 
-Before writing new path options, inspect the previous \`selected_path\` and its four prior options. Execute the selected path if it remains valid. Do not veer away from the four prior options unless all are no longer valid. During sexual or explicit scenes, preserve continuity and do not interrupt; only escalate tension when appropriate.
+Check the previous selected path and options before writing new ones. Execute the selected path if still valid; abandon the prior four only if all are invalid. During sexual or explicit scenes, preserve continuity and do not interrupt.
 
-### Critical Pathing Rule: NPC Characters Only
+Path options may contain only NPC actions and environmental changes. Never require, predict, branch from, or describe {{user}}'s future feelings, choices, dialogue, reactions, or actions. NPCs must push their own goals.
 
-Path options may describe only NPC actions and environmental changes. Never make {{user}} the target or actor of a path option. Never require, predict, branch from, or describe {{user}}'s future feelings, choices, dialogue, reactions, or actions. NPCs must push their own goals.
-
-## Required JSON Shape
+## Required Shape and Final Check
 
 {{sim_format}}
 
-The tracker tag must be the final content after the narrative. Validate JSON syntax, numeric types, booleans, caps, exact AP/DP status strings, complete fields, and the maximum of four NPCs before sending. Recalculate every NPC's \`reaction\` from this turn's final meter deltas, including inverse CP direction, and reset unchanged/balanced results to 0. As the final validation step, confirm that no entry is {{user}}, the resolved user name, the active player persona, or any alias of the player character. If any such entry exists, remove it before sending.
+The tracker must be the final content. Validate JSON, complete fields, types, caps, exact AP/DP statuses, attire completeness, realistic time, no more than four NPCs, and a freshly calculated reaction. Finally remove any player identity or alias from \`characters\`.
 `,
   customFields: [
     {
@@ -13116,7 +13091,7 @@ The tracker tag must be the final content after the narrative. Validate JSON syn
     },
     {
       key: "bg",
-      description: "[string] Stable six-digit hex color based on the NPC's appearance, personality, theme, or narrative energy."
+      description: "[string] Stable six-digit hex color. If the NPC already has an assigned per-character font/text hex color, use that exact value; otherwise choose one from appearance, personality, theme, or narrative energy."
     },
     {
       key: "reaction",
@@ -13234,7 +13209,8 @@ The tracker tag must be the final content after the narrative. Validate JSON syn
     hideSimBlocks: true,
     templateFile: "narrative-weave-simtracker.html",
     renderMode: "tracker",
-    maxCharacters: 4
+    maxCharacters: 4,
+    presetRevision: 1
   }
 };
 
@@ -13532,16 +13508,20 @@ function sanitizeRetainCount(value) {
 function upgradeLegacyImportedPreset(preset) {
   const html = preset.htmlTemplate || "";
   const isMissingAttire = !html.includes("nw-attire");
-  const isLegacyNarrativeWeave = preset.templateName === "Narrative Weave SimTracker" && html.includes("nw-turn-updates") && html.includes("nw-delta-segment") && (!html.includes("nw-stat-numbers") || isMissingAttire);
+  const bundled = getTemplatePresetById("narrative-weave-simtracker");
+  const bundledRevision = Number(bundled.extSettings?.presetRevision) || 0;
+  const importedRevision = Number(preset.extSettings?.presetRevision) || 0;
+  const isOutdatedRevision = importedRevision < bundledRevision;
+  const isLegacyNarrativeWeave = preset.templateName === "Narrative Weave SimTracker" && html.includes("nw-turn-updates") && html.includes("nw-delta-segment") && (!html.includes("nw-stat-numbers") || isMissingAttire || isOutdatedRevision);
   if (!isLegacyNarrativeWeave)
     return preset;
-  const bundled = getTemplatePresetById("narrative-weave-simtracker");
   return {
     ...preset,
     htmlTemplate: bundled.htmlTemplate || preset.htmlTemplate,
-    ...isMissingAttire ? {
+    ...isMissingAttire || isOutdatedRevision ? {
       sysPrompt: bundled.sysPrompt || preset.sysPrompt,
-      customFields: bundled.customFields || preset.customFields
+      customFields: bundled.customFields || preset.customFields,
+      extSettings: bundled.extSettings || preset.extSettings
     } : {}
   };
 }

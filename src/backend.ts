@@ -307,24 +307,28 @@ function sanitizeRetainCount(value: unknown): number {
 function upgradeLegacyImportedPreset(preset: TemplatePreset): TemplatePreset {
   const html = preset.htmlTemplate || "";
   const isMissingAttire = !html.includes("nw-attire");
+  const bundled = getTemplatePresetById("narrative-weave-simtracker");
+  const bundledRevision = Number(bundled.extSettings?.presetRevision) || 0;
+  const importedRevision = Number(preset.extSettings?.presetRevision) || 0;
+  const isOutdatedRevision = importedRevision < bundledRevision;
   const isLegacyNarrativeWeave =
     preset.templateName === "Narrative Weave SimTracker"
     && html.includes("nw-turn-updates")
     && html.includes("nw-delta-segment")
-    && (!html.includes("nw-stat-numbers") || isMissingAttire);
+    && (!html.includes("nw-stat-numbers") || isMissingAttire || isOutdatedRevision);
 
   if (!isLegacyNarrativeWeave) return preset;
 
-  // Early Narrative Weave imports received timestamp IDs, so selecting one
-  // bypasses later bundled updates. Upgrade only that known revision.
-  const bundled = getTemplatePresetById("narrative-weave-simtracker");
+  // Imported Narrative Weave copies receive timestamp IDs, so selecting one
+  // bypasses bundled updates. Upgrade only copies with known template markers.
   return {
     ...preset,
     htmlTemplate: bundled.htmlTemplate || preset.htmlTemplate,
-    ...(isMissingAttire
+    ...(isMissingAttire || isOutdatedRevision
       ? {
           sysPrompt: bundled.sysPrompt || preset.sysPrompt,
           customFields: bundled.customFields || preset.customFields,
+          extSettings: bundled.extSettings || preset.extSettings,
         }
       : {}),
   };
