@@ -12180,6 +12180,43 @@ var narrative_weave_simtracker_default = {
     outline-offset: -3px;
   }
 
+  .nw-hover-tooltip {
+    position: absolute;
+    z-index: 6;
+    padding: 8px 10px;
+    visibility: hidden;
+    border: 1px solid var(--nw-border-hover);
+    border-radius: 7px;
+    opacity: 0;
+    color: var(--nw-text);
+    background: color-mix(in srgb, var(--nw-bg) 96%, #000 4%);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0;
+    pointer-events: none;
+    text-transform: none;
+    transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+  }
+
+  .nw-world-tooltip {
+    top: 50%;
+    left: 50%;
+    width: max-content;
+    max-width: calc(100% - 64px);
+    transform: translate(-50%, calc(-50% + 4px));
+    text-align: center;
+  }
+
+  .nw-world:not([open]) > .nw-summary:hover .nw-world-tooltip,
+  .nw-world:not([open]) > .nw-summary:focus-visible .nw-world-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+
   .nw-summary-title {
     min-width: 0;
     margin: 0;
@@ -12272,6 +12309,12 @@ var narrative_weave_simtracker_default = {
     -webkit-line-clamp: 3;
   }
 
+  .nw-character[open] > .nw-summary .nw-thought {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+
   .nw-thread {
     margin: 0;
     color: var(--nw-text);
@@ -12339,6 +12382,29 @@ var narrative_weave_simtracker_default = {
     border: 1px solid var(--nw-border);
     border-radius: 7px;
     background: var(--nw-surface);
+  }
+
+  .nw-stat {
+    position: relative;
+  }
+
+  .nw-stat:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--nw-focus) 70%, transparent);
+    outline-offset: -3px;
+  }
+
+  .nw-stat-tooltip {
+    inset: 8px;
+    display: flex;
+    align-items: center;
+    transform: translateY(4px);
+  }
+
+  .nw-character[open] .nw-stat:hover .nw-stat-tooltip,
+  .nw-character[open] .nw-stat:focus-visible .nw-stat-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .nw-field-label,
@@ -12590,6 +12656,10 @@ var narrative_weave_simtracker_default = {
             No immediate narrative thread recorded.
           {{/if}}
         </p>
+        <span class="nw-hover-tooltip nw-world-tooltip" role="tooltip">
+          Date: {{#if worldData.current_date}}{{worldData.current_date}}{{else}}Unknown{{/if}}
+          \xB7 Time: {{#if worldData.current_time}}{{worldData.current_time}}{{else}}Unknown{{/if}}
+        </span>
       </summary>
 
       <div class="nw-body">
@@ -12814,7 +12884,8 @@ var narrative_weave_simtracker_default = {
           <section class="nw-section" aria-label="Relationship statistics">
             <h3 class="nw-section-title">Relationship meters</h3>
             <div class="nw-stat-grid">
-              <div class="nw-stat">
+              <div class="nw-stat" tabindex="0">
+                <span class="nw-hover-tooltip nw-stat-tooltip" role="tooltip">Affection Points toward the user, 0-200 hard range; normal per-turn movement -5 to +2.</span>
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">AP \xB7 Affection</span>
                   <span class="nw-stat-numbers">
@@ -12845,7 +12916,8 @@ var narrative_weave_simtracker_default = {
                 </div>
               </div>
 
-              <div class="nw-stat">
+              <div class="nw-stat" tabindex="0">
+                <span class="nw-hover-tooltip nw-stat-tooltip" role="tooltip">Desire Points, 0-150 hard range; move in 5-point increments with absolute per-turn change -50 to +50.</span>
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">DP \xB7 Desire</span>
                   <span class="nw-stat-numbers">
@@ -12876,7 +12948,8 @@ var narrative_weave_simtracker_default = {
                 </div>
               </div>
 
-              <div class="nw-stat">
+              <div class="nw-stat" tabindex="0">
+                <span class="nw-hover-tooltip nw-stat-tooltip" role="tooltip">Trust Points toward the user, 0-150 hard range; normal per-turn movement -5 to +2 and absolute limit -50 to +50.</span>
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">TP \xB7 Trust</span>
                   <span class="nw-stat-numbers">
@@ -12905,7 +12978,8 @@ var narrative_weave_simtracker_default = {
                 </div>
               </div>
 
-              <div class="nw-stat">
+              <div class="nw-stat" tabindex="0">
+                <span class="nw-hover-tooltip nw-stat-tooltip" role="tooltip">Contempt Points toward the user, 0-150 hard range; normal per-turn movement -5 to +2 and absolute limit -50 to +50.</span>
                 <div class="nw-stat-head">
                   <span class="nw-stat-label">CP \xB7 Contempt</span>
                   <span class="nw-stat-numbers">
