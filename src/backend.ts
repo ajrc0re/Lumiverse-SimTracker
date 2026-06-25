@@ -327,6 +327,9 @@ function upgradeLegacyImportedPreset(preset: TemplatePreset): TemplatePreset {
     ...(isMissingAttire || isOutdatedRevision
       ? {
           sysPrompt: bundled.sysPrompt || preset.sysPrompt,
+          displayInstructions: bundled.displayInstructions || preset.displayInstructions,
+          inlineTemplatesEnabled: bundled.inlineTemplatesEnabled ?? preset.inlineTemplatesEnabled,
+          inlineTemplates: bundled.inlineTemplates || preset.inlineTemplates,
           customFields: bundled.customFields || preset.customFields,
           extSettings: bundled.extSettings || preset.extSettings,
         }
@@ -347,6 +350,8 @@ function sanitizePresetArray(value: unknown): TemplatePreset[] {
         htmlTemplate: typeof p.htmlTemplate === "string" ? p.htmlTemplate : "",
         sysPrompt: typeof p.sysPrompt === "string" ? p.sysPrompt : "",
         displayInstructions: typeof p.displayInstructions === "string" ? p.displayInstructions : "",
+        inlineTemplatesEnabled: typeof p.inlineTemplatesEnabled === "boolean" ? p.inlineTemplatesEnabled : false,
+        inlineTemplates: Array.isArray(p.inlineTemplates) ? p.inlineTemplates : [],
         customFields: Array.isArray(p.customFields) ? (p.customFields as any) : [],
         extSettings: (p.extSettings && typeof p.extSettings === "object" ? p.extSettings : {}) as Record<string, unknown>,
       });
@@ -2510,7 +2515,14 @@ async function handleImportPresetFile(payload: Record<string, unknown>): Promise
     return;
   }
 
-  if (Array.isArray(parsed.inlineTemplates) && parsed.inlineTemplates.length > 0) {
+  const hasInlineTemplates = Array.isArray(parsed.inlineTemplates) && parsed.inlineTemplates.length > 0;
+  const hasTrackerTemplate =
+    typeof parsed.htmlTemplate === "string"
+    || typeof parsed.sysPrompt === "string"
+    || Array.isArray(parsed.customFields)
+    || (parsed.extSettings && typeof parsed.extSettings === "object");
+
+  if (hasInlineTemplates && !hasTrackerTemplate) {
     config = { ...config, inlinePacks: [...config.inlinePacks, parsed] };
     await saveConfig();
     pushMacroValues();

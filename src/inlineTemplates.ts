@@ -63,7 +63,9 @@ function renderErrorSpan(name: string, reason: string, detail?: string): string 
 function collectInlineDefs(config: InlineProcessorConfig, preset: TemplatePreset): InlineTemplateDef[] {
   const out: InlineTemplateDef[] = [];
   const presetInline = (preset as unknown as Record<string, unknown>).inlineTemplates;
-  if (Array.isArray(presetInline)) out.push(...(presetInline as InlineTemplateDef[]));
+  if (preset.inlineTemplatesEnabled === true && Array.isArray(presetInline)) {
+    out.push(...(presetInline as InlineTemplateDef[]));
+  }
   for (const pack of config.inlinePacks) {
     if (pack && pack.enabled === false) continue;
     const packInline = (pack as Record<string, unknown>)?.inlineTemplates;
@@ -223,8 +225,13 @@ export function createInlineTemplateProcessor(deps: InlineProcessorDeps): Inline
   const processMessage = (messageId: string): void => {
     if (!messageId) return;
     const config = deps.getConfig();
+    const preset = deps.getPreset();
+    const presetInline = (preset as unknown as Record<string, unknown>).inlineTemplates;
+    const hasPresetInline = preset.inlineTemplatesEnabled === true && Array.isArray(presetInline) && presetInline.length > 0;
     clearMessage(messageId);
-    if (!config.enableInlineTemplates) return;
+    if (!config.enableInlineTemplates && !hasPresetInline) return;
+
+    const effectiveConfig = config.enableInlineTemplates ? config : { ...config, inlinePacks: [] };
 
     const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
     if (!messageNode) return;
@@ -232,11 +239,10 @@ export function createInlineTemplateProcessor(deps: InlineProcessorDeps): Inline
     const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
     const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
 
-    const preset = deps.getPreset();
     const messageArtifacts: Element[] = [];
     for (const root of roots) {
-      processTagElements(root, config, preset, messageArtifacts);
-      processLegacyMarkers(root, config, preset, messageArtifacts);
+      processTagElements(root, effectiveConfig, preset, messageArtifacts);
+      processLegacyMarkers(root, effectiveConfig, preset, messageArtifacts);
     }
 
     if (messageArtifacts.length > 0) {

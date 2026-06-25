@@ -37,6 +37,9 @@ Assemble reads a config JSON like:
   "templateName": "My Tracker",
   "templateAuthor": "Author Name",
   "templatePosition": "BOTTOM",
+  "displayInstructions": "Optional inline display guidance",
+  "inlineTemplatesEnabled": true,
+  "inlineTemplatesFile": "./inline-templates.json",
   "htmlFile": "./my-tracker.html",
   "promptFile": "./prompt.md",
   "fieldsFile": "./fields.json",
@@ -77,11 +80,16 @@ if (CMD === 'extract') {
   fs.writeFileSync(path.join(dest, 'prompt.md'), data.sysPrompt || '', 'utf-8');
   fs.writeFileSync(path.join(dest, 'fields.json'), JSON.stringify(data.customFields || [], null, 2), 'utf-8');
   fs.writeFileSync(path.join(dest, 'settings.json'), JSON.stringify(data.extSettings || {}, null, 2), 'utf-8');
+  if (Array.isArray(data.inlineTemplates)) {
+    fs.writeFileSync(path.join(dest, 'inline-templates.json'), JSON.stringify(data.inlineTemplates, null, 2), 'utf-8');
+  }
   fs.writeFileSync(path.join(dest, 'metadata.json'), JSON.stringify({
     templateName: data.templateName,
     templateAuthor: data.templateAuthor,
     templatePosition: data.templatePosition,
     trackerDesc: data.trackerDesc,
+    displayInstructions: data.displayInstructions || undefined,
+    inlineTemplatesEnabled: data.inlineTemplatesEnabled || undefined,
     tabsType: data.tabsType || undefined
   }, null, 2), 'utf-8');
 
@@ -133,17 +141,21 @@ else if (CMD === 'assemble') {
   const promptContent = readFile(config.promptFile);
   const fieldsContent = config.fieldsFile ? JSON.parse(readFile(config.fieldsFile)) : [];
   const settingsContent = config.settingsFile ? JSON.parse(readFile(config.settingsFile)) : {};
+  const inlineTemplatesContent = config.inlineTemplatesFile ? JSON.parse(readFile(config.inlineTemplatesFile)) : undefined;
 
   const output = {
     templateName: config.templateName || 'Untitled Tracker',
     templateAuthor: config.templateAuthor || 'Unknown',
+    trackerDesc: config.trackerDesc || '',
     templatePosition: config.templatePosition || 'BOTTOM',
     tabsType: config.tabsType || undefined,
+    displayInstructions: config.displayInstructions || undefined,
+    inlineTemplatesEnabled: typeof config.inlineTemplatesEnabled === 'boolean' ? config.inlineTemplatesEnabled : undefined,
+    inlineTemplates: inlineTemplatesContent,
     htmlTemplate: htmlContent,
     sysPrompt: promptContent,
     customFields: fieldsContent,
-    extSettings: settingsContent,
-    trackerDesc: config.trackerDesc || ''
+    extSettings: settingsContent
   };
 
   Object.keys(output).forEach(key => {
@@ -151,11 +163,12 @@ else if (CMD === 'assemble') {
   });
 
   const outPath = outFlag || (config.outFile || './assembled-template.json');
-  fs.writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
+  fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, 'utf-8');
   console.log(`Assembled template written to ${outPath}`);
   console.log(`  HTML: ${htmlContent.length} chars (raw)`);
   console.log(`  Prompt: ${promptContent.length} chars`);
   console.log(`  Fields: ${fieldsContent.length}`);
+  console.log(`  Inline templates: ${Array.isArray(inlineTemplatesContent) ? inlineTemplatesContent.length : 0}`);
   console.log(`  Settings: ${Object.keys(settingsContent).length}`);
 }
 

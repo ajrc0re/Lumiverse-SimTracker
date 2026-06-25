@@ -10515,6 +10515,49 @@ var narrative_weave_simtracker_default = {
   templateAuthor: "c0re",
   trackerDesc: "A narrative relationship and plot momentum tracker for up to four NPCs plus a separate world and story state.",
   templatePosition: "BOTTOM",
+  displayInstructions: "Use the text_messages inline display when narrating in-world SMS or chat exchanges.",
+  inlineTemplatesEnabled: true,
+  inlineTemplates: [
+    {
+      insertName: "text_messages",
+      insertPurpose: "Render an in-world SMS/chat thread with inbound and outbound bubbles.",
+      parameters: [
+        {
+          name: "contact",
+          description: "Contact name, group name, or number shown in the thread header."
+        },
+        {
+          name: "device",
+          description: "Optional app/device label such as Messages, Signal, or encrypted chat."
+        },
+        {
+          name: "time",
+          description: "Optional header timestamp for the current message moment."
+        },
+        {
+          name: "status",
+          description: "Optional delivery/read status shown at the bottom."
+        },
+        {
+          name: "typing",
+          description: "Optional name or label for a contact who is currently typing."
+        },
+        {
+          name: "context",
+          description: "Optional short thread context, warning, or prior-history note."
+        },
+        {
+          name: "accent",
+          description: "Optional hex color for the contact/avatar accent."
+        },
+        {
+          name: "messages",
+          description: "Array of message objects. Each object uses side sent/received, text, and optional sender, time, or reaction."
+        }
+      ],
+      htmlContent: "<div class='sst-inline-text-thread' style='display:block;margin:14px 0;max-width:440px;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;line-height:1.35;'><div style='padding:10px;border:1px solid rgba(148,163,184,0.28);border-radius:30px;background:linear-gradient(145deg,#111827 0%,#020617 100%);box-shadow:0 18px 45px rgba(0,0,0,0.34),inset 0 1px 0 rgba(255,255,255,0.08);'><div style='overflow:hidden;border:1px solid rgba(148,163,184,0.18);border-radius:24px;background:radial-gradient(circle at top left,rgba(56,189,248,0.16),transparent 34%),linear-gradient(180deg,#0f172a 0%,#111827 100%);'><div style='display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid rgba(148,163,184,0.16);background:linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.02));'><div style='display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:0 0 34px;border-radius:50%;color:#fff;font-size:12px;font-weight:800;letter-spacing:0.04em;background:linear-gradient(135deg,{{#if accent}}{{accent}}{{else}}#38bdf8{{/if}},#8b5cf6);box-shadow:0 0 0 2px rgba(255,255,255,0.08),0 8px 18px rgba(56,189,248,0.22);'>{{#if contact}}{{initials contact}}{{else}}?{{/if}}</div><div style='min-width:0;flex:1;'><div style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f8fafc;font-size:14px;font-weight:800;'>{{#if contact}}{{contact}}{{else}}Unknown Contact{{/if}}</div><div style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;font-size:11px;font-weight:650;'>{{#if device}}{{device}}{{else}}Messages{{/if}}{{#if context}} · {{context}}{{/if}}</div></div>{{#if time}}<div style='flex:0 0 auto;color:#cbd5e1;font-size:11px;font-weight:700;'>{{time}}</div>{{/if}}</div><div style='display:grid;gap:8px;padding:13px 12px 12px;'>{{#if messages}}{{#each messages}}<div style='display:flex;justify-content:{{#if (or (eq side 'sent') (eq side 's') (eq dir 's'))}}flex-end{{else}}flex-start{{/if}};'><div style='max-width:82%;min-width:0;{{#if (or (eq side 'sent') (eq side 's') (eq dir 's'))}}text-align:right;{{/if}}'>{{#if sender}}<div style='margin:0 6px 3px;color:#94a3b8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;'>{{sender}}</div>{{/if}}<div style='display:inline-block;max-width:100%;padding:9px 11px;border-radius:{{#if (or (eq side 'sent') (eq side 's') (eq dir 's'))}}18px 18px 4px 18px{{else}}18px 18px 18px 4px{{/if}};color:{{#if (or (eq side 'sent') (eq side 's') (eq dir 's'))}}#ecfeff{{else}}#f8fafc{{/if}};background:{{#if (or (eq side 'sent') (eq side 's') (eq dir 's'))}}linear-gradient(135deg,#0891b2,#2563eb){{else}}rgba(30,41,59,0.96){{/if}};border:1px solid {{#if (or (eq side 'sent') (eq side 's') (eq dir 's'))}}rgba(125,211,252,0.26){{else}}rgba(148,163,184,0.16){{/if}};box-shadow:0 8px 18px rgba(0,0,0,0.18);font-size:13px;overflow-wrap:anywhere;text-align:left;'>{{text}}</div>{{#if (or time reaction)}}<div style='margin:3px 6px 0;color:#64748b;font-size:10px;font-weight:650;'>{{#if time}}{{time}}{{/if}}{{#if reaction}}{{#if time}} · {{/if}}{{reaction}}{{/if}}</div>{{/if}}</div></div>{{/each}}{{else}}<div style='padding:10px;border:1px dashed rgba(148,163,184,0.28);border-radius:14px;color:#94a3b8;font-size:12px;text-align:center;'>No message content supplied.</div>{{/if}}{{#if typing}}<div style='display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:11px;font-weight:650;'><span style='width:7px;height:7px;border-radius:50%;background:#38bdf8;box-shadow:11px 0 0 rgba(56,189,248,0.65),22px 0 0 rgba(56,189,248,0.35);'></span><span style='margin-left:20px;'>{{typing}} is typing…</span></div>{{/if}}{{#if status}}<div style='padding-top:2px;color:#64748b;font-size:10px;font-weight:700;text-align:right;text-transform:uppercase;letter-spacing:0.08em;'>{{status}}</div>{{/if}}</div></div></div></div>"
+    }
+  ],
   htmlTemplate: `<!-- TEMPLATE NAME: Narrative Weave SimTracker -->
 <!-- AUTHOR: c0re -->
 <!-- POSITION: BOTTOM -->
@@ -11606,6 +11649,12 @@ Check the previous selected path and options before writing new ones. Execute th
 
 Path options may contain only NPC actions and environmental changes. Never require, predict, branch from, or describe {{user}}'s future feelings, choices, dialogue, reactions, or actions. NPCs must push their own goals.
 
+Avoid pure \`A\` every turn. If prior \`selected_path\` was \`A\`, raise B/C/D priority for this turn and choose one or blend with A unless continuity makes A unavoidable.
+
+## Inline Text Messages
+
+When narrating SMS/chat, use one single-line inline display: \`[[DISPLAY=text_messages, DATA={contact:"Name", time:"HH:MM", messages:[{side:"received", text:"..."},{side:"sent", text:"..."}], status:"Delivered"}]]\`. Include 3-6 prior bubbles when thread history exists.
+
 ## Required Shape and Final Check
 
 {{sim_format}}
@@ -11758,7 +11807,7 @@ The tracker must be the final content. Validate JSON, complete fields, types, ca
     templateFile: "narrative-weave-simtracker.html",
     renderMode: "tracker",
     maxCharacters: 4,
-    presetRevision: 1
+    presetRevision: 2
   }
 };
 
@@ -17928,8 +17977,9 @@ function renderErrorSpan(name, reason, detail) {
 function collectInlineDefs(config, preset) {
   const out = [];
   const presetInline = preset.inlineTemplates;
-  if (Array.isArray(presetInline))
+  if (preset.inlineTemplatesEnabled === true && Array.isArray(presetInline)) {
     out.push(...presetInline);
+  }
   for (const pack of config.inlinePacks) {
     if (pack && pack.enabled === false)
       continue;
@@ -18063,19 +18113,22 @@ function createInlineTemplateProcessor(deps) {
     if (!messageId)
       return;
     const config = deps.getConfig();
+    const preset = deps.getPreset();
+    const presetInline = preset.inlineTemplates;
+    const hasPresetInline = preset.inlineTemplatesEnabled === true && Array.isArray(presetInline) && presetInline.length > 0;
     clearMessage(messageId);
-    if (!config.enableInlineTemplates)
+    if (!config.enableInlineTemplates && !hasPresetInline)
       return;
+    const effectiveConfig = config.enableInlineTemplates ? config : { ...config, inlinePacks: [] };
     const messageNode = document.querySelector(`[data-message-id="${messageId}"]`);
     if (!messageNode)
       return;
     const proseNodes = Array.from(messageNode.querySelectorAll("div[class*='prose']"));
     const roots = proseNodes.length > 0 ? proseNodes : [messageNode];
-    const preset = deps.getPreset();
     const messageArtifacts = [];
     for (const root of roots) {
-      processTagElements(root, config, preset, messageArtifacts);
-      processLegacyMarkers(root, config, preset, messageArtifacts);
+      processTagElements(root, effectiveConfig, preset, messageArtifacts);
+      processLegacyMarkers(root, effectiveConfig, preset, messageArtifacts);
     }
     if (messageArtifacts.length > 0) {
       artifactsByMessage.set(messageId, messageArtifacts);
