@@ -8494,7 +8494,7 @@ Each character has:
 var pulse_thread_tracker_default = {
   templateName: "Pulse Thread Tracker",
   templateAuthor: "Prolix OCs",
-  trackerDesc: "Narrative character tracker with fertility, womb fullness, semen volume, and refractory gauges.",
+  trackerDesc: "Narrative character tracker with fertility, womb fullness, semen volume, refractory, and bladder/urination gauges.",
   templatePosition: "BOTTOM",
   htmlTemplate: `<!-- TEMPLATE NAME: Pulse Thread Tracker -->
 <!-- AUTHOR: Prolix OCs -->
@@ -9493,6 +9493,142 @@ var pulse_thread_tracker_default = {
         background: linear-gradient(90deg, #9333ea, #d946ef);
     }
 
+    /* --- ALL: Bladder & Urination Vessel --- */
+    .pt-bladder-vessel {
+        width: 140px;
+        height: 180px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .pt-bladder-svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        overflow: visible;
+        filter: none;
+    }
+
+    .pt-bladder-kidney {
+        fill: color-mix(in srgb, #ffd86b 12%, rgba(255, 255, 255, 0.05));
+        stroke: color-mix(in srgb, #ffd86b 50%, rgba(255, 255, 255, 0.3));
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .pt-bladder-ureter {
+        fill: none;
+        stroke: color-mix(in srgb, #ffd86b 40%, rgba(255, 255, 255, 0.25));
+        stroke-width: 2;
+        stroke-linecap: round;
+        opacity: 0.85;
+    }
+
+    .pt-bladder-urachus {
+        fill: none;
+        stroke: rgba(255, 255, 255, 0.22);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+    }
+
+    .pt-bladder-outline {
+        fill: none;
+        stroke: color-mix(in srgb, #ffd86b 70%, white 30%);
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        opacity: 0.95;
+        transform-box: fill-box;
+        transform-origin: center;
+    }
+
+    .pt-bladder-outline.straining {
+        animation: bladderStrain 1.2s ease-in-out infinite;
+    }
+
+    @keyframes bladderStrain {
+        0%, 100% { transform: scale(1); opacity: 0.95; }
+        50% { transform: scale(1.04); opacity: 0.72; }
+    }
+
+    .pt-bladder-inner {
+        fill: rgba(255, 255, 255, 0.05);
+        stroke: rgba(255, 255, 255, 0.08);
+        stroke-width: 1.5;
+    }
+
+    .pt-bladder-rugae {
+        fill: none;
+        stroke: rgba(255, 255, 255, 0.08);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+    }
+
+    .pt-bladder-liquid {
+        fill: rgba(255, 210, 84, 0.92);
+        transition: y 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .pt-bladder-surface {
+        stroke: rgba(255, 240, 180, 0.75);
+        stroke-width: 2;
+        stroke-linecap: round;
+        opacity: 0.88;
+    }
+
+    .pt-bladder-urethra {
+        fill: none;
+        stroke: color-mix(in srgb, #ffd86b 60%, rgba(255, 255, 255, 0.2) 40%);
+        stroke-width: 3;
+        stroke-linecap: round;
+    }
+
+    .pt-bladder-sphincter {
+        fill: none;
+        stroke: color-mix(in srgb, #ffd86b 55%, rgba(255, 255, 255, 0.25) 45%);
+        stroke-width: 3;
+    }
+
+    .pt-bladder-sphincter.straining {
+        animation: sphincterHold 0.9s ease-in-out infinite;
+    }
+
+    @keyframes sphincterHold {
+        0%, 100% { stroke-opacity: 1; }
+        50% { stroke-opacity: 0.4; }
+    }
+
+    .pt-bladder-drip {
+        fill: rgba(255, 210, 84, 0.9);
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: bladderDrip 1.6s ease-in infinite;
+    }
+
+    @keyframes bladderDrip {
+        0% { transform: translateY(0); opacity: 0; }
+        15% { opacity: 0.9; }
+        100% { transform: translateY(10px); opacity: 0; }
+    }
+
+    .pt-bladder-meter {
+        height: 7px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--pt-surface-strong) 92%, transparent);
+        border: 1px solid color-mix(in srgb, var(--pt-border) 75%, transparent);
+    }
+
+    .pt-bladder-meter-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+        background: linear-gradient(90deg, #fff3c4, #f5a623);
+    }
+
     /* --- MALE: Semen / Refractory Penis --- */
     .pt-penis-container {
         position: relative;
@@ -9756,7 +9892,7 @@ var pulse_thread_tracker_default = {
     @media (max-width: 420px) {
         .pulse-tabbed-root { border-radius: calc(var(--pt-radius) - 6px); }
         .pt-bio-zone { grid-template-columns: 1fr; }
-        .pt-fertility-ring, .pt-penis-container, .pt-womb-vessel, .pt-anal-vessel, .pt-male-visuals, .pt-breast-vessel { justify-self: center; }
+        .pt-fertility-ring, .pt-penis-container, .pt-womb-vessel, .pt-anal-vessel, .pt-bladder-vessel, .pt-male-visuals, .pt-breast-vessel { justify-self: center; }
         .pt-bio-zone.pt-bio-compact { grid-template-columns: auto 1fr; }
     }
 
@@ -10078,7 +10214,7 @@ var pulse_thread_tracker_default = {
             </div>
 
             <!-- Biological -->
-            {{#if (or (hasFertilityTracking stats) (hasRefractoryTracking stats) (hasLactationTracking stats) (hasAnalTracking stats))}}
+            {{#if (or (hasFertilityTracking stats) (hasRefractoryTracking stats) (hasLactationTracking stats) (hasAnalTracking stats) (eqi stats.sex "male") (eqi stats.sex "female") (eqi stats.sex "futanari") (eqi stats.sex "futa") (eqi stats.sex "both") (eqi stats.sex "intersex") (eqi stats.sex "hermaphrodite") (gt stats.bladder_fullness_pct 0) (gt stats.urination_need_pct 0) (gt stats.bladder_pressure_pct 0))}}
             <div class="pt-bio-stack">
                 {{#if (hasFertilityTracking stats)}}
                 <div class="pt-bio-column">
@@ -10247,7 +10383,7 @@ var pulse_thread_tracker_default = {
                 </div>
                 {{/if}}
 
-                {{#if (or (hasRefractoryTracking stats) (hasLactationTracking stats) (hasAnalTracking stats))}}
+                {{#if (or (hasRefractoryTracking stats) (hasLactationTracking stats) (hasAnalTracking stats) (eqi stats.sex "male") (eqi stats.sex "female") (eqi stats.sex "futanari") (eqi stats.sex "futa") (eqi stats.sex "both") (eqi stats.sex "intersex") (eqi stats.sex "hermaphrodite") (gt stats.bladder_fullness_pct 0) (gt stats.urination_need_pct 0) (gt stats.bladder_pressure_pct 0))}}
                 <div class="pt-bio-column">
                     {{#if (hasRefractoryTracking stats)}}
                     <div class="pt-bio-zone">
@@ -10507,6 +10643,90 @@ var pulse_thread_tracker_default = {
                         </div>
                     </div>
                     {{/if}}
+
+                    {{#if (or (eqi stats.sex "male") (eqi stats.sex "female") (eqi stats.sex "futanari") (eqi stats.sex "futa") (eqi stats.sex "both") (eqi stats.sex "intersex") (eqi stats.sex "hermaphrodite") (gt stats.bladder_fullness_pct 0) (gt stats.urination_need_pct 0) (gt stats.bladder_pressure_pct 0))}}
+                    <div class="pt-bio-zone">
+                        <div class="pt-bladder-vessel">
+                            <svg class="pt-bladder-svg" viewBox="0 0 100 160" aria-hidden="true" focusable="false">
+                                <defs>
+                                    <clipPath id="pt-bladder-clip-{{@index}}">
+                                        <!-- Inner cavity: dome at y≈70 down to the neck at y≈124 -->
+                                        <path d="M 50 70 C 66 70 77 81 77 96 C 77 112 66 124 50 124 C 34 124 23 112 23 96 C 23 81 34 70 50 70 Z" />
+                                    </clipPath>
+                                    <linearGradient id="pt-bladder-depth-{{@index}}" x1="0.5" y1="0" x2="0.5" y2="1">
+                                        <stop offset="0%" stop-color="#5c4a16" stop-opacity="0.6" />
+                                        <stop offset="100%" stop-color="#241d08" stop-opacity="0.85" />
+                                    </linearGradient>
+                                </defs>
+
+                                <!-- Urachus: dome ligament running up toward the navel -->
+                                <path class="pt-bladder-urachus" d="M 50 66 C 50 58 50 50 50 44" />
+
+                                <!-- Kidneys feeding the bladder via the ureters -->
+                                <ellipse class="pt-bladder-kidney" cx="26" cy="20" rx="8" ry="12" transform="rotate(-16 26 20)" />
+                                <ellipse class="pt-bladder-kidney" cx="74" cy="20" rx="8" ry="12" transform="rotate(16 74 20)" />
+                                <path class="pt-bladder-ureter" d="M 27 32 C 30 45 37 55 44 66" />
+                                <path class="pt-bladder-ureter" d="M 73 32 C 70 45 63 55 56 66" />
+
+                                <!-- Outer outline: pulses while holding back a strong urge -->
+                                <path class="pt-bladder-outline {{#if (gt stats.bladder_pressure_pct 60)}}straining{{/if}}" d="M 50 66 C 69 66 80 79 80 96 C 80 114 68 127 50 127 C 32 127 20 114 20 96 C 20 79 31 66 50 66 Z" />
+
+                                <!-- Inner cavity with depth gradient -->
+                                <path class="pt-bladder-inner" style="fill:url(#pt-bladder-depth-{{@index}})" d="M 50 70 C 66 70 77 81 77 96 C 77 112 66 124 50 124 C 34 124 23 112 23 96 C 23 81 34 70 50 70 Z" />
+
+                                <!-- Bladder wall trabeculae -->
+                                <path class="pt-bladder-rugae" d="M 33 88 Q 50 94 67 88 M 31 100 Q 50 106 69 100 M 35 112 Q 50 117 65 112" />
+
+                                <!-- Urethra + internal sphincter at the neck -->
+                                <path class="pt-bladder-urethra" d="M 47 127 C 47 133 48 138 49 141" />
+                                <path class="pt-bladder-urethra" d="M 53 127 C 53 133 52 138 51 141" />
+                                <ellipse class="pt-bladder-sphincter {{#if (gt stats.bladder_pressure_pct 60)}}straining{{/if}}" cx="50" cy="131" rx="6.5" ry="3.4" />
+
+                                <!-- Urine fill, rising from the neck with bladder_fullness_pct -->
+                                <g clip-path="url(#pt-bladder-clip-{{@index}})">
+                                    <rect class="pt-bladder-liquid" x="0" y="{{subtract 124 (multiply (clampPercent stats.bladder_fullness_pct) 0.54)}}" width="100" height="{{multiply (clampPercent stats.bladder_fullness_pct) 0.54}}" />
+                                    <path class="pt-bladder-surface" d="M 30 {{subtract 124 (multiply (clampPercent stats.bladder_fullness_pct) 0.54)}} C 38 {{add (subtract 124 (multiply (clampPercent stats.bladder_fullness_pct) 0.54)) 3}} 62 {{add (subtract 124 (multiply (clampPercent stats.bladder_fullness_pct) 0.54)) 3}} 70 {{subtract 124 (multiply (clampPercent stats.bladder_fullness_pct) 0.54)}}" />
+                                </g>
+
+                                {{#if (or (gt stats.bladder_pressure_pct 85) (gte stats.bladder_fullness_pct 95))}}
+                                <!-- Leaking: a drip escaping past the strained sphincter -->
+                                <ellipse class="pt-bladder-drip" cx="50" cy="146" rx="1.6" ry="2.4" />
+                                {{/if}}
+                            </svg>
+                        </div>
+                        <div class="pt-bio-panel">
+                            <div class="pt-bio-title-row">
+                                <h4>Bladder</h4>
+                                {{#if (gt stats.urination_need_pct 85)}}
+                                    <span class="pt-risk-badge risk-preg">Desperate</span>
+                                {{else if (gt stats.urination_need_pct 60)}}
+                                    <span class="pt-risk-badge risk-med">Urgent</span>
+                                {{else if (gt stats.urination_need_pct 30)}}
+                                    <span class="pt-risk-badge risk-low">Filling</span>
+                                {{else}}
+                                    <span class="pt-risk-badge risk-unknown">Relieved</span>
+                                {{/if}}
+                            </div>
+                            <div class="pt-bio-grid">
+                                <div class="pt-bio-row">
+                                    <span class="pt-bio-key">Fullness</span>
+                                    <span class="pt-bio-value">{{clampPercent stats.bladder_fullness_pct}}%</span>
+                                </div>
+                                <div class="pt-bladder-meter"><div class="pt-bladder-meter-fill" style="width: {{clampPercent stats.bladder_fullness_pct}}%"></div></div>
+                                <div class="pt-bio-row">
+                                    <span class="pt-bio-key">Urge</span>
+                                    <span class="pt-bio-value">{{clampPercent stats.urination_need_pct}}%</span>
+                                </div>
+                                <div class="pt-bladder-meter"><div class="pt-bladder-meter-fill" style="width: {{clampPercent stats.urination_need_pct}}%"></div></div>
+                                <div class="pt-bio-row">
+                                    <span class="pt-bio-key">Pressure</span>
+                                    <span class="pt-bio-value">{{clampPercent stats.bladder_pressure_pct}}%</span>
+                                </div>
+                                <div class="pt-bladder-meter"><div class="pt-bladder-meter-fill" style="width: {{clampPercent stats.bladder_pressure_pct}}%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    {{/if}}
                 </div>
                 {{/if}}
             </div>
@@ -10650,11 +10870,12 @@ TEMPLATE VARIABLES (tabbed mode):
     - {{stats.cup_size}}, {{stats.breast_fullness_pct}}, {{stats.milk_ml}}, {{stats.milk_capacity_ml}}, {{stats.nipple_sensitivity_pct}}, {{stats.lactating}}
   - {{breastGeometry}}: precomputed by the renderer — pathLeft/pathRight, fillTop/Height, apexY/XLeft/XRight, areolaY/R, nippleR, cleavagePath, foldLeftPath/foldRightPath, glossXLeft/XRight/Y/RX/RY, cupLabel
     - {{stats.anal_fullness_pct}}, {{stats.anal_tightness_pct}}, {{stats.anal_depth_pct}} — current anal penetration depth (0-100), {{stats.prostate_stimulation_pct}}
+    - {{stats.bladder_fullness_pct}}, {{stats.urination_need_pct}}, {{stats.bladder_pressure_pct}} — bladder fill, felt urge, and holding strain (0-100; all characters)
     - {{stats.last_react}}, {{stats.internal_thought}}
     - {{stats.days_since_first_meeting}}, {{stats.inactive}}, {{stats.inactiveReason}}
 -->
 `,
-  sysPrompt: '## NARRATIVE CHARACTER TRACKER (Pulse Thread)\n\nEmit one tracker per turn: a `worldData` object (`current_date` YYYY-MM-DD, `current_time` 24h HH:MM) and a `characters` array.\n\n### RULES\n\n1. **Full schema, every turn.** Emit every field, always as a `characters` array (even one NPC). No renames, omissions, or shortened forms. Migrate older tracker shapes in history into this schema — never reproduce an old layout.\n2. **Deduce, don\'t blank.** Infer missing values from narrative cues (dialogue, actions, time, lore). Use `0` / `""` / `false` only when there is truly no signal. Preserve biology, anatomy, and `bg` unless the narrative explicitly changes them.\n3. **Never track `{{user}}`.** Drop any `{{user}}` entry silently, even from history. NPCs only.\n4. **Up to 4 active characters**; mark the rest `"inactive": true`.\n5. **Enums are integers**, never strings (`cycle_stage_id`, `cervix_state_id`, `last_react`, `inactiveReason`).\n6. **Don\'t emit derived fields.** The renderer computes stat deltas, bracket labels, and descriptors.\n\n### SCHEMA\n\n{{sim_format}}\n\n### STAT METERS (hard caps)\n\n| Field | Range | Brackets |\n|---|---|---|\n| `ap` Affection | 0-200 | 0-30 Strangers / 31-60 Acquaintances / 61-90 Friends / 91-120 Romantic / 121-150 Steady / 151-180 Committed / 181-200 Devoted |\n| `dp` Desire | 0-150 | 0-25 Cold / 26-50 Warm / 51-75 Interested / 76-100 Aroused / 101-125 Needy / 126-150 Desperate |\n| `tp` Trust | 0-150 | Falls with lies / broken promises; rises with reliability. |\n| `cp` Contempt | 0-150 | Rises when harmed; high cp drags ap/dp/tp down. |\n\nMove +/- per turn, scaled to the moment.\n\n### ENUMS\n\n- `cycle_stage_id`: `0` unknown, `1` menstruation (d1-5), `2` follicular (d6-13), `3` ovulation (d14-16, peak), `4` luteal (d17-28), `5` pregnancy, `6` rut/heat.\n- `cervix_state_id` (closed→open): `0` unknown, `1` sealed, `2` firm, `3` soft, `4` open, `5` dilated, `6` kissed, `7` split (breached — see Split cervix).\n- `last_react`: `0` Neutral, `1` Like/Approve, `2` Dislike/Disapprove.\n- `inactiveReason`: `0` active, `1` Asleep, `2` Comatose, `3` Contempt/refusing, `4` Incapacitated, `5` Death.\n\n### BIOLOGY\n\n`sex` is lowercase `female` (default) | `male` | `futanari` | `other`; preserve unless biology explicitly changes. **Futanari emit both female and male field groups.** Advance `cycle_day` / `days_preg` / `refractory_minutes` as narrative time passes.\n\n**Cycle & womb — female / futanari**\n- `womb_fullness_pct` / `womb_receptivity_pct` — 0-100. Receptivity is high at ovulation/rut and high arousal, low at menstruation or low arousal.\n- `breeding_count` — internal finishes this cycle; increment per internal finish, reset at a new cycle.\n- `vag_depth_pct` — current vaginal penetration depth (0-130). **Transient** (this turn\'s scene, not a lasting state): set each turn from the narrative, `0` when nothing is inside. `100` = hilted against the cervix (sustained 95-100 nudging it tends the cervix toward `6` kissed); above `100` = tip past a **split** cervix inside the womb (max `130`), valid only while `cervix_state_id: 7`.\n\n**Split cervix** (`cervix_state_id: 7` — extreme only):\n- Set `7` only when the narrative explicitly breaches the cervix — oversized/monstrous partner, brute cervical penetration, fertility magic or transformation. **Never set it casually or as a synonym for "open/dilated".**\n- While split: internal finishes add **directly** to `womb_fullness_pct` (ejaculation past the os = full delivery), the conception gate applies aggressively, and `vag_depth_pct` may exceed 100.\n- Split persists until healed or rested (medical care, recovery time, healing magic); then return to the appropriate 1-5 state. Repeated splitting may leave the cervix defaulting to `4` open.\n\n**Conception & pregnancy** (two stages):\n- `conceived: true` — fertilized but not showing. Auto-set by the engine when `womb_fullness_pct > 85%` in a fertile window (ovulation/rut/luteal d≤19), automatic at 100%. **Once true, preserve every turn until pregnancy is confirmed — never revert.**\n- `preg: true` — pregnancy confirmed (test, reveal, missed period, showing). Also set `cycle_stage_id: 5`, `cervix_state_id: 1`, advance `days_preg` daily, preserve `conception_date`.\n- Neither: all conception/pregnancy fields at defaults.\n\n**Breast & lactation — female / futanari** (defaults unless pregnant/postpartum/lactating):\n- `cup_size` — `AA` / `A`–`K`. Cues: flat/tiny→`AA`, petite→`A`, B→`B`, handful→`C`, full→`D`, DD→`DD`, heavy→`F`–`G`, huge→`H`+. UK doubled letters (`FF`/`GG`/…) alias up. Set on first appearance; preserve unless biology changes (puberty, magic, surgery) — **not** with arousal or engorgement.\n- `breast_fullness_pct` — 0-100 engorgement vs. cup. Rises with pregnancy/arousal/milk buildup; drops after nursing/pumping.\n- `milk_ml` / `milk_capacity_ml` — stored vs. max (combined ~100-600 ml). `0` when not lactating.\n- `nipple_sensitivity_pct` — 0-100; rises with arousal/hormones/stimulation, falls fast when it stops.\n- `lactating` — `true` once production begins (mid-to-late pregnancy onward).\n\n**Refractory & semen — male / futanari** (`0` for others):\n- `refractory_minutes` — minutes until ready (`0` = ready); decrement with time. `refractory_total` — length of the current period (`0` if none).\n- `semen_ml` / `semen_capacity_ml` — current vs. max; drops after ejaculation, recovers with rest/arousal.\n- `male_fertility_pct` — 0-100; adjust for rut, recovery, fatigue, magic.\n\n**Anal — all characters** (defaults if no anal content):\n- `anal_fullness_pct` — 0-100 volume inside; rises with insertion/ejaculation, falls with withdrawal/cleanup.\n- `anal_tightness_pct` — 0-100 sphincter resistance; `100` = virgin-tight, drops with use/lube/arousal, recovers with rest.\n- `anal_depth_pct` — 0-100 current penetration depth; `100` = fully hilted. **Transient** like `vag_depth_pct`: set each turn, `0` after withdrawal. Prostate stimulation climbs when depth exceeds ~70.\n- `prostate_stimulation_pct` — 0-100 active stimulation; rises with prostate-angled pressure, falls fast when it stops. `0` without a prostate.\n\n### OTHER FIELDS\n\n- `internal_thought` — one short first-person sentence of current inner monologue; refresh every turn.\n- `days_since_first_meeting` — in-world days since first meeting `{{user}}`.\n- `inactive` / `inactiveReason` — set when asleep, comatose, dead, refusing engagement, or off-scene.\n- `bg` — hex color matching the character\'s vibe; preserve once chosen.\n',
+  sysPrompt: '## NARRATIVE CHARACTER TRACKER (Pulse Thread)\n\nEmit one tracker per turn: a `worldData` object (`current_date` YYYY-MM-DD, `current_time` 24h HH:MM) and a `characters` array.\n\n### RULES\n\n1. **Full schema, every turn.** Emit every field, always as a `characters` array (even one NPC). No renames, omissions, or shortened forms. Migrate older tracker shapes in history into this schema — never reproduce an old layout.\n2. **Deduce, don\'t blank.** Infer missing values from narrative cues (dialogue, actions, time, lore). Use `0` / `""` / `false` only when there is truly no signal. Preserve biology, anatomy, and `bg` unless the narrative explicitly changes them.\n3. **Never track `{{user}}`.** Drop any `{{user}}` entry silently, even from history. NPCs only.\n4. **Up to 4 active characters**; mark the rest `"inactive": true`.\n5. **Enums are integers**, never strings (`cycle_stage_id`, `cervix_state_id`, `last_react`, `inactiveReason`).\n6. **Don\'t emit derived fields.** The renderer computes stat deltas, bracket labels, and descriptors.\n\n### SCHEMA\n\n{{sim_format}}\n\n### STAT METERS (hard caps)\n\n| Field | Range | Brackets |\n|---|---|---|\n| `ap` Affection | 0-200 | 0-30 Strangers / 31-60 Acquaintances / 61-90 Friends / 91-120 Romantic / 121-150 Steady / 151-180 Committed / 181-200 Devoted |\n| `dp` Desire | 0-150 | 0-25 Cold / 26-50 Warm / 51-75 Interested / 76-100 Aroused / 101-125 Needy / 126-150 Desperate |\n| `tp` Trust | 0-150 | Falls with lies / broken promises; rises with reliability. |\n| `cp` Contempt | 0-150 | Rises when harmed; high cp drags ap/dp/tp down. |\n\nMove +/- per turn, scaled to the moment.\n\n### ENUMS\n\n- `cycle_stage_id`: `0` unknown, `1` menstruation (d1-5), `2` follicular (d6-13), `3` ovulation (d14-16, peak), `4` luteal (d17-28), `5` pregnancy, `6` rut/heat.\n- `cervix_state_id` (closed→open): `0` unknown, `1` sealed, `2` firm, `3` soft, `4` open, `5` dilated, `6` kissed, `7` split (breached — see Split cervix).\n- `last_react`: `0` Neutral, `1` Like/Approve, `2` Dislike/Disapprove.\n- `inactiveReason`: `0` active, `1` Asleep, `2` Comatose, `3` Contempt/refusing, `4` Incapacitated, `5` Death.\n\n### BIOLOGY\n\n`sex` is lowercase `female` (default) | `male` | `futanari` | `other`; preserve unless biology explicitly changes. **Futanari emit both female and male field groups.** Advance `cycle_day` / `days_preg` / `refractory_minutes` as narrative time passes.\n\n**Cycle & womb — female / futanari**\n- `womb_fullness_pct` / `womb_receptivity_pct` — 0-100. Receptivity is high at ovulation/rut and high arousal, low at menstruation or low arousal.\n- `breeding_count` — internal finishes this cycle; increment per internal finish, reset at a new cycle.\n- `vag_depth_pct` — current vaginal penetration depth (0-130). **Transient** (this turn\'s scene, not a lasting state): set each turn from the narrative, `0` when nothing is inside. `100` = hilted against the cervix (sustained 95-100 nudging it tends the cervix toward `6` kissed); above `100` = tip past a **split** cervix inside the womb (max `130`), valid only while `cervix_state_id: 7`.\n\n**Split cervix** (`cervix_state_id: 7` — extreme only):\n- Set `7` only when the narrative explicitly breaches the cervix — oversized/monstrous partner, brute cervical penetration, fertility magic or transformation. **Never set it casually or as a synonym for "open/dilated".**\n- While split: internal finishes add **directly** to `womb_fullness_pct` (ejaculation past the os = full delivery), the conception gate applies aggressively, and `vag_depth_pct` may exceed 100.\n- Split persists until healed or rested (medical care, recovery time, healing magic); then return to the appropriate 1-5 state. Repeated splitting may leave the cervix defaulting to `4` open.\n\n**Conception & pregnancy** (two stages):\n- `conceived: true` — fertilized but not showing. Auto-set by the engine when `womb_fullness_pct > 85%` in a fertile window (ovulation/rut/luteal d≤19), automatic at 100%. **Once true, preserve every turn until pregnancy is confirmed — never revert.**\n- `preg: true` — pregnancy confirmed (test, reveal, missed period, showing). Also set `cycle_stage_id: 5`, `cervix_state_id: 1`, advance `days_preg` daily, preserve `conception_date`.\n- Neither: all conception/pregnancy fields at defaults.\n\n**Breast & lactation — female / futanari** (defaults unless pregnant/postpartum/lactating):\n- `cup_size` — `AA` / `A`–`K`. Cues: flat/tiny→`AA`, petite→`A`, B→`B`, handful→`C`, full→`D`, DD→`DD`, heavy→`F`–`G`, huge→`H`+. UK doubled letters (`FF`/`GG`/…) alias up. Set on first appearance; preserve unless biology changes (puberty, magic, surgery) — **not** with arousal or engorgement.\n- `breast_fullness_pct` — 0-100 engorgement vs. cup. Rises with pregnancy/arousal/milk buildup; drops after nursing/pumping.\n- `milk_ml` / `milk_capacity_ml` — stored vs. max (combined ~100-600 ml). `0` when not lactating.\n- `nipple_sensitivity_pct` — 0-100; rises with arousal/hormones/stimulation, falls fast when it stops.\n- `lactating` — `true` once production begins (mid-to-late pregnancy onward).\n\n**Refractory & semen — male / futanari** (`0` for others):\n- `refractory_minutes` — minutes until ready (`0` = ready); decrement with time. `refractory_total` — length of the current period (`0` if none).\n- `semen_ml` / `semen_capacity_ml` — current vs. max; drops after ejaculation, recovers with rest/arousal.\n- `male_fertility_pct` — 0-100; adjust for rut, recovery, fatigue, magic.\n\n**Anal — all characters** (defaults if no anal content):\n- `anal_fullness_pct` — 0-100 volume inside; rises with insertion/ejaculation, falls with withdrawal/cleanup.\n- `anal_tightness_pct` — 0-100 sphincter resistance; `100` = virgin-tight, drops with use/lube/arousal, recovers with rest.\n- `anal_depth_pct` — 0-100 current penetration depth; `100` = fully hilted. **Transient** like `vag_depth_pct`: set each turn, `0` after withdrawal. Prostate stimulation climbs when depth exceeds ~70.\n- `prostate_stimulation_pct` — 0-100 active stimulation; rises with prostate-angled pressure, falls fast when it stops. `0` without a prostate.\n\n**Bladder & urination — all characters** (defaults if no bladder content):\n- `bladder_fullness_pct` — 0-100 physical fill; rises with fluid intake and time since last voiding, drops sharply after urinating.\n- `urination_need_pct` — 0-100 felt urge; generally tracks fullness but bends with state — dulled by arousal, distraction, or sleep, spiked by triggers (running water, cold, laughter, abdominal pressure).\n- `bladder_pressure_pct` — 0-100 holding strain against the sphincter; climbs while actively holding back a strong urge, spikes with laughter, sneezing, or impact, falls to `0` once voided or relieved. High need with high pressure reads as squirming, leg-crossing, fidgeting.\n\n### OTHER FIELDS\n\n- `internal_thought` — one short first-person sentence of current inner monologue; refresh every turn.\n- `days_since_first_meeting` — in-world days since first meeting `{{user}}`.\n- `inactive` / `inactiveReason` — set when asleep, comatose, dead, refusing engagement, or off-scene.\n- `bg` — hex color matching the character\'s vibe; preserve once chosen.\n',
   customFields: [
     {
       key: "ap",
@@ -10779,6 +11000,18 @@ TEMPLATE VARIABLES (tabbed mode):
     {
       key: "prostate_stimulation_pct",
       description: "[number] Active prostate stimulation level (0-100). Rises with direct pressure / deep penetration / prostate-angled toys; falls quickly when stimulation stops. 0 for characters without a prostate."
+    },
+    {
+      key: "bladder_fullness_pct",
+      description: "[number] Physical bladder fill (0-100). Rises with fluid intake and narrative time since last voiding; drops sharply after urinating. Preserve between turns. 0 when not applicable."
+    },
+    {
+      key: "urination_need_pct",
+      description: "[number] Felt urge to urinate (0-100). Generally tracks bladder_fullness_pct but bends with state — dulled by arousal, distraction, or sleep; spiked by triggers like running water, cold, laughter, or abdominal pressure. 0 when not applicable."
+    },
+    {
+      key: "bladder_pressure_pct",
+      description: "[number] Holding strain against the urethral sphincter (0-100). Climbs while actively holding back a strong urge; spikes with laughter, sneezing, or impact; falls to 0 once voided or relieved. High values read as squirming, leg-crossing, fidgeting. 0 when not applicable."
     },
     {
       key: "last_react",
