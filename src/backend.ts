@@ -1951,6 +1951,37 @@ function sanitizeSysPromptForWireFormat(base: string, tagName: string, identifie
 }
 
 /**
+ * Appended to every assembled tracker prompt (primary macro and secondary
+ * generation) so the LLM omits fields that cannot apply to a character —
+ * e.g. female-only groups on male characters — instead of spending tokens
+ * per turn on zero/default placeholders.
+ *
+ * Templates routinely demand a "full schema, every turn" and the
+ * `{{sim_format}}` example block shows every field on one character, both
+ * of which pull toward emitting the entire schema. This block is appended
+ * AFTER the template body so it wins on recency, and it explicitly names
+ * the behaviors it must override (full-schema rules, "0 for others"
+ * defaults, carrying fields forward from the previous state's baseline).
+ *
+ * Worded template-agnostically on purpose: it must make sense for bundled
+ * presets and user-imported templates alike, so it defers to whatever
+ * applicability markers the schema itself carries ("female / futanari",
+ * "0 without a prostate", …) rather than naming specific fields.
+ */
+const FIELD_APPLICABILITY_DIRECTIVE = [
+  "### FIELD APPLICABILITY — OMIT FIELDS THAT CANNOT APPLY",
+  "",
+  "The schema example above lists every field this template can track; it is a schema reference, not a fill-in sheet to copy onto every character. For each character, emit only the fields that apply to them and omit the rest entirely:",
+  "",
+  "- **Anatomy gate.** The schema marks which groups apply to which `sex` (e.g. groups labeled \"female / futanari\" or \"male / futanari\"). Never emit, for a character, a field describing anatomy or biology that character does not have.",
+  "- **Scene gate.** When a field group holds only default values for a character because its content plays no role in the scene, omit the whole group rather than emitting zero/default placeholders.",
+  "- **Absent, not blank.** \"Omit\" means the key is missing from that character's object — never `0`, `\"\"`, or `false` standing in for \"does not apply\".",
+  "- **Prune inherited state.** If a previous tracker state lists a field that cannot apply to a character, drop it instead of carrying it forward as \"unchanged\".",
+  "- **Reversible.** When a previously omitted field becomes applicable — biology change, new narrative content — begin emitting it that turn and keep it thereafter.",
+  "- **Precedence.** These rules override any instruction to emit \"every field\" / \"full schema\" / \"no omissions\": full schema means every field that applies to that character. Never drop a field that does apply.",
+].join("\n");
+
+/**
  * Push current macro values to the host so prompt assembly can resolve
  * them instantly without an RPC roundtrip to the worker.
  */
@@ -1979,6 +2010,9 @@ function pushMacroValues(): void {
   let simTracker = base
     ? directive + "\n\n" + base.replace(/\{\{sim_format\}\}/g, fmt)
     : directive + "\n\n" + fmt;
+  // Appended after the template body so it wins on recency against any
+  // "full schema, every turn" rule the template opens with.
+  simTracker += "\n\n" + FIELD_APPLICABILITY_DIRECTIVE;
   if (firstMessageFertilityHint) {
     simTracker += "\n\n" + firstMessageFertilityHint;
   }
@@ -2119,6 +2153,10 @@ async function generateTrackerWithSecondaryLLM(chatId: string, targetMessageId: 
     const systemPrompt = preset.sysPrompt || "";
     const formatExample = buildExampleTrackerBlock(config.trackerFormat, config.codeBlockIdentifier);
     let processedPrompt = systemPrompt.replace(/\{\{sim_format\}\}/g, formatExample);
+    // Same applicability filter the primary macro carries, so the secondary
+    // LLM prunes inapplicable fields (including ones it would otherwise
+    // carry forward from the previous-state baseline below).
+    processedPrompt += "\n\n" + FIELD_APPLICABILITY_DIRECTIVE;
 
     const tagName = sanitizeTagName(config.trackerTagName);
     const identifier = config.codeBlockIdentifier;

@@ -14844,6 +14844,19 @@ ${body.trim()}
   out = out.replace(textRe, `${safeTag} tag`);
   return out;
 }
+var FIELD_APPLICABILITY_DIRECTIVE = [
+  "### FIELD APPLICABILITY \u2014 OMIT FIELDS THAT CANNOT APPLY",
+  "",
+  "The schema example above lists every field this template can track; it is a schema reference, not a fill-in sheet to copy onto every character. For each character, emit only the fields that apply to them and omit the rest entirely:",
+  "",
+  '- **Anatomy gate.** The schema marks which groups apply to which `sex` (e.g. groups labeled "female / futanari" or "male / futanari"). Never emit, for a character, a field describing anatomy or biology that character does not have.',
+  "- **Scene gate.** When a field group holds only default values for a character because its content plays no role in the scene, omit the whole group rather than emitting zero/default placeholders.",
+  '- **Absent, not blank.** "Omit" means the key is missing from that character\'s object \u2014 never `0`, `""`, or `false` standing in for "does not apply".',
+  '- **Prune inherited state.** If a previous tracker state lists a field that cannot apply to a character, drop it instead of carrying it forward as "unchanged".',
+  "- **Reversible.** When a previously omitted field becomes applicable \u2014 biology change, new narrative content \u2014 begin emitting it that turn and keep it thereafter.",
+  '- **Precedence.** These rules override any instruction to emit "every field" / "full schema" / "no omissions": full schema means every field that applies to that character. Never drop a field that does apply.'
+].join(`
+`);
 function pushMacroValues() {
   const fmt = buildExampleTrackerBlock(config.trackerFormat, config.codeBlockIdentifier);
   spindle.updateMacroValue("sim_format", fmt);
@@ -14866,6 +14879,9 @@ function pushMacroValues() {
 ` + base.replace(/\{\{sim_format\}\}/g, fmt) : directive + `
 
 ` + fmt;
+  simTracker += `
+
+` + FIELD_APPLICABILITY_DIRECTIVE;
   if (firstMessageFertilityHint) {
     simTracker += `
 
@@ -14975,6 +14991,9 @@ async function generateTrackerWithSecondaryLLM(chatId, targetMessageId) {
     const systemPrompt = preset.sysPrompt || "";
     const formatExample = buildExampleTrackerBlock(config.trackerFormat, config.codeBlockIdentifier);
     let processedPrompt = systemPrompt.replace(/\{\{sim_format\}\}/g, formatExample);
+    processedPrompt += `
+
+` + FIELD_APPLICABILITY_DIRECTIVE;
     const tagName = sanitizeTagName(config.trackerTagName);
     const identifier = config.codeBlockIdentifier;
     const messageCount = config.secondaryLLMMessageCount;
