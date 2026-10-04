@@ -1963,22 +1963,25 @@ function sanitizeSysPromptForWireFormat(base: string, tagName: string, identifie
  * the behaviors it must override (full-schema rules, "0 for others"
  * defaults, carrying fields forward from the previous state's baseline).
  *
- * Worded template-agnostically on purpose: it must make sense for bundled
- * presets and user-imported templates alike, so it defers to whatever
- * applicability markers the schema itself carries ("female / futanari",
- * "0 without a prostate", …) rather than naming specific fields.
+ * Mostly worded template-agnostically: it must make sense for bundled
+ * presets and user-imported templates alike, so the anatomy gate defers to
+ * whatever applicability markers the schema itself carries ("female /
+ * futanari", "0 without a prostate", …). The one deliberate exception is
+ * naming universal bodily functions (bladder, anal) as always-present:
+ * anatomy is the ONLY omission criterion, so scene-irrelevant groups keep
+ * emitting their defaults every turn.
  */
 const FIELD_APPLICABILITY_DIRECTIVE = [
   "### FIELD APPLICABILITY — OMIT FIELDS THAT CANNOT APPLY",
   "",
-  "The schema example above lists every field this template can track; it is a schema reference, not a fill-in sheet to copy onto every character. For each character, emit only the fields that apply to them and omit the rest entirely:",
+  "The schema example above lists every field this template can track; it is a schema reference, not a fill-in sheet to copy onto every character. For each character, emit only the fields their anatomy allows and omit the rest entirely:",
   "",
   "- **Anatomy gate.** The schema marks which groups apply to which `sex` (e.g. groups labeled \"female / futanari\" or \"male / futanari\"). Never emit, for a character, a field describing anatomy or biology that character does not have.",
-  "- **Scene gate.** When a field group holds only default values for a character because its content plays no role in the scene, omit the whole group rather than emitting zero/default placeholders.",
+  "- **Universal fields stay.** Groups the schema marks for all characters — bodily functions every body has, like bladder/urination and anal state — are emitted every turn even when they hold defaults. Scene content never removes them.",
   "- **Absent, not blank.** \"Omit\" means the key is missing from that character's object — never `0`, `\"\"`, or `false` standing in for \"does not apply\".",
-  "- **Prune inherited state.** If a previous tracker state lists a field that cannot apply to a character, drop it instead of carrying it forward as \"unchanged\".",
-  "- **Reversible.** When a previously omitted field becomes applicable — biology change, new narrative content — begin emitting it that turn and keep it thereafter.",
-  "- **Precedence.** These rules override any instruction to emit \"every field\" / \"full schema\" / \"no omissions\": full schema means every field that applies to that character. Never drop a field that does apply.",
+  "- **Prune inherited state.** If a previous tracker state lists a field that this character's anatomy cannot have, drop it instead of carrying it forward as \"unchanged\".",
+  "- **Reversible.** When a previously omitted field becomes applicable — e.g. a biology or anatomy change such as a transformation — begin emitting it that turn and keep it thereafter.",
+  "- **Precedence.** These rules override any instruction to emit \"every field\" / \"full schema\" / \"no omissions\", and any per-group \"`0` for others\" default: fields outside a character's anatomy are omitted, not zeroed. Never drop a field the character's anatomy allows.",
 ].join("\n");
 
 /**
