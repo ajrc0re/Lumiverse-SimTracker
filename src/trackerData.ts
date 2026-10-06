@@ -12,9 +12,26 @@ function cleanupPlusSigns(input: string): string {
   return input.replace(/([\s:[,{])\+(\d+(?:\.\d+)?)([\s,}\]\n\r]|$)/g, "$1$2$3");
 }
 
+/**
+ * Freaky Frankenstein emits its `<internal_states>` tracker as raw HTML
+ * (nested `<details>` blocks with pipe-delimited lines), not JSON/YAML. When
+ * a payload carries that object, keep the text verbatim — signs like
+ * `BOND: +4` must survive — and surface it to the template layer through
+ * `worldData.internal_states_html`, where the preset's template-logic script
+ * parses the modules. Returns null for payloads without the object so
+ * ordinary invalid JSON/YAML still reports as invalid.
+ */
+const INTERNAL_STATES_RE = /<internal_states\b[^>]*>[\s\S]*<\/internal_states>/i;
+
 export function parseTrackerBlock(raw: string): TrackerData | null {
-  const cleaned = cleanupPlusSigns(raw.trim());
-  if (!cleaned) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  if (INTERNAL_STATES_RE.test(trimmed)) {
+    return { worldData: { internal_states_html: trimmed }, characters: [] };
+  }
+
+  const cleaned = cleanupPlusSigns(trimmed);
 
   try {
     const json = JSON.parse(cleaned) as unknown;

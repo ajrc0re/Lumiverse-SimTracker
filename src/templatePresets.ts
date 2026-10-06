@@ -4,6 +4,7 @@ import tacticalHudSidebarTabs from "../tracker-card-templates/tactical-hud-sideb
 import rpgSidebarPreset from "../tracker-card-templates/rpg-sidebar-preset.json";
 import pulseThreadTracker from "../tracker-card-templates/pulse-thread-tracker.json";
 import narrativeWeaveSimTracker from "../tracker-card-templates/narrative-weave-simtracker.json";
+import internalStatesSimTracker from "../tracker-card-templates/internal-states-simtracker.json";
 
 export type TemplateField = {
   key: string;
@@ -55,6 +56,10 @@ const PRESETS: TemplatePreset[] = [
   {
     id: "narrative-weave-simtracker",
     ...narrativeWeaveSimTracker,
+  },
+  {
+    id: "internal-states-simtracker",
+    ...internalStatesSimTracker,
   },
 ];
 

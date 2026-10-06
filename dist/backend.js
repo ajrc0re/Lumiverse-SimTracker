@@ -6961,6 +6961,2103 @@ The tracker must be the final content. Validate JSON, complete fields, types, ca
     presetRevision: 2
   }
 };
+// tracker-card-templates/internal-states-simtracker.json
+var internal_states_simtracker_default = {
+  templateName: "Internal States Board",
+  templateAuthor: "c0re",
+  trackerDesc: "Renders the Freaky Frankenstein <internal_states> HTML object as one collapsible panel per module \u2014 cast, world, bonds, story and engine state \u2014 in the Narrative Weave visual language. No JSON tracker emission required.",
+  templatePosition: "BOTTOM",
+  displayInstructions: `Pairs with Freaky Frankenstein 5.x: keep the <internal_states> block exactly as <internal_states_module> defines it, wrapped in <tracker type="sim"> instead of the GFX comments. Optional modules (BONDS, QUESTS, INV & SKILLS, CHEKHOV'S GUN, INTERNAL THOUGHTS, GM'S NOTEBOOK, DND TASK SIM, WORLD SIM) appear automatically when enabled.`,
+  htmlTemplate: `<!-- TEMPLATE NAME: Internal States Board -->
+<!-- AUTHOR: c0re -->
+<!-- POSITION: BOTTOM -->
+
+<!-- Parses the raw <internal_states> HTML object emitted by Freaky
+     Frankenstein's <internal_states_module> prompt and renders one
+     collapsible panel per module in the Narrative Weave visual language.
+     No JSON/YAML is required from the model: the object arrives inside a
+     <tracker type="sim"> wrapper and this preset's template logic does
+     all structural parsing client-side. -->
+
+<script type="text/x-handlebars-template-logic">
+(function () {
+  "use strict";
+
+  var wd = data.worldData && typeof data.worldData === "object" ? data.worldData : {};
+  var html = typeof wd.internal_states_html === "string" ? wd.internal_states_html : "";
+  if (!html) return data;
+
+  var NONE_RE = /^(?:none|n\\/a|no active notes|none established|nothing|-)[.!]?$/i;
+
+  function decodeEntities(s) {
+    return String(s == null ? "" : s)
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#0?39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&");
+  }
+  function clean(s) {
+    return decodeEntities(String(s == null ? "" : s).replace(/<[^>]*>/g, " "))
+      .replace(/\\{\\{\\s*user\\s*\\}\\}/gi, "You")
+      .replace(/\\{\\{\\s*char\\s*\\}\\}/gi, "Char")
+      .replace(/\\s+/g, " ").trim();
+  }
+  function trunc(s, n) {
+    s = clean(s);
+    if (s.length <= n) return s;
+    var cut = s.slice(0, Math.max(0, n - 1));
+    var spaceAt = cut.lastIndexOf(" ");
+    if (spaceAt > Math.floor(n * 0.6)) cut = cut.slice(0, spaceAt);
+    return cut.trimEnd() + "\u2026";
+  }
+  function cap(s) {
+    s = clean(s);
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+  function splitPipes(line) {
+    return line.split("|").map(function (p) { return p.trim(); }).filter(function (p) { return p !== ""; });
+  }
+  function parseSeg(seg) {
+    var m = seg.match(/^([A-Za-z][A-Za-z0-9 ./'()&-]{0,34}?)\\s*:\\s*(.+)$/);
+    if (m) return { key: cap(m[1]), keyNorm: m[1].trim().toLowerCase(), value: m[2].trim() };
+    return { key: null, keyNorm: null, value: seg };
+  }
+  function isNone(v) {
+    return !v || NONE_RE.test(String(v).trim());
+  }
+  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+  // \u2500\u2500 Module identification \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  var MODULE_META = [
+    { match: /^npc agendas$/, id: "agendas", icon: "\uD83D\uDC64", kind: "agendas", accent: "#49b8ae", category: "Cast" },
+    { match: /^npc locations$/, id: "locations", icon: "\uD83D\uDCCD", kind: "locations", accent: "#49b8ae", category: "Cast" },
+    { match: /^factions$/, id: "factions", icon: "\uD83C\uDFF3\uFE0F", kind: "factions", accent: "#d5a84b", category: "World" },
+    { match: /^bonds$/, id: "bonds", icon: "\uD83D\uDC9A", kind: "bonds", accent: "#e36d91", category: "Bonds" },
+    { match: /^quests$/, id: "quests", icon: "\uD83D\uDCDC", kind: "quests", accent: "#ee8454", category: "Story" },
+    { match: /^inv & skills$/, id: "inventory", icon: "\uD83C\uDF92", kind: "inventory", accent: "#5cc8be", category: "System" },
+    { match: /^(chekhov'?s? ?gun|chekhov seeds)$/, id: "chekhov", icon: "\uD83D\uDD2B", kind: "chekhov", accent: "#ee8454", category: "Story" },
+    { match: /^internal thoughts$/, id: "thoughts", icon: "\uD83E\uDDE0", kind: "thoughts", accent: "#49b8ae", category: "Cast" },
+    { match: /^gm'?s? ?notebook$/, id: "notebook", icon: "\uD83D\uDCD3", kind: "notebook", accent: "#5cc8be", category: "Story", wide: true },
+    { match: /^dnd task sim$/, id: "dnd", icon: "\uD83C\uDFB2", kind: "dnd", accent: "#5cc8be", category: "System" },
+    { match: /^world sim$/, id: "worldsim", icon: "\uD83C\uDF0E", kind: "worldsim", accent: "#d5a84b", category: "World" },
+    { match: /^physics,? engine & world$/, id: "physics", icon: "\uD83C\uDF0C", kind: "physics", accent: "#d5a84b", category: "World", wide: true }
+  ];
+
+  function normalizeTitle(title) {
+    return title
+      .toLowerCase()
+      .replace(/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\u{FE0F}\\u{200D}]/gu, "")
+      .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")
+      .replace(/\\s+/g, " ")
+      .trim();
+  }
+  function metaFor(title) {
+    var norm = normalizeTitle(title);
+    for (var i = 0; i < MODULE_META.length; i++) {
+      if (MODULE_META[i].match.test(norm)) return MODULE_META[i];
+    }
+    return null;
+  }
+
+  // \u2500\u2500 Shared line collection \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  function collectLines(body) {
+    return body.split(/\\r?\\n/)
+      .map(function (l) { return clean(l).replace(/^[-\u2022*]\\s*/, "").trim(); })
+      .filter(function (l) { return l !== "" && l !== "-"; });
+  }
+
+  // \u2500\u2500 Per-kind parsers \u2192 return { entries | fields | groups | quest, empty, ... }
+  function parseAgendas(lines) {
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      if (!segs.length) continue;
+      var name = segs[0];
+      var agenda = "";
+      var stepCurrent = null, stepMax = null, stepPct = null, stepInfinite = false, hasStep = false;
+      var meta = [];
+      for (var j = 1; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        var kn = seg.keyNorm || "";
+        if (kn === "agenda" || kn === "task" || kn === "goal") { agenda = seg.value; continue; }
+        var sm = segs[j].match(/\\(?\\s*step\\s*(\\d+)\\s*\\/\\s*([^)\\s]+)\\s*\\)?/i);
+        if (sm) {
+          hasStep = true;
+          stepCurrent = Number(sm[1]);
+          stepMax = sm[2];
+          var maxNum = Number(stepMax);
+          if (isFinite(maxNum) && maxNum > 0) stepPct = clamp(Math.round((stepCurrent / maxNum) * 100), 0, 100);
+          else stepInfinite = true;
+          continue;
+        }
+        if (seg.key) meta.push({ label: seg.key, value: seg.value });
+      }
+      if (isNone(name) && !agenda && !meta.length && !hasStep) continue;
+      entries.push({
+        name: name, agenda: agenda,
+        hasStep: hasStep, stepCurrent: stepCurrent, stepMax: stepMax,
+        stepPct: stepPct, stepInfinite: stepInfinite,
+        meta: meta
+      });
+    }
+    return { entries: entries };
+  }
+
+  function parseLocations(lines) {
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      if (!segs.length) continue;
+      var name = segs[0];
+      var loc = "";
+      for (var j = 1; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        if (seg.keyNorm && seg.keyNorm.indexOf("location") === 0) { loc = seg.value; break; }
+      }
+      if (!loc) loc = segs.slice(1).join(" \u2014 ");
+      if (isNone(name) && isNone(loc)) continue;
+      entries.push({ name: name, location: loc });
+    }
+    return { entries: entries };
+  }
+
+  function parseFactions(lines) {
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      if (!segs.length || isNone(segs[0]) && segs.length === 1) continue;
+      var fields = [];
+      for (var j = 1; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        if (seg.key) fields.push({ label: seg.key, value: seg.value, none: isNone(seg.value) });
+      }
+      entries.push({ name: segs[0], fields: fields });
+    }
+    return { entries: entries };
+  }
+
+  function parseBonds(lines) {
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var arrowM = line.match(/([^\u2194\u27F7|]+?)\\s*[\u2194\u27F7]\\s*([^\u2194\u27F7|]+)/);
+      if (!arrowM) continue;
+      var left = clean(arrowM[1]);
+      var right = clean(arrowM[2]);
+      var bond = null, bondSign = "+", sparks = null, grudge = null;
+      var rest = line.replace(arrowM[0], "");
+      var segs = splitPipes(rest);
+      for (var j = 0; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        var kn = seg.keyNorm || "";
+        var vm = seg.value && seg.value.match(/([+-]?)\\s*(\\d+)/);
+        if (kn.indexOf("bond") === 0 && vm) { bondSign = vm[1] === "-" ? "-" : "+"; bond = Number(vm[2]) * (bondSign === "-" ? -1 : 1); }
+        else if (kn.indexOf("spark") === 0 && vm) { sparks = Number(vm[2]); }
+        else if (kn.indexOf("grudge") === 0 && vm) { grudge = Number(vm[2]); }
+      }
+      entries.push({
+        left: left, right: right,
+        bond: bond,
+        hasBond: bond !== null,
+        bondDisplay: bond === null ? "?" : (bond < 0 ? "" : "+") + bond,
+        bondPct: bond === null ? 0 : clamp(Math.round(((bond + 5) / 25) * 100), 0, 100),
+        bondTone: bond === null ? "dim" : bond < 0 ? "bad" : "good",
+        sparks: sparks,
+        hasSparks: sparks !== null,
+        sparksPct: sparks === null ? 0 : clamp(Math.round((sparks / 7) * 100), 0, 100),
+        grudge: grudge,
+        hasGrudge: grudge !== null,
+        grudgePct: grudge === null ? 0 : clamp(Math.round((grudge / 5) * 100), 0, 100),
+        grudgeHot: grudge !== null && grudge >= 3
+      });
+    }
+    return { entries: entries };
+  }
+
+  function parseQuests(lines) {
+    var main = null, side = null;
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      if (!segs.length) continue;
+      var head = parseSeg(segs[0]);
+      var role = (head.keyNorm || segs[0].toLowerCase()).indexOf("side") === 0 ? "side"
+        : (head.keyNorm || segs[0].toLowerCase()).indexOf("main") === 0 ? "main" : null;
+      if (!role) continue;
+      var q = { status: "Active", statusLower: "active", statusCompleted: false, objective: "", progressCurrent: null, progressMax: null, progressPct: null, progressInfinite: false, hasProgress: false, reward: "", none: false };
+      var headVal = head.value != null ? head.value : segs[0];
+      var parts = headVal.split(/\\s+[\u2014\u2013]\\s+/);
+      var statusRaw = clean(parts[0] || "");
+      if (parts.length > 1) {
+        q.status = cap(statusRaw) || "Active";
+        q.objective = clean(parts.slice(1).join(" \u2014 "));
+      } else if (isNone(statusRaw)) {
+        q.status = cap(statusRaw) || "None";
+        q.none = true;
+      } else {
+        q.objective = statusRaw;
+      }
+      q.statusLower = q.status.toLowerCase();
+      q.statusCompleted = q.statusLower === "completed";
+      for (var j = 1; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        var kn = seg.keyNorm || "";
+        if (kn.indexOf("progress") === 0) {
+          var pm = seg.value.match(/(\\d+)\\s*\\/\\s*(\\S+)/);
+          if (pm) {
+            q.hasProgress = true;
+            q.progressCurrent = Number(pm[1]);
+            q.progressMax = pm[2];
+            var maxNum = Number(pm[2]);
+            if (isFinite(maxNum) && maxNum > 0) q.progressPct = clamp(Math.round((q.progressCurrent / maxNum) * 100), 0, 100);
+            else q.progressInfinite = true;
+          }
+        } else if (kn.indexOf("reward") === 0) {
+          q.reward = seg.value;
+        }
+      }
+      if (role === "main") main = q; else side = q;
+    }
+    return { main: main, side: side, entries: [] };
+  }
+
+  function chipsFor(value) {
+    if (isNone(value)) return [];
+    var parts = clean(value).split(/,\\s*/).filter(function (p) { return p && !isNone(p); });
+    return parts;
+  }
+
+  function parseInventory(lines) {
+    var fields = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      for (var j = 0; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        if (!seg.key) { if (segs.length === 1 && !isNone(segs[j])) fields.push({ label: "Note", value: segs[j], chips: chipsFor(segs[j]) }); continue; }
+        fields.push({ label: seg.key, value: seg.value, chips: chipsFor(seg.value), none: isNone(seg.value) });
+      }
+    }
+    return { fields: fields };
+  }
+
+  function parseChekhov(lines) {
+    var groups = { active: [], locked: [], fired: [] };
+    var order = ["active", "locked", "fired"];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var segs = splitPipes(line);
+      var g = null;
+      var first = parseSeg(segs[0] || line);
+      var fn = (first.keyNorm || line.toLowerCase());
+      if (fn.indexOf("active") === 0) g = "active";
+      else if (fn.indexOf("locked") === 0) g = "locked";
+      else if (fn.indexOf("fired") === 0) g = "fired";
+      if (!g) continue;
+
+      var bulletRe = /\\[\\s*(?:(?:bullet|seed|gun|chekhov)\\s*:)?\\s*([^\\]]+?)\\s*\\]\\s*(?:\\(\\s*([^()]*?)\\s*\\))?/gi;
+      var m, found = false;
+      while ((m = bulletRe.exec(line)) !== null) {
+        var text = clean(m[1]).replace(/^(?:bullet|seed|gun|chekhov)\\s*:\\s*/i, "");
+        var meta = m[2] || "";
+        var wm = meta.match(/weight\\s*:?\\s*(\\d+)/i);
+        var am = meta.match(/age\\s*:?\\s*(\\d+)/i);
+        var weight = wm ? Number(wm[1]) : null;
+        var age = am ? Number(am[1]) : null;
+        var lockedTime = null;
+        var lt = text.match(/\\[\\s*locked:\\s*([^\\]]+)\\]/i);
+        if (lt) { lockedTime = clean(lt[1]); text = clean(text.replace(lt[0], "")); }
+        // Standalone "[LOCKED: T:HH:MM]" tags decorate the previous bullet
+        // rather than being bullets of their own.
+        var soloLock = text.match(/^locked\\s*:\\s*(.+)$/i);
+        if (soloLock && groups[g].length > 0) {
+          groups[g][groups[g].length - 1].lockedLabel = clean(soloLock[1]);
+          found = true;
+          continue;
+        }
+        var dots = "";
+        if (weight !== null) {
+          var w = clamp(weight, 1, 3);
+          dots = "";
+          for (var d = 0; d < 3; d++) dots += d < w ? "\u25CF" : "\u25CB";
+        }
+        found = true;
+        groups[g].push({
+          text: text,
+          weight: weight, hasWeight: weight !== null, dots: dots,
+          age: age, hasAge: age !== null,
+          ready: age !== null && age >= 4,
+          lockedLabel: lockedTime
+        });
+      }
+      if (!found) {
+        var restLine = line.indexOf("|") !== -1 ? line.replace(/^[^|]*\\|/, "").trim() : (first.value || "");
+        if (!isNone(restLine)) groups[g].push({ text: clean(restLine), weight: null, hasWeight: false, dots: "", age: null, hasAge: false, ready: false, lockedLabel: null });
+      }
+    }
+    var out = [];
+    var labels = { active: "Active", locked: "Locked", fired: "Fired" };
+    for (var k = 0; k < order.length; k++) {
+      var key = order[k];
+      out.push({ key: key, label: labels[key], items: groups[key] });
+    }
+    return { groups: out, activeCount: groups.active.length };
+  }
+
+  function parseThoughts(lines) {
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      if (!segs.length) continue;
+      var name = segs[0];
+      var text = "";
+      for (var j = 1; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        if (seg.keyNorm && seg.keyNorm.indexOf("internal thought") === 0) { text = seg.value; break; }
+      }
+      if (!text) text = segs.slice(1).join(" | ");
+      if (isNone(name) && isNone(text)) continue;
+      entries.push({ name: name, text: text });
+    }
+    return { entries: entries };
+  }
+
+  function parseNotebook(lines) {
+    var entries = [];
+    var labels = { R: "Reminder", T: "Thread", D: "Debug" };
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(/^[\\[(]?\\s*([RTD])\\s*[\\])]\\s*:?\\s*(.*)$/i);
+      var marker = m ? m[1].toUpperCase() : "T";
+      var text = m ? m[2] : lines[i];
+      if (!clean(text)) continue;
+      entries.push({ marker: marker, markerLower: marker.toLowerCase(), label: labels[marker] || "Note", text: clean(text) });
+    }
+    return { entries: entries };
+  }
+
+  function parseKeyedFields(lines, wideKeys) {
+    var fields = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      for (var j = 0; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        if (!seg.key) continue;
+        var wide = false;
+        for (var k = 0; k < wideKeys.length; k++) if (seg.keyNorm.indexOf(wideKeys[k]) === 0) wide = true;
+        fields.push({ label: seg.key, value: seg.value, wide: wide, none: isNone(seg.value) });
+      }
+    }
+    return { fields: fields };
+  }
+
+  function parseWorldsim(lines) {
+    var table = "", roll = null, hasRoll = false, eventName = "", eventText = "", hasEvent = false;
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      for (var j = 0; j < segs.length; j++) {
+        var seg = parseSeg(segs[j]);
+        if (!seg.keyNorm) continue;
+        if (seg.keyNorm.indexOf("active table") === 0) table = seg.value;
+        else if (seg.keyNorm.indexOf("roll") === 0) { var rm = seg.value.match(/\\d+/); if (rm) { roll = Number(rm[0]); hasRoll = true; } }
+        else if (seg.keyNorm.indexOf("event") === 0) {
+          hasEvent = true;
+          var em = seg.value.match(/^\\s*([A-Z][A-Z_]{2,})\\b\\s*(?:[\u2014\u2013-]\\s*(.*))?$/);
+          if (em) { eventName = em[1]; eventText = clean(em[2] || ""); }
+          else { eventName = ""; eventText = seg.value; }
+        }
+      }
+    }
+    return { table: table, roll: roll, hasRoll: hasRoll, eventName: eventName, eventText: eventText, hasEvent: hasEvent };
+  }
+
+  function parseGeneric(lines) {
+    var entries = [];
+    for (var i = 0; i < lines.length; i++) {
+      var segs = splitPipes(lines[i]);
+      var name = segs.length > 1 ? segs[0] : null;
+      var text = name ? segs.slice(1).join(" | ") : lines[i];
+      entries.push({ name: name, text: text });
+    }
+    return { entries: entries };
+  }
+
+  // \u2500\u2500 Preview + count label per kind \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  function summarize(kind, parsed, lines) {
+    var s = { count: null, countLabel: "", preview: "", emptyText: "" };
+    function firstMeaningful() {
+      for (var i = 0; i < lines.length; i++) if (!isNone(lines[i])) return lines[i];
+      return lines[0] || "";
+    }
+    switch (kind) {
+      case "agendas":
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? parsed.entries.length + (parsed.entries.length === 1 ? " NPC" : " NPCs") : "";
+        s.preview = parsed.entries.length ? trunc((parsed.entries[0].name || "") + (parsed.entries[0].agenda ? " \u2014 " + parsed.entries[0].agenda : ""), 74) : trunc(firstMeaningful(), 74);
+        break;
+      case "locations":
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? String(parsed.entries.length) : "";
+        s.preview = trunc(parsed.entries.map(function (e) { return e.name; }).join(" \xB7 ") || firstMeaningful(), 74);
+        break;
+      case "factions":
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? String(parsed.entries.length) : "";
+        s.preview = trunc(parsed.entries.map(function (e) { return e.name; }).join(" \xB7 ") || firstMeaningful(), 74);
+        break;
+      case "bonds":
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? String(parsed.entries.length) : "";
+        if (parsed.entries.length) {
+          var b = parsed.entries[0];
+          s.preview = trunc(b.left + " \u2194 " + b.right + "  BOND " + b.bondDisplay, 74);
+        } else s.preview = trunc(firstMeaningful(), 74);
+        break;
+      case "quests":
+        var q = parsed.main || parsed.side;
+        s.count = null;
+        s.countLabel = parsed.main ? "Main: " + parsed.main.status : "";
+        s.preview = q ? trunc((q.none ? q.status : q.objective) + (q.reward && !q.none ? " \xB7 \uD83C\uDF81 " + q.reward : ""), 74) : trunc(firstMeaningful(), 74);
+        break;
+      case "inventory":
+        s.countLabel = "";
+        s.preview = trunc(parsed.fields.map(function (f) { return f.label + ": " + trunc(f.value, 22); }).join(" \xB7 ") || firstMeaningful(), 90);
+        break;
+      case "chekhov":
+        var act = parsed.groups[0].items.length, lk = parsed.groups[1].items.length, fd = parsed.groups[2].items.length;
+        s.count = act;
+        s.countLabel = (act || lk || fd) ? (act + "\u25B2" + (lk ? " " + lk + "\uD83D\uDD12" : "") + (fd ? " " + fd + "\u2713" : "")) : "";
+        var firstBullet = parsed.groups[0].items[0] || parsed.groups[1].items[0] || parsed.groups[2].items[0];
+        s.preview = firstBullet ? trunc(firstBullet.text, 74) : trunc(firstMeaningful(), 74);
+        break;
+      case "thoughts":
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? String(parsed.entries.length) : "";
+        s.preview = parsed.entries.length ? trunc(parsed.entries[0].name + ": " + parsed.entries[0].text, 74) : trunc(firstMeaningful(), 74);
+        break;
+      case "notebook":
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? parsed.entries.length + (parsed.entries.length === 1 ? " note" : " notes") : "";
+        s.preview = parsed.entries.length ? trunc(parsed.entries[0].text, 74) : trunc(firstMeaningful(), 74);
+        break;
+      case "dnd":
+        var dc = null, task = null;
+        for (var i2 = 0; i2 < parsed.fields.length; i2++) {
+          var kl = parsed.fields[i2].label.toLowerCase();
+          if (kl.indexOf("locked dc") === 0) dc = parsed.fields[i2].value;
+          if (kl.indexOf("task") === 0) task = parsed.fields[i2].value;
+        }
+        var dcNum = dc && dc.match(/\\d+/);
+        s.countLabel = dcNum ? "DC " + dcNum[0] : "";
+        s.preview = trunc(task || firstMeaningful(), 74);
+        break;
+      case "worldsim":
+        s.countLabel = parsed.hasEvent && parsed.eventName ? parsed.eventName : "";
+        s.preview = trunc(parsed.hasEvent ? (parsed.eventName ? parsed.eventName + " \u2014 " : "") + parsed.eventText : firstMeaningful(), 74);
+        break;
+      case "physics":
+        var env = null;
+        for (var i3 = 0; i3 < parsed.fields.length; i3++) if (parsed.fields[i3].label.toLowerCase().indexOf("env") === 0) env = parsed.fields[i3].value;
+        s.countLabel = "";
+        s.preview = trunc(env || parsed.fields.map(function (f) { return f.label + ": " + trunc(f.value, 26); }).join(" \xB7 ") || firstMeaningful(), 96);
+        break;
+      default:
+        s.count = parsed.entries.length;
+        s.countLabel = parsed.entries.length ? String(parsed.entries.length) : "";
+        s.preview = trunc(parsed.entries.length ? parsed.entries[0].text : firstMeaningful(), 74);
+    }
+    return s;
+  }
+
+  function isEmptyKind(kind, parsed, lines) {
+    var meaningful = 0;
+    for (var i = 0; i < lines.length; i++) if (!isNone(lines[i])) meaningful++;
+    if (meaningful === 0) return true;
+    switch (kind) {
+      case "agendas": case "locations": case "factions": case "bonds": case "thoughts": case "notebook":
+        return parsed.entries.length === 0;
+      case "quests": return !parsed.main && !parsed.side;
+      case "inventory": case "dnd": case "physics": return parsed.fields.length === 0;
+      case "chekhov":
+        return parsed.groups.every(function (g) { return g.items.length === 0; });
+      case "worldsim": return !parsed.table && parsed.roll === null && !parsed.hasEvent;
+      default: return parsed.entries.length === 0;
+    }
+  }
+
+  // \u2500\u2500 Extract modules \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  var turnMatch = html.match(/turn\\s*:\\s*(\\d+)/i);
+  var turn = turnMatch ? Number(turnMatch[1]) : null;
+
+  var headRe = /<details\\b[^>]*>\\s*<summary\\b[^>]*>([\\s\\S]*?)<\\/summary>/gi;
+  var heads = [];
+  var hm;
+  while ((hm = headRe.exec(html)) !== null) {
+    heads.push({ title: clean(hm[1]), start: hm.index, bodyStart: headRe.lastIndex });
+  }
+  var lastClose = html.lastIndexOf("</details>");
+
+  var modules = [];
+  // Running count of single-column modules already placed. A wide module only
+  // spans both columns when it starts at a clean row boundary (even count);
+  // otherwise it is demoted to single-column so the grid never shows a hole.
+  var runningNormal = 0;
+  for (var i = 0; i < heads.length; i++) {
+    var h = heads[i];
+    if (/internal states/i.test(h.title)) continue;
+    var bodyEnd = (i + 1 < heads.length) ? heads[i + 1].start : lastClose;
+    var body = html.slice(h.bodyStart, bodyEnd).replace(/(?:\\s*<\\/details>)+\\s*$/, "").trim();
+    var lines = collectLines(body);
+    var meta = metaFor(h.title) || {};
+    var kind = meta.kind || "generic";
+
+    var parsed;
+    try {
+      switch (kind) {
+        case "agendas": parsed = parseAgendas(lines); break;
+        case "locations": parsed = parseLocations(lines); break;
+        case "factions": parsed = parseFactions(lines); break;
+        case "bonds": parsed = parseBonds(lines); break;
+        case "quests": parsed = parseQuests(lines); break;
+        case "inventory": parsed = parseInventory(lines); break;
+        case "chekhov": parsed = parseChekhov(lines); break;
+        case "thoughts": parsed = parseThoughts(lines); break;
+        case "notebook": parsed = parseNotebook(lines); break;
+        case "dnd": parsed = parseKeyedFields(lines, ["task"]); break;
+        case "worldsim": parsed = parseWorldsim(lines); break;
+        case "physics": parsed = parseKeyedFields(lines, ["env", "physics"]); break;
+        default: parsed = parseGeneric(lines);
+      }
+    } catch (e) {
+      parsed = parseGeneric(lines);
+      kind = "generic";
+    }
+
+    var empty = isEmptyKind(kind, parsed, lines);
+    var sum = summarize(kind, parsed, lines);
+
+    var EMOJI_RE = /[\\u{1F300}-\\u{1FAFF}\\u{2190}-\\u{21FF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}][\\u{FE0F}\\u{200D}\\u{20E3}]?/u;
+    var rawTitle = clean(h.title);
+    var emojiM = rawTitle.match(EMOJI_RE);
+    var displayTitle = rawTitle.replace(EMOJI_RE, "").replace(/\\s+/g, " ").trim() || rawTitle;
+
+    var wide = !!meta.wide && runningNormal % 2 === 0;
+    if (!wide) runningNormal += 1;
+
+    modules.push({
+      id: meta.id || "module-" + (modules.length + 1),
+      kind: kind,
+      icon: meta.icon || (emojiM ? emojiM[0] : "\u25AB\uFE0F"),
+      title: displayTitle,
+      accent: meta.accent || "#5cc8be",
+      category: meta.category || "Misc",
+      wide: wide,
+      empty: empty,
+      emptyText: empty ? (lines[0] || "None") : "",
+      lines: lines,
+      entries: parsed.entries || null,
+      fields: parsed.fields || null,
+      groups: parsed.groups || null,
+      quest: parsed.main || parsed.side || null,
+      main: parsed.main || null,
+      side: parsed.side || null,
+      activeCount: parsed.activeCount || null,
+      table: parsed.table || null,
+      roll: parsed.roll !== undefined ? parsed.roll : null,
+      hasRoll: !!parsed.hasRoll,
+      eventName: parsed.eventName || null,
+      eventText: parsed.eventText || null,
+      hasEvent: !!parsed.hasEvent,
+      count: sum.count,
+      countLabel: sum.countLabel,
+      preview: sum.preview
+    });
+  }
+
+  var categories = [];
+  for (var c = 0; c < modules.length; c++) {
+    if (categories.indexOf(modules[c].category) === -1) categories.push(modules[c].category);
+  }
+  wd.internalStates = {
+    turn: turn,
+    modules: modules,
+    moduleCount: modules.length,
+    categories: categories,
+    categoryLine: categories.join(" \xB7 ")
+  };
+  data.worldData = wd;
+  data.internalStatesPresent = modules.length > 0;
+  return data;
+})();
+</script>
+
+<!-- CARD_TEMPLATE_START -->
+<style>
+  .is-tracker {
+    --is-bg: color-mix(in srgb, var(--lumiverse-bg, #17171c) 88%, #101116 12%);
+    --is-surface: color-mix(in srgb, var(--lumiverse-fill-subtle, #25262d) 84%, transparent);
+    --is-surface-strong: color-mix(in srgb, var(--lumiverse-fill, #30313a) 88%, transparent);
+    --is-border: var(--lumiverse-border, rgba(255, 255, 255, 0.13));
+    --is-border-hover: var(--lumiverse-border-hover, rgba(255, 255, 255, 0.24));
+    --is-text: var(--lumiverse-text, #f4f4f6);
+    --is-muted: var(--lumiverse-text-muted, #b4b5bd);
+    --is-dim: var(--lumiverse-text-dim, #8a8c96);
+    --is-focus: #5cc8be;
+    --is-good: #55c98b;
+    --is-bad: #ef6b72;
+    --is-gold: #d5a84b;
+    --is-accent: #5cc8be;
+    width: min(100%, 1100px);
+    margin: 14px auto;
+    color: var(--is-text);
+    font-family: var(--lumiverse-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .is-tracker,
+  .is-tracker * {
+    box-sizing: border-box;
+  }
+
+  .is-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  /* \u2500\u2500 Hero header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 18px;
+    margin-bottom: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--is-border);
+    border-top: 3px solid var(--is-gold);
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at top left, color-mix(in srgb, var(--is-gold) 12%, transparent), transparent 46%),
+      var(--is-bg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  }
+
+  .is-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .is-hero-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border: 1px solid color-mix(in srgb, var(--is-gold) 45%, var(--is-border));
+    border-radius: 10px;
+    font-size: 18px;
+    background: color-mix(in srgb, var(--is-gold) 15%, transparent);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--is-gold) 22%, transparent);
+  }
+
+  .is-hero-title {
+    margin: 0;
+    color: var(--is-text);
+    font-size: 17px;
+    font-weight: 750;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+
+  .is-hero-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--is-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .is-hero-right {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .is-turn-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 3px 10px;
+    border: 1px solid color-mix(in srgb, var(--is-gold) 46%, var(--is-border));
+    border-radius: 999px;
+    color: #f0d08d;
+    background: color-mix(in srgb, var(--is-gold) 14%, transparent);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .is-dot-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 27px;
+    height: 27px;
+    border: 1px solid color-mix(in srgb, var(--is-accent, #5cc8be) 45%, var(--is-border));
+    border-radius: 7px;
+    font-size: 13px;
+    background: color-mix(in srgb, var(--is-accent, #5cc8be) 14%, transparent);
+    transition: transform 140ms ease, border-color 140ms ease;
+  }
+
+  .is-dot-chip:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--is-accent, #5cc8be) 80%, var(--is-border));
+  }
+
+  /* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--is-border);
+    border-top: 3px solid var(--is-accent);
+    border-radius: 8px;
+    background: var(--is-bg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .is-panel:hover {
+    border-color: var(--is-border-hover);
+  }
+
+  .is-panel[open] {
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  }
+
+  .is-wide {
+    grid-column: 1 / -1;
+  }
+
+  .is-summary {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    padding: 11px 38px 11px 13px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--is-accent) 12%, var(--is-surface)) 0%,
+      transparent 78%
+    );
+  }
+
+  .is-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .is-summary::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    width: 8px;
+    height: 8px;
+    margin-top: -6px;
+    border-right: 2px solid var(--is-muted);
+    border-bottom: 2px solid var(--is-muted);
+    transform: rotate(45deg);
+    transition: transform 180ms ease, border-color 180ms ease;
+  }
+
+  .is-panel[open] > .is-summary::after {
+    margin-top: -2px;
+    transform: rotate(225deg);
+    border-color: var(--is-text);
+  }
+
+  .is-summary:hover {
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--is-accent) 18%, var(--is-surface-strong)) 0%,
+      transparent 80%
+    );
+  }
+
+  .is-summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--is-focus) 70%, transparent);
+    outline-offset: -3px;
+  }
+
+  .is-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border: 1px solid color-mix(in srgb, var(--is-accent) 40%, var(--is-border));
+    border-radius: 8px;
+    font-size: 15px;
+    background: color-mix(in srgb, var(--is-accent) 15%, transparent);
+  }
+
+  .is-titles {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .is-title {
+    color: var(--is-text);
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .is-preview {
+    color: var(--is-muted);
+    font-size: 12px;
+    font-weight: 550;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .is-chips {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 auto;
+    padding-right: 6px;
+  }
+
+  .is-count-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border: 1px solid color-mix(in srgb, var(--is-accent) 45%, var(--is-border));
+    border-radius: 999px;
+    color: var(--is-text);
+    background: color-mix(in srgb, var(--is-accent) 13%, transparent);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .is-cat-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border: 1px solid var(--is-border);
+    border-radius: 999px;
+    color: var(--is-dim);
+    background: var(--is-surface);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* \u2500\u2500 Body scaffolding \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-body {
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--is-border);
+    animation: is-body-in 180ms ease-out;
+  }
+
+  @keyframes is-body-in {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .is-section {
+    padding-top: 13px;
+  }
+
+  .is-section + .is-section {
+    margin-top: 13px;
+    border-top: 1px solid var(--is-border);
+  }
+
+  .is-sub {
+    margin: 0 0 8px;
+    color: var(--is-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .is-empty {
+    color: var(--is-dim);
+    font-style: italic;
+  }
+
+  /* \u2500\u2500 Field grids \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-fieldgrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .is-field {
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--is-border);
+    border-radius: 7px;
+    background: var(--is-surface);
+  }
+
+  .is-field-wide {
+    grid-column: 1 / -1;
+  }
+
+  .is-field-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--is-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .is-field-value {
+    color: var(--is-text);
+    overflow-wrap: anywhere;
+  }
+
+  /* \u2500\u2500 Trackers / progress \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-track {
+    position: relative;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--is-text) 9%, transparent);
+  }
+
+  .is-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--is-accent);
+    transition: width 280ms ease;
+  }
+
+  .is-fill-inf {
+    background: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--is-accent) 40%, transparent) 0 9px,
+      color-mix(in srgb, var(--is-accent) 10%, transparent) 9px 18px
+    );
+  }
+
+  .is-fill-good { background: var(--is-good); }
+  .is-fill-bad { background: var(--is-bad); }
+  .is-fill-pink { background: #e36d91; }
+
+  /* \u2500\u2500 People (agendas) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-person {
+    padding: 10px;
+    border: 1px solid var(--is-border);
+    border-radius: 7px;
+    background: var(--is-surface);
+  }
+
+  .is-person + .is-person {
+    margin-top: 8px;
+  }
+
+  .is-person-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+
+  .is-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--is-accent), color-mix(in srgb, var(--is-accent) 50%, #000));
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--is-accent) 28%, transparent);
+  }
+
+  .is-person-name {
+    color: var(--is-text);
+    font-size: 14px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+
+  .is-person-agenda {
+    color: var(--is-text);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .is-step {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 9px;
+  }
+
+  .is-step .is-track {
+    flex: 1;
+  }
+
+  .is-step-label {
+    color: var(--is-muted);
+    font-size: 11px;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+
+  .is-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .is-chip-row-empty {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .is-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 9px;
+    border: 1px solid var(--is-border);
+    border-radius: 999px;
+    color: var(--is-text);
+    background: var(--is-surface);
+    font-size: 11px;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+  }
+
+  .is-chip-key {
+    margin-right: 5px;
+    color: var(--is-dim);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .is-chip-dim {
+    color: var(--is-dim);
+    font-style: italic;
+  }
+
+  /* \u2500\u2500 Locations \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-loc-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .is-loc-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .is-loc-pin {
+    flex: 0 0 auto;
+    font-size: 13px;
+  }
+
+  .is-loc-name {
+    color: var(--is-text);
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .is-loc-dots {
+    flex: 1;
+    min-width: 18px;
+    border-bottom: 1px dotted color-mix(in srgb, var(--is-border-hover) 80%, transparent);
+    transform: translateY(-3px);
+  }
+
+  .is-loc-text {
+    color: var(--is-muted);
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  /* \u2500\u2500 Bonds \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-bond {
+    padding: 12px;
+    border: 1px solid var(--is-border);
+    border-radius: 8px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--is-accent) 9%, var(--is-surface)) 0%,
+      var(--is-surface) 72%
+    );
+  }
+
+  .is-bond + .is-bond {
+    margin-top: 8px;
+  }
+
+  .is-bond-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 11px;
+  }
+
+  .is-bond-name {
+    color: var(--is-text);
+    font-size: 14px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+
+  .is-bond-link {
+    color: var(--is-accent);
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .is-bond-score {
+    display: inline-flex;
+    align-items: center;
+    min-height: 23px;
+    padding: 2px 9px;
+    border: 1px solid var(--is-border);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 850;
+  }
+
+  .is-bond-score-good {
+    color: #9ce4bb;
+    border-color: color-mix(in srgb, var(--is-good) 55%, var(--is-border));
+    background: color-mix(in srgb, var(--is-good) 14%, transparent);
+  }
+
+  .is-bond-score-bad {
+    color: #ffabb0;
+    border-color: color-mix(in srgb, var(--is-bad) 55%, var(--is-border));
+    background: color-mix(in srgb, var(--is-bad) 14%, transparent);
+  }
+
+  .is-bond-score-dim {
+    color: var(--is-dim);
+    background: var(--is-surface);
+  }
+
+  .is-meter {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .is-meter + .is-meter {
+    margin-top: 8px;
+  }
+
+  .is-meter-label {
+    color: var(--is-dim);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .is-meter-value {
+    color: var(--is-text);
+    font-size: 12px;
+    font-weight: 800;
+    text-align: right;
+  }
+
+  /* \u2500\u2500 Quests \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-quest {
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--is-accent) 38%, var(--is-border));
+    border-radius: 8px;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--is-accent) 10%, var(--is-surface)) 0%,
+      transparent 76%
+    );
+  }
+
+  .is-quest + .is-quest {
+    margin-top: 8px;
+  }
+
+  .is-quest-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .is-quest-tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 23px;
+    padding: 2px 10px;
+    border: 1px solid color-mix(in srgb, var(--is-accent) 55%, var(--is-border));
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--is-accent) 75%, #fff);
+    background: color-mix(in srgb, var(--is-accent) 15%, transparent);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .is-quest-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 23px;
+    padding: 2px 9px;
+    border: 1px solid var(--is-border);
+    border-radius: 999px;
+    color: var(--is-muted);
+    background: var(--is-surface);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .is-quest-status-good {
+    color: #9ce4bb;
+    border-color: color-mix(in srgb, var(--is-good) 50%, var(--is-border));
+    background: color-mix(in srgb, var(--is-good) 12%, transparent);
+  }
+
+  .is-quest-reward {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+    min-height: 23px;
+    padding: 2px 9px;
+    border: 1px solid color-mix(in srgb, var(--is-gold) 45%, var(--is-border));
+    border-radius: 999px;
+    color: #f0d08d;
+    background: color-mix(in srgb, var(--is-gold) 12%, transparent);
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .is-quest-objective {
+    margin-top: 8px;
+    color: var(--is-text);
+    font-size: 15px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .is-quest-side-text {
+    margin-top: 6px;
+    color: var(--is-muted);
+    overflow-wrap: anywhere;
+  }
+
+  /* \u2500\u2500 Chekhov's gun \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-chekhov-cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .is-chekhov-col {
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--is-border);
+    border-radius: 7px;
+    background: var(--is-surface);
+  }
+
+  .is-chekhov-col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 7px;
+    color: var(--is-dim);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .is-chekhov-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 5px;
+    border: 1px solid var(--is-border);
+    border-radius: 999px;
+    color: var(--is-muted);
+    background: var(--is-bg);
+    font-size: 10px;
+    font-weight: 850;
+  }
+
+  .is-bullet {
+    padding: 7px 8px;
+    border: 1px solid var(--is-border);
+    border-radius: 6px;
+    background: var(--is-bg);
+  }
+
+  .is-bullet + .is-bullet {
+    margin-top: 6px;
+  }
+
+  .is-bullet-text {
+    color: var(--is-text);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .is-bullet-meta {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+  }
+
+  .is-weight {
+    color: var(--is-accent);
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .is-age {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border: 1px solid var(--is-border);
+    border-radius: 999px;
+    color: var(--is-dim);
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+
+  .is-ready {
+    color: #9ce4bb;
+    border-color: color-mix(in srgb, var(--is-good) 55%, var(--is-border));
+    background: color-mix(in srgb, var(--is-good) 13%, transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--is-good) 18%, transparent);
+  }
+
+  .is-lock-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border: 1px solid color-mix(in srgb, var(--is-gold) 45%, var(--is-border));
+    border-radius: 999px;
+    color: #f0d08d;
+    background: color-mix(in srgb, var(--is-gold) 12%, transparent);
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+
+  /* \u2500\u2500 Thoughts \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-thought {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--is-border);
+    border-left: 3px solid var(--is-accent);
+    border-radius: 7px;
+    background: var(--is-surface);
+  }
+
+  .is-thought + .is-thought {
+    margin-top: 8px;
+  }
+
+  .is-thought figcaption {
+    margin-bottom: 4px;
+    color: var(--is-dim);
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .is-thought blockquote {
+    margin: 0;
+    color: var(--is-text);
+    font-style: italic;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  /* \u2500\u2500 GM notebook \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-notes {
+    display: grid;
+    gap: 6px;
+  }
+
+  .is-note {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 7px 10px;
+    border: 1px solid var(--is-border);
+    border-left: 3px solid var(--is-note-tone, var(--is-accent));
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--is-note-tone, var(--is-accent)) 6%, var(--is-surface));
+  }
+
+  .is-note-r { --is-note-tone: #d5a84b; }
+  .is-note-t { --is-note-tone: #49b8ae; }
+  .is-note-d { --is-note-tone: #ef6b72; }
+
+  .is-note-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 1px 8px;
+    border: 1px solid color-mix(in srgb, var(--is-note-tone, var(--is-accent)) 50%, var(--is-border));
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--is-note-tone, var(--is-accent)) 70%, #fff);
+    background: color-mix(in srgb, var(--is-note-tone, var(--is-accent)) 13%, transparent);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .is-note-text {
+    color: var(--is-text);
+    overflow-wrap: anywhere;
+  }
+
+  /* \u2500\u2500 World sim \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-ws-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+
+  .is-ws-roll {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 2px 10px;
+    border: 1px solid color-mix(in srgb, var(--is-accent) 45%, var(--is-border));
+    border-radius: 999px;
+    color: var(--is-text);
+    background: color-mix(in srgb, var(--is-accent) 13%, transparent);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .is-event {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin-top: 9px;
+    padding: 9px 10px;
+    border: 1px solid var(--is-border);
+    border-radius: 7px;
+    background: var(--is-surface);
+  }
+
+  .is-event-name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 9px;
+    border: 1px solid color-mix(in srgb, var(--is-accent) 48%, var(--is-border));
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--is-accent) 72%, #fff);
+    background: color-mix(in srgb, var(--is-accent) 16%, transparent);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .is-event-text {
+    color: var(--is-muted);
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+
+  /* \u2500\u2500 Generic lists \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .is-list li {
+    position: relative;
+    padding-left: 15px;
+    color: var(--is-text);
+    overflow-wrap: anywhere;
+  }
+
+  .is-list li::before {
+    content: "";
+    position: absolute;
+    top: 0.6em;
+    left: 1px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--is-accent);
+  }
+
+  .is-list-name {
+    font-weight: 800;
+  }
+
+  /* \u2500\u2500 Waiting state \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  .is-waiting {
+    padding: 18px 16px;
+    border: 1px dashed var(--is-border-hover);
+    border-radius: 8px;
+    color: var(--is-dim);
+    background: var(--is-bg);
+    text-align: center;
+    font-style: italic;
+  }
+
+  .is-raw {
+    margin: 8px 0 0;
+    padding: 10px;
+    border: 1px solid var(--is-border);
+    border-radius: 7px;
+    color: var(--is-muted);
+    background: var(--is-surface);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 220px;
+    overflow: auto;
+  }
+
+  @media (max-width: 720px) {
+    .is-tracker {
+      margin: 10px auto;
+    }
+
+    .is-grid,
+    .is-fieldgrid,
+    .is-chekhov-cols {
+      grid-template-columns: 1fr;
+    }
+
+    .is-wide {
+      grid-column: auto;
+    }
+
+    .is-hero {
+      justify-content: flex-start;
+    }
+
+    .is-summary {
+      min-height: 56px;
+      padding: 10px 34px 10px 11px;
+    }
+
+    .is-body {
+      padding: 0 11px 11px;
+    }
+
+    .is-cat-chip {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-tracker *,
+    .is-tracker *::before,
+    .is-tracker *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<section class="is-tracker" aria-label="Internal states module board">
+  {{#if worldData.internalStates}}
+    {{#if worldData.internalStates.modules.length}}
+      {{#with worldData.internalStates}}
+      <header class="is-hero">
+        <div class="is-hero-left">
+          <span class="is-hero-icon" aria-hidden="true">\uD83C\uDFAC</span>
+          <div style="min-width:0;">
+            <h2 class="is-hero-title">Internal States</h2>
+            <span class="is-hero-sub">{{moduleCount}} module{{#if (gt moduleCount 1)}}s{{/if}}{{#if categoryLine}} \xB7 {{categoryLine}}{{/if}}</span>
+          </div>
+        </div>
+        <div class="is-hero-right">
+          {{#if turn}}<span class="is-turn-chip">Turn {{turn}}</span>{{/if}}
+          {{#each modules}}<span class="is-dot-chip" style="--is-accent: {{accent}};" title="{{title}}">{{icon}}</span>{{/each}}
+        </div>
+      </header>
+
+      <div class="is-grid">
+        {{#each modules}}
+        <details class="is-panel{{#if wide}} is-wide{{/if}}" style="--is-accent: {{accent}};">
+          <summary class="is-summary">
+            <span class="is-icon" aria-hidden="true">{{icon}}</span>
+            <span class="is-titles">
+              <span class="is-title">{{title}}</span>
+              {{#if preview}}<span class="is-preview">{{preview}}</span>{{/if}}
+            </span>
+            <span class="is-chips">
+              {{#if countLabel}}<span class="is-count-chip">{{countLabel}}</span>{{/if}}
+              <span class="is-cat-chip">{{category}}</span>
+            </span>
+          </summary>
+
+          <div class="is-body">
+            {{!-- \u2500\u2500 Agendas \u2500\u2500 --}}
+            {{#if (eq kind "agendas")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  {{#each entries}}
+                  <div class="is-person">
+                    <div class="is-person-head">
+                      <span class="is-avatar">{{initials name}}</span>
+                      <span class="is-person-name">{{name}}</span>
+                      {{#if agenda}}<span class="is-person-agenda">\u2014 {{agenda}}</span>{{/if}}
+                    </div>
+                    {{#if hasStep}}
+                    <div class="is-step">
+                      <div class="is-track" role="progressbar" aria-label="Agenda step" aria-valuenow="{{stepCurrent}}" aria-valuemax="{{stepMax}}">
+                        {{#if stepInfinite}}
+                          <div class="is-fill is-fill-inf" style="width: 100%;"></div>
+                        {{else}}
+                          <div class="is-fill" style="width: {{stepPct}}%;"></div>
+                        {{/if}}
+                      </div>
+                      <span class="is-step-label">Step {{stepCurrent}}/{{stepMax}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if meta.length}}
+                    <div class="is-chip-row-empty">
+                      {{#each meta}}<span class="is-chip"><span class="is-chip-key">{{label}}</span>{{value}}</span>{{/each}}
+                    </div>
+                    {{/if}}
+                  </div>
+                  {{/each}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Locations \u2500\u2500 --}}
+            {{#if (eq kind "locations")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <ul class="is-loc-list">
+                    {{#each entries}}
+                    <li>
+                      <span class="is-loc-pin" aria-hidden="true">\uD83D\uDCCD</span>
+                      <span class="is-loc-name">{{name}}</span>
+                      <span class="is-loc-dots" aria-hidden="true"></span>
+                      <span class="is-loc-text">{{location}}</span>
+                    </li>
+                    {{/each}}
+                  </ul>
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Factions \u2500\u2500 --}}
+            {{#if (eq kind "factions")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section" style="display:grid; gap:8px;">
+                  {{#each entries}}
+                  <div class="is-field is-field-wide">
+                    <span class="is-field-label">{{name}}</span>
+                    {{#if fields.length}}
+                      <div class="is-chip-row">
+                        {{#each fields}}<span class="is-chip{{#if none}} is-chip-dim{{/if}}"><span class="is-chip-key">{{label}}</span>{{value}}</span>{{/each}}
+                      </div>
+                    {{else}}
+                      <span class="is-field-value">No faction details recorded.</span>
+                    {{/if}}
+                  </div>
+                  {{/each}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Bonds \u2500\u2500 --}}
+            {{#if (eq kind "bonds")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  {{#each entries}}
+                  <div class="is-bond">
+                    <div class="is-bond-head">
+                      <span class="is-bond-name">{{left}}</span>
+                      <span class="is-bond-link" aria-hidden="true">\u2194</span>
+                      <span class="is-bond-name">{{right}}</span>
+                      <span class="is-bond-score is-bond-score-{{bondTone}}" title="Bond value on the -5 to +20 scale">BOND {{bondDisplay}}</span>
+                    </div>
+                    <div class="is-meter">
+                      <span class="is-meter-label">Bond</span>
+                      <div class="is-track" role="progressbar" aria-label="Bond" aria-valuenow="{{bond}}" aria-valuemin="-5" aria-valuemax="20">
+                        <div class="is-fill is-fill-{{bondTone}}" style="width: {{bondPct}}%;"></div>
+                      </div>
+                      <span class="is-meter-value">{{bondDisplay}}</span>
+                    </div>
+                    {{#if hasSparks}}
+                    <div class="is-meter">
+                      <span class="is-meter-label">Sparks</span>
+                      <div class="is-track" aria-label="Sparks" aria-valuenow="{{sparks}}">
+                        <div class="is-fill is-fill-pink" style="width: {{sparksPct}}%;"></div>
+                      </div>
+                      <span class="is-meter-value">{{sparks}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if hasGrudge}}
+                    <div class="is-meter">
+                      <span class="is-meter-label">Grudge</span>
+                      <div class="is-track" aria-label="Grudge" aria-valuenow="{{grudge}}">
+                        <div class="is-fill is-fill-bad" style="width: {{grudgePct}}%;"></div>
+                      </div>
+                      <span class="is-meter-value">{{grudge}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if grudgeHot}}<div class="is-chip-row-empty"><span class="is-chip" title="Grudge 3+ halves positive bond gains"><span class="is-chip-key">Effect</span>positive gains halved</span></div>{{/if}}
+                  </div>
+                  {{/each}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Quests \u2500\u2500 --}}
+            {{#if (eq kind "quests")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  {{#if main}}
+                  <div class="is-quest">
+                    <div class="is-quest-head">
+                      <span class="is-quest-tag">Main</span>
+                      <span class="is-quest-status{{#if main.statusCompleted}} is-quest-status-good{{/if}}">{{main.status}}</span>
+                      {{#if main.reward}}<span class="is-quest-reward">\uD83C\uDF81 {{main.reward}}</span>{{/if}}
+                    </div>
+                    {{#if main.objective}}<div class="is-quest-objective">{{main.objective}}</div>{{/if}}
+                    {{#if main.hasProgress}}
+                    <div class="is-step">
+                      <div class="is-track" role="progressbar" aria-label="Quest progress" aria-valuenow="{{main.progressCurrent}}" aria-valuemax="{{main.progressMax}}">
+                        {{#if main.progressInfinite}}
+                          <div class="is-fill is-fill-inf" style="width: 100%;"></div>
+                        {{else}}
+                          <div class="is-fill" style="width: {{main.progressPct}}%;"></div>
+                        {{/if}}
+                      </div>
+                      <span class="is-step-label">{{main.progressCurrent}}/{{main.progressMax}}</span>
+                    </div>
+                    {{/if}}
+                  </div>
+                  {{/if}}
+                  {{#if side}}
+                  <div class="is-quest">
+                    <div class="is-quest-head">
+                      <span class="is-quest-tag">Side</span>
+                      <span class="is-quest-status{{#if side.statusCompleted}} is-quest-status-good{{/if}}">{{side.status}}</span>
+                      {{#if side.reward}}<span class="is-quest-reward">\uD83C\uDF81 {{side.reward}}</span>{{/if}}
+                    </div>
+                    {{#if side.objective}}<div class="is-quest-objective" style="font-size:13px;">{{side.objective}}</div>{{/if}}
+                    {{#if side.hasProgress}}
+                    <div class="is-step">
+                      <div class="is-track">
+                        {{#if side.progressInfinite}}
+                          <div class="is-fill is-fill-inf" style="width: 100%;"></div>
+                        {{else}}
+                          <div class="is-fill" style="width: {{side.progressPct}}%;"></div>
+                        {{/if}}
+                      </div>
+                      <span class="is-step-label">{{side.progressCurrent}}/{{side.progressMax}}</span>
+                    </div>
+                    {{/if}}
+                  </div>
+                  {{/if}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Inventory \u2500\u2500 --}}
+            {{#if (eq kind "inventory")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section" style="display:grid; gap:8px;">
+                  {{#each fields}}
+                  <div class="is-field is-field-wide">
+                    <span class="is-field-label">{{label}}</span>
+                    {{#if none}}
+                      <span class="is-field-value is-empty">{{value}}</span>
+                    {{else if chips.length}}
+                      <div class="is-chip-row">
+                        {{#each chips}}<span class="is-chip">{{this}}</span>{{/each}}
+                      </div>
+                    {{else}}
+                      <span class="is-field-value">{{value}}</span>
+                    {{/if}}
+                  </div>
+                  {{/each}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Chekhov's gun \u2500\u2500 --}}
+            {{#if (eq kind "chekhov")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <div class="is-chekhov-cols">
+                    {{#each groups}}
+                    <div class="is-chekhov-col">
+                      <div class="is-chekhov-col-head">
+                        <span>{{label}}</span>
+                        <span class="is-chekhov-count">{{items.length}}</span>
+                      </div>
+                      {{#if items.length}}
+                        {{#each items}}
+                        <div class="is-bullet">
+                          <div class="is-bullet-text">{{text}}</div>
+                          <div class="is-bullet-meta">
+                            {{#if dots}}<span class="is-weight" title="Weight {{weight}} of 3">{{dots}}</span>{{/if}}
+                            {{#if hasAge}}<span class="is-age{{#if ready}} is-ready{{/if}}" title="{{#if ready}}Age \u2265 4 \u2014 eligible to fire{{else}}Fires at age \u2265 4{{/if}}">age {{age}}</span>{{/if}}
+                            {{#if lockedLabel}}<span class="is-lock-tag">\uD83D\uDD12 {{lockedLabel}}</span>{{/if}}
+                          </div>
+                        </div>
+                        {{/each}}
+                      {{else}}
+                        <div class="is-empty">None</div>
+                      {{/if}}
+                    </div>
+                    {{/each}}
+                  </div>
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Thoughts \u2500\u2500 --}}
+            {{#if (eq kind "thoughts")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  {{#each entries}}
+                  <figure class="is-thought">
+                    <figcaption>{{name}}</figcaption>
+                    <blockquote>{{text}}</blockquote>
+                  </figure>
+                  {{/each}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 GM notebook \u2500\u2500 --}}
+            {{#if (eq kind "notebook")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <div class="is-notes">
+                    {{#each entries}}
+                    <div class="is-note is-note-{{markerLower}}">
+                      <span class="is-note-badge">{{label}}</span>
+                      <span class="is-note-text">{{text}}</span>
+                    </div>
+                    {{/each}}
+                  </div>
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 DND task sim \u2500\u2500 --}}
+            {{#if (eq kind "dnd")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <div class="is-fieldgrid">
+                    {{#each fields}}
+                    <div class="is-field{{#if wide}} is-field-wide{{/if}}">
+                      <span class="is-field-label">{{label}}</span>
+                      <span class="is-field-value{{#if none}} is-empty{{/if}}">{{value}}</span>
+                    </div>
+                    {{/each}}
+                  </div>
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 World sim \u2500\u2500 --}}
+            {{#if (eq kind "worldsim")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <div class="is-ws-row">
+                    {{#if table}}<span class="is-chip"><span class="is-chip-key">Table</span>{{table}}</span>{{/if}}
+                    {{#if hasRoll}}<span class="is-ws-roll">\uD83C\uDFB2 {{roll}}</span>{{/if}}
+                  </div>
+                  {{#if hasEvent}}
+                  <div class="is-event">
+                    {{#if eventName}}<span class="is-event-name">{{eventName}}</span>{{/if}}
+                    {{#if eventText}}<span class="is-event-text">{{eventText}}</span>{{/if}}
+                  </div>
+                  {{/if}}
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Physics / engine \u2500\u2500 --}}
+            {{#if (eq kind "physics")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <div class="is-fieldgrid">
+                    {{#each fields}}
+                    <div class="is-field{{#if wide}} is-field-wide{{/if}}">
+                      <span class="is-field-label">{{label}}</span>
+                      <span class="is-field-value">{{value}}</span>
+                    </div>
+                    {{/each}}
+                  </div>
+                </div>
+              {{/if}}
+            {{/if}}
+
+            {{!-- \u2500\u2500 Generic fallback \u2500\u2500 --}}
+            {{#if (eq kind "generic")}}
+              {{#if empty}}
+                <div class="is-empty">{{emptyText}}</div>
+              {{else}}
+                <div class="is-section">
+                  <ul class="is-list">
+                    {{#each entries}}
+                    <li>{{#if name}}<span class="is-list-name">{{name}}</span> \u2014 {{/if}}{{text}}</li>
+                    {{/each}}
+                  </ul>
+                </div>
+              {{/if}}
+            {{/if}}
+          </div>
+        </details>
+        {{/each}}
+      </div>
+      {{/with}}
+    {{else}}
+      <div class="is-waiting">An &lt;internal_states&gt; object was found, but no modules could be read from it.</div>
+    {{/if}}
+  {{else}}
+    <div class="is-waiting">Waiting for an &lt;internal_states&gt; object \u2014 this tracker renders the modules exactly as the story emits them.</div>
+  {{/if}}
+</section>
+<!-- CARD_TEMPLATE_END -->
+
+<!--
+TEMPLATE VARIABLES (all produced by the template-logic parser above):
+- {{worldData.internalStates.turn}}: Turn counter parsed from the \uD83C\uDFAC header.
+- {{worldData.internalStates.modules}}: Ordered module records, one per <details> section as written.
+- Module fields: id, kind (agendas|locations|factions|bonds|quests|inventory|chekhov|thoughts|notebook|dnd|worldsim|physics|generic), icon, title, accent, category, wide, empty, entries/fields/groups, preview, countLabel.
+- Bond scales mirror Freaky Frankenstein: BOND -5..+20, Sparks 0-7, Grudge 0-5.
+- Chekhov bullets expose weight (1-3) and age; age \u2265 4 renders as fire-ready.
+
+INPUT CONTRACT:
+- The model emits the Freaky Frankenstein <internal_states> HTML block wrapped in
+  <tracker type="sim"> ... </tracker> (replacing the <!-- GFX_START --> / <!-- GFX_END -->
+  comments). The payload parser falls back to raw-HTML mode when JSON/YAML parsing
+  fails and the payload contains an <internal_states> object.
+-->
+`,
+  sysPrompt: '## INTERNAL STATES BOARD\n\nThis tracker renders the Freaky Frankenstein `<internal_states>` HTML object, so keep emitting that object exactly as `<internal_states_module>` defines it \u2014 same sections, same telegraphic one-line entries, same `<details>`/`<summary>` structure.\n\nThe only wrapper change: the final block opens with `<tracker type="sim">` where `<!-- GFX_START -->` used to appear and closes with `</tracker>` where `<!-- GFX_END -->` used to appear. The `<internal_states>` HTML between them stays byte-for-byte identical: never convert it to JSON or YAML and never place it in code fences.',
+  customFields: [],
+  extSettings: {
+    codeBlockIdentifier: "sim",
+    renderMode: "tracker",
+    hideSimBlocks: true,
+    templateFile: "internal-states-simtracker.html",
+    presetRevision: 1
+  }
+};
 
 // src/templatePresets.ts
 var PRESETS = [
@@ -6987,6 +9084,10 @@ var PRESETS = [
   {
     id: "narrative-weave-simtracker",
     ...narrative_weave_simtracker_default
+  },
+  {
+    id: "internal-states-simtracker",
+    ...internal_states_simtracker_default
   }
 ];
 function getTemplatePresets() {
@@ -7449,8 +9550,8 @@ function toJS(value, arg, ctx) {
       return value.toJSON(arg, ctx);
     const data = { aliasCount: 0, count: 1, res: undefined };
     ctx.anchors.set(value, data);
-    ctx.onCreate = (res) => {
-      data.res = res;
+    ctx.onCreate = (res2) => {
+      data.res = res2;
       delete ctx.onCreate;
     };
     const res = value.toJSON(arg, ctx);
@@ -7487,8 +9588,8 @@ class NodeBase {
     };
     const res = toJS(this, "", ctx);
     if (typeof onAnchor === "function")
-      for (const { count, res } of ctx.anchors.values())
-        onAnchor(res, count);
+      for (const { count, res: res2 } of ctx.anchors.values())
+        onAnchor(res2, count);
     return typeof reviver === "function" ? applyReviver(reviver, { "": res }, "", res) : res;
   }
 }
@@ -7658,10 +9759,10 @@ function createNode(value, tagName, ctx) {
       value = value.toJSON();
     }
     if (!value || typeof value !== "object") {
-      const node = new Scalar(value);
+      const node2 = new Scalar(value);
       if (ref)
-        ref.node = node;
-      return node;
+        ref.node = node2;
+      return node2;
     }
     tagObj = value instanceof Map ? schema[MAP] : (Symbol.iterator in Object(value)) ? schema[SEQ] : schema[MAP];
   }
@@ -7894,17 +9995,17 @@ function foldFlowLines(text, indent, mode = "flow", { indentAtStart, lineWidth =
   if (onFold)
     onFold();
   let res = text.slice(0, folds[0]);
-  for (let i = 0;i < folds.length; ++i) {
-    const fold = folds[i];
-    const end = folds[i + 1] || text.length;
+  for (let i2 = 0;i2 < folds.length; ++i2) {
+    const fold = folds[i2];
+    const end2 = folds[i2 + 1] || text.length;
     if (fold === 0)
       res = `
-${indent}${text.slice(0, end)}`;
+${indent}${text.slice(0, end2)}`;
     else {
       if (mode === FOLD_QUOTED && escapedFolds[fold])
         res += `${text[fold]}\\`;
       res += `
-${indent}${text.slice(fold + 1, end)}`;
+${indent}${text.slice(fold + 1, end2)}`;
     }
   }
   return res;
@@ -8499,15 +10600,15 @@ function mergeValue(ctx, map, value) {
   if (!isMap(source))
     throw new Error("Merge sources must be maps or map aliases");
   const srcMap = source.toJSON(null, ctx, Map);
-  for (const [key, value] of srcMap) {
+  for (const [key, value2] of srcMap) {
     if (map instanceof Map) {
       if (!map.has(key))
-        map.set(key, value);
+        map.set(key, value2);
     } else if (map instanceof Set) {
       map.add(key);
     } else if (!Object.prototype.hasOwnProperty.call(map, key)) {
       Object.defineProperty(map, key, {
-        value,
+        value: value2,
         writable: true,
         enumerable: true,
         configurable: true
@@ -8603,8 +10704,8 @@ class Pair {
 // node_modules/yaml/browser/dist/stringify/stringifyCollection.js
 function stringifyCollection(collection, ctx, options) {
   const flow = ctx.inFlow ?? collection.flow;
-  const stringify = flow ? stringifyFlowCollection : stringifyBlockCollection;
-  return stringify(collection, ctx, options);
+  const stringify2 = flow ? stringifyFlowCollection : stringifyBlockCollection;
+  return stringify2(collection, ctx, options);
 }
 function stringifyBlockCollection({ comment, items }, ctx, { blockItemPrefix, flowChars, itemIndent, onChompKeep, onComment }) {
   const { indent, options: { commentString } } = ctx;
@@ -8613,13 +10714,13 @@ function stringifyBlockCollection({ comment, items }, ctx, { blockItemPrefix, fl
   const lines = [];
   for (let i = 0;i < items.length; ++i) {
     const item = items[i];
-    let comment = null;
+    let comment2 = null;
     if (isNode(item)) {
       if (!chompKeep && item.spaceBefore)
         lines.push("");
       addCommentBefore(ctx, lines, item.commentBefore, chompKeep);
       if (item.comment)
-        comment = item.comment;
+        comment2 = item.comment;
     } else if (isPair(item)) {
       const ik = isNode(item.key) ? item.key : null;
       if (ik) {
@@ -8629,12 +10730,12 @@ function stringifyBlockCollection({ comment, items }, ctx, { blockItemPrefix, fl
       }
     }
     chompKeep = false;
-    let str = stringify(item, itemCtx, () => comment = null, () => chompKeep = true);
-    if (comment)
-      str += lineComment(str, itemIndent, commentString(comment));
-    if (chompKeep && comment)
+    let str2 = stringify(item, itemCtx, () => comment2 = null, () => chompKeep = true);
+    if (comment2)
+      str2 += lineComment(str2, itemIndent, commentString(comment2));
+    if (chompKeep && comment2)
       chompKeep = false;
-    lines.push(blockItemPrefix + str);
+    lines.push(blockItemPrefix + str2);
   }
   let str;
   if (lines.length === 0) {
@@ -8862,10 +10963,10 @@ var map = {
   default: true,
   nodeClass: YAMLMap,
   tag: "tag:yaml.org,2002:map",
-  resolve(map, onError) {
-    if (!isMap(map))
+  resolve(map2, onError) {
+    if (!isMap(map2))
       onError("Expected a mapping for this tag");
-    return map;
+    return map2;
   },
   createNode: (schema, obj, ctx) => YAMLMap.from(schema, obj, ctx)
 };
@@ -8959,10 +11060,10 @@ var seq = {
   default: true,
   nodeClass: YAMLSeq,
   tag: "tag:yaml.org,2002:seq",
-  resolve(seq, onError) {
-    if (!isSeq(seq))
+  resolve(seq2, onError) {
+    if (!isSeq(seq2))
       onError("Expected a sequence for this tag");
-    return seq;
+    return seq2;
   },
   createNode: (schema, obj, ctx) => YAMLSeq.from(schema, obj, ctx)
 };
@@ -9190,10 +11291,10 @@ var binary = {
 };
 
 // node_modules/yaml/browser/dist/schema/yaml-1.1/pairs.js
-function resolvePairs(seq, onError) {
-  if (isSeq(seq)) {
-    for (let i = 0;i < seq.items.length; ++i) {
-      let item = seq.items[i];
+function resolvePairs(seq2, onError) {
+  if (isSeq(seq2)) {
+    for (let i = 0;i < seq2.items.length; ++i) {
+      let item = seq2.items[i];
       if (isPair(item))
         continue;
       else if (isMap(item)) {
@@ -9210,15 +11311,15 @@ ${cn.comment}` : item.comment;
         }
         item = pair;
       }
-      seq.items[i] = isPair(item) ? item : new Pair(item);
+      seq2.items[i] = isPair(item) ? item : new Pair(item);
     }
   } else
     onError("Expected a sequence for this tag");
-  return seq;
+  return seq2;
 }
-function createPairs(schema, iterable, ctx) {
+function createPairs(schema3, iterable, ctx) {
   const { replacer } = ctx;
-  const pairs = new YAMLSeq(schema);
+  const pairs = new YAMLSeq(schema3);
   pairs.tag = "tag:yaml.org,2002:pairs";
   let i = 0;
   if (iterable && Symbol.iterator in Object(iterable))
@@ -9269,9 +11370,9 @@ class YAMLOMap extends YAMLSeq {
   toJSON(_, ctx) {
     if (!ctx)
       return super.toJSON(_);
-    const map = new Map;
+    const map2 = new Map;
     if (ctx?.onCreate)
-      ctx.onCreate(map);
+      ctx.onCreate(map2);
     for (const pair of this.items) {
       let key, value;
       if (isPair(pair)) {
@@ -9280,16 +11381,16 @@ class YAMLOMap extends YAMLSeq {
       } else {
         key = toJS(pair, "", ctx);
       }
-      if (map.has(key))
+      if (map2.has(key))
         throw new Error("Ordered maps must not include duplicate keys");
-      map.set(key, value);
+      map2.set(key, value);
     }
-    return map;
+    return map2;
   }
-  static from(schema, iterable, ctx) {
-    const pairs = createPairs(schema, iterable, ctx);
+  static from(schema3, iterable, ctx) {
+    const pairs2 = createPairs(schema3, iterable, ctx);
     const omap = new this;
-    omap.items = pairs.items;
+    omap.items = pairs2.items;
     return omap;
   }
 }
@@ -9300,10 +11401,10 @@ var omap = {
   nodeClass: YAMLOMap,
   default: false,
   tag: "tag:yaml.org,2002:omap",
-  resolve(seq, onError) {
-    const pairs = resolvePairs(seq, onError);
+  resolve(seq2, onError) {
+    const pairs2 = resolvePairs(seq2, onError);
     const seenKeys = [];
-    for (const { key } of pairs.items) {
+    for (const { key } of pairs2.items) {
       if (isScalar(key)) {
         if (seenKeys.includes(key.value)) {
           onError(`Ordered maps must not include duplicate keys: ${key.value}`);
@@ -9312,9 +11413,9 @@ var omap = {
         }
       }
     }
-    return Object.assign(new YAMLOMap, pairs);
+    return Object.assign(new YAMLOMap, pairs2);
   },
-  createNode: (schema, iterable, ctx) => YAMLOMap.from(schema, iterable, ctx)
+  createNode: (schema3, iterable, ctx) => YAMLOMap.from(schema3, iterable, ctx)
 };
 
 // node_modules/yaml/browser/dist/schema/yaml-1.1/bool.js
@@ -9399,8 +11500,8 @@ function intResolve2(str, offset, radix, { intAsBigInt }) {
         str = `0x${str}`;
         break;
     }
-    const n = BigInt(str);
-    return sign === "-" ? BigInt(-1) * n : n;
+    const n2 = BigInt(str);
+    return sign === "-" ? BigInt(-1) * n2 : n2;
   }
   const n = parseInt(str, radix);
   return sign === "-" ? -1 * n : n;
@@ -9451,8 +11552,8 @@ var intHex2 = {
 
 // node_modules/yaml/browser/dist/schema/yaml-1.1/set.js
 class YAMLSet extends YAMLMap {
-  constructor(schema) {
-    super(schema);
+  constructor(schema3) {
+    super(schema3);
     this.tag = YAMLSet.tag;
   }
   add(key) {
@@ -9492,9 +11593,9 @@ class YAMLSet extends YAMLMap {
     else
       throw new Error("Set items must all have null values");
   }
-  static from(schema, iterable, ctx) {
+  static from(schema3, iterable, ctx) {
     const { replacer } = ctx;
-    const set = new this(schema);
+    const set = new this(schema3);
     if (iterable && Symbol.iterator in Object(iterable))
       for (let value of iterable) {
         if (typeof replacer === "function")
@@ -9511,16 +11612,16 @@ var set = {
   nodeClass: YAMLSet,
   default: false,
   tag: "tag:yaml.org,2002:set",
-  createNode: (schema, iterable, ctx) => YAMLSet.from(schema, iterable, ctx),
-  resolve(map, onError) {
-    if (isMap(map)) {
-      if (map.hasAllNullValues(true))
-        return Object.assign(new YAMLSet, map);
+  createNode: (schema3, iterable, ctx) => YAMLSet.from(schema3, iterable, ctx),
+  resolve(map2, onError) {
+    if (isMap(map2)) {
+      if (map2.hasAllNullValues(true))
+        return Object.assign(new YAMLSet, map2);
       else
         onError("Set items must all have null values");
     } else
       onError("Expected a mapping for this tag");
-    return map;
+    return map2;
   }
 };
 
@@ -9529,7 +11630,7 @@ function parseSexagesimal(str, asBigInt) {
   const sign = str[0];
   const parts = sign === "-" || sign === "+" ? str.substring(1) : str;
   const num = (n) => asBigInt ? BigInt(n) : Number(n);
-  const res = parts.replace(/_/g, "").split(":").reduce((res, p) => res * num(60) + num(p), num(0));
+  const res = parts.replace(/_/g, "").split(":").reduce((res2, p) => res2 * num(60) + num(p), num(0));
   return sign === "-" ? num(-1) * res : res;
 }
 function stringifySexagesimal(node) {
@@ -9683,16 +11784,16 @@ function getTags(customTags, schemaName, addMergeTag) {
   }
   if (addMergeTag)
     tags = tags.concat(merge);
-  return tags.reduce((tags, tag) => {
+  return tags.reduce((tags2, tag) => {
     const tagObj = typeof tag === "string" ? tagsByName[tag] : tag;
     if (!tagObj) {
       const tagName = JSON.stringify(tag);
       const keys = Object.keys(tagsByName).map((key) => JSON.stringify(key)).join(", ");
       throw new Error(`Unknown custom tag ${tagName}; use one of ${keys}`);
     }
-    if (!tags.includes(tagObj))
-      tags.push(tagObj);
-    return tags;
+    if (!tags2.includes(tagObj))
+      tags2.push(tagObj);
+    return tags2;
   }, []);
 }
 
@@ -9700,11 +11801,11 @@ function getTags(customTags, schemaName, addMergeTag) {
 var sortMapEntriesByKey = (a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
 
 class Schema {
-  constructor({ compat, customTags, merge, resolveKnownTags, schema, sortMapEntries, toStringDefaults }) {
+  constructor({ compat, customTags, merge: merge2, resolveKnownTags, schema: schema4, sortMapEntries, toStringDefaults }) {
     this.compat = Array.isArray(compat) ? getTags(compat, "compat") : compat ? getTags(null, compat) : null;
-    this.name = typeof schema === "string" && schema || "core";
+    this.name = typeof schema4 === "string" && schema4 || "core";
     this.knownTags = resolveKnownTags ? coreKnownTags : {};
-    this.tags = getTags(customTags, this.name, merge);
+    this.tags = getTags(customTags, this.name, merge2);
     this.toStringOptions = toStringDefaults ?? null;
     Object.defineProperty(this, MAP, { value: map });
     Object.defineProperty(this, SCALAR, { value: string });
@@ -9989,8 +12090,8 @@ class Document {
     };
     const res = toJS(this.contents, jsonArg ?? "", ctx);
     if (typeof onAnchor === "function")
-      for (const { count, res } of ctx.anchors.values())
-        onAnchor(res, count);
+      for (const { count, res: res2 } of ctx.anchors.values())
+        onAnchor(res2, count);
     return typeof reviver === "function" ? applyReviver(reviver, { "": res }, "", res) : res;
   }
   toJSON(jsonArg, onAnchor) {
@@ -10259,7 +12360,7 @@ function mapIncludes(ctx, items, search) {
 var startColMsg = "All mapping items must start at the same column";
 function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, tag) {
   const NodeClass = tag?.nodeClass ?? YAMLMap;
-  const map = new NodeClass(ctx.schema);
+  const map2 = new NodeClass(ctx.schema);
   if (ctx.atRoot)
     ctx.atRoot = false;
   let offset = bm.offset;
@@ -10285,11 +12386,11 @@ function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, ta
       if (!keyProps.anchor && !keyProps.tag && !sep) {
         commentEnd = keyProps.end;
         if (keyProps.comment) {
-          if (map.comment)
-            map.comment += `
+          if (map2.comment)
+            map2.comment += `
 ` + keyProps.comment;
           else
-            map.comment = keyProps.comment;
+            map2.comment = keyProps.comment;
         }
         continue;
       }
@@ -10305,7 +12406,7 @@ function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, ta
     if (ctx.schema.compat)
       flowIndentCheck(bm.indent, key, onError);
     ctx.atKey = false;
-    if (mapIncludes(ctx, map.items, keyNode))
+    if (mapIncludes(ctx, map2.items, keyNode))
       onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
     const valueProps = resolveProps(sep ?? [], {
       indicator: "map-value-ind",
@@ -10330,7 +12431,7 @@ function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, ta
       const pair = new Pair(keyNode, valueNode);
       if (ctx.options.keepSourceTokens)
         pair.srcToken = collItem;
-      map.items.push(pair);
+      map2.items.push(pair);
     } else {
       if (implicitKey)
         onError(keyNode.range, "MISSING_CHAR", "Implicit map keys need to be followed by map values");
@@ -10344,19 +12445,19 @@ function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, ta
       const pair = new Pair(keyNode);
       if (ctx.options.keepSourceTokens)
         pair.srcToken = collItem;
-      map.items.push(pair);
+      map2.items.push(pair);
     }
   }
   if (commentEnd && commentEnd < offset)
     onError(commentEnd, "IMPOSSIBLE", "Map comment with trailing content");
-  map.range = [bm.offset, offset, commentEnd ?? offset];
-  return map;
+  map2.range = [bm.offset, offset, commentEnd ?? offset];
+  return map2;
 }
 
 // node_modules/yaml/browser/dist/compose/resolve-block-seq.js
 function resolveBlockSeq({ composeNode, composeEmptyNode }, ctx, bs, onError, tag) {
   const NodeClass = tag?.nodeClass ?? YAMLSeq;
-  const seq = new NodeClass(ctx.schema);
+  const seq2 = new NodeClass(ctx.schema);
   if (ctx.atRoot)
     ctx.atRoot = false;
   if (ctx.atKey)
@@ -10381,7 +12482,7 @@ function resolveBlockSeq({ composeNode, composeEmptyNode }, ctx, bs, onError, ta
       } else {
         commentEnd = props.end;
         if (props.comment)
-          seq.comment = props.comment;
+          seq2.comment = props.comment;
         continue;
       }
     }
@@ -10389,10 +12490,10 @@ function resolveBlockSeq({ composeNode, composeEmptyNode }, ctx, bs, onError, ta
     if (ctx.schema.compat)
       flowIndentCheck(bs.indent, value, onError);
     offset = node.range[2];
-    seq.items.push(node);
+    seq2.items.push(node);
   }
-  seq.range = [bs.offset, offset, commentEnd ?? offset];
-  return seq;
+  seq2.range = [bs.offset, offset, commentEnd ?? offset];
+  return seq2;
 }
 
 // node_modules/yaml/browser/dist/compose/resolve-end.js
@@ -10436,9 +12537,9 @@ function resolveEnd(end, offset, reqSpace, onError) {
 var blockMsg = "Block collections are not allowed within flow collections";
 var isBlock = (token) => token && (token.type === "block-map" || token.type === "block-seq");
 function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onError, tag) {
-  const isMap = fc.start.source === "{";
-  const fcName = isMap ? "flow map" : "flow sequence";
-  const NodeClass = tag?.nodeClass ?? (isMap ? YAMLMap : YAMLSeq);
+  const isMap2 = fc.start.source === "{";
+  const fcName = isMap2 ? "flow map" : "flow sequence";
+  const NodeClass = tag?.nodeClass ?? (isMap2 ? YAMLMap : YAMLSeq);
   const coll = new NodeClass(ctx.schema);
   coll.flow = true;
   const atRoot = ctx.atRoot;
@@ -10475,7 +12576,7 @@ function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onErr
         offset = props.end;
         continue;
       }
-      if (!isMap && ctx.options.strict && containsNewline(key))
+      if (!isMap2 && ctx.options.strict && containsNewline(key))
         onError(key, "MULTILINE_IMPLICIT_KEY", "Implicit keys of flow sequence pairs need to be on a single line");
     }
     if (i === 0) {
@@ -10512,7 +12613,7 @@ function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onErr
         }
       }
     }
-    if (!isMap && !sep && !props.found) {
+    if (!isMap2 && !sep && !props.found) {
       const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep, null, props, onError);
       coll.items.push(valueNode);
       offset = valueNode.range[2];
@@ -10535,7 +12636,7 @@ function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onErr
         startOnNewline: false
       });
       if (valueProps.found) {
-        if (!isMap && !props.found && ctx.options.strict) {
+        if (!isMap2 && !props.found && ctx.options.strict) {
           if (sep)
             for (const st of sep) {
               if (st === valueProps.found)
@@ -10568,23 +12669,23 @@ function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onErr
       const pair = new Pair(keyNode, valueNode);
       if (ctx.options.keepSourceTokens)
         pair.srcToken = collItem;
-      if (isMap) {
-        const map = coll;
-        if (mapIncludes(ctx, map.items, keyNode))
+      if (isMap2) {
+        const map2 = coll;
+        if (mapIncludes(ctx, map2.items, keyNode))
           onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        map.items.push(pair);
+        map2.items.push(pair);
       } else {
-        const map = new YAMLMap(ctx.schema);
-        map.flow = true;
-        map.items.push(pair);
+        const map2 = new YAMLMap(ctx.schema);
+        map2.flow = true;
+        map2.items.push(pair);
         const endRange = (valueNode ?? keyNode).range;
-        map.range = [keyNode.range[0], endRange[1], endRange[2]];
-        coll.items.push(map);
+        map2.range = [keyNode.range[0], endRange[1], endRange[2]];
+        coll.items.push(map2);
       }
       offset = valueNode ? valueNode.range[2] : valueProps.end;
     }
   }
-  const expectedEnd = isMap ? "}" : "]";
+  const expectedEnd = isMap2 ? "}" : "]";
   const [ce, ...ee] = fc.end;
   let cePos = offset;
   if (ce?.source === expectedEnd)
@@ -10681,12 +12782,12 @@ function resolveBlockScalar(ctx, scalar, onError) {
       break;
   }
   if (chompStart === 0) {
-    const value = header.chomp === "+" && lines.length > 0 ? `
+    const value2 = header.chomp === "+" && lines.length > 0 ? `
 `.repeat(Math.max(1, lines.length - 1)) : "";
-    let end = start + header.length;
+    let end2 = start + header.length;
     if (scalar.source)
-      end += scalar.source.length;
-    return { value, type, comment: header.comment, range: [start, end, end] };
+      end2 += scalar.source.length;
+    return { value: value2, type, comment: header.comment, range: [start, end2, end2] };
   }
   let trimIndent = scalar.indent + header.indent;
   let offset = scalar.offset + header.length;
@@ -11098,11 +13199,11 @@ function composeScalar(ctx, token, tagToken, onError) {
     scalar.comment = comment;
   return scalar;
 }
-function findScalarTagByName(schema, value, tagName, tagToken, onError) {
+function findScalarTagByName(schema4, value, tagName, tagToken, onError) {
   if (tagName === "!")
-    return schema[SCALAR];
+    return schema4[SCALAR];
   const matchWithTest = [];
-  for (const tag of schema.tags) {
+  for (const tag of schema4.tags) {
     if (!tag.collection && tag.tag === tagName) {
       if (tag.default && tag.test)
         matchWithTest.push(tag);
@@ -11113,18 +13214,18 @@ function findScalarTagByName(schema, value, tagName, tagToken, onError) {
   for (const tag of matchWithTest)
     if (tag.test?.test(value))
       return tag;
-  const kt = schema.knownTags[tagName];
+  const kt = schema4.knownTags[tagName];
   if (kt && !kt.collection) {
-    schema.tags.push(Object.assign({}, kt, { default: false, test: undefined }));
+    schema4.tags.push(Object.assign({}, kt, { default: false, test: undefined }));
     return kt;
   }
   onError(tagToken, "TAG_RESOLVE_FAILED", `Unresolved tag: ${tagName}`, tagName !== "tag:yaml.org,2002:str");
-  return schema[SCALAR];
+  return schema4[SCALAR];
 }
-function findScalarTagByTest({ atKey, directives, schema }, value, token, onError) {
-  const tag = schema.tags.find((tag) => (tag.default === true || atKey && tag.default === "key") && tag.test?.test(value)) || schema[SCALAR];
-  if (schema.compat) {
-    const compat = schema.compat.find((tag) => tag.default && tag.test?.test(value)) ?? schema[SCALAR];
+function findScalarTagByTest({ atKey, directives, schema: schema4 }, value, token, onError) {
+  const tag = schema4.tags.find((tag2) => (tag2.default === true || atKey && tag2.default === "key") && tag2.test?.test(value)) || schema4[SCALAR];
+  if (schema4.compat) {
+    const compat = schema4.compat.find((tag2) => tag2.default && tag2.test?.test(value)) ?? schema4[SCALAR];
     if (tag.tag !== compat.tag) {
       const ts = directives.tagString(tag.tag);
       const cs = directives.tagString(compat.tag);
@@ -11951,18 +14052,18 @@ class Lexer {
     let indent = 0;
     let ch;
     loop:
-      for (let i = this.pos;ch = this.buffer[i]; ++i) {
+      for (let i2 = this.pos;ch = this.buffer[i2]; ++i2) {
         switch (ch) {
           case " ":
             indent += 1;
             break;
           case `
 `:
-            nl = i;
+            nl = i2;
             indent = 0;
             break;
           case "\r": {
-            const next = this.buffer[i + 1];
+            const next = this.buffer[i2 + 1];
             if (!next && !this.atEnd)
               return this.setNext("block-scalar");
             if (next === `
@@ -12005,16 +14106,16 @@ class Lexer {
       nl = i - 1;
     } else if (!this.blockScalarKeep) {
       do {
-        let i = nl - 1;
-        let ch = this.buffer[i];
-        if (ch === "\r")
-          ch = this.buffer[--i];
-        const lastChar = i;
-        while (ch === " ")
-          ch = this.buffer[--i];
-        if (ch === `
-` && i >= this.pos && i + 1 + indent > lastChar)
-          nl = i;
+        let i2 = nl - 1;
+        let ch2 = this.buffer[i2];
+        if (ch2 === "\r")
+          ch2 = this.buffer[--i2];
+        const lastChar = i2;
+        while (ch2 === " ")
+          ch2 = this.buffer[--i2];
+        if (ch2 === `
+` && i2 >= this.pos && i2 + 1 + indent > lastChar)
+          nl = i2;
         else
           break;
       } while (true);
@@ -12532,14 +14633,14 @@ class Parser {
         delete scalar.end;
       } else
         sep = [this.sourceToken];
-      const map = {
+      const map2 = {
         type: "block-map",
         offset: scalar.offset,
         indent: scalar.indent,
         items: [{ start, key: scalar, sep }]
       };
       this.onKeyLine = true;
-      this.stack[this.stack.length - 1] = map;
+      this.stack[this.stack.length - 1] = map2;
     } else
       yield* this.lineEnd(scalar);
   }
@@ -12570,8 +14671,8 @@ class Parser {
         yield* this.step();
     }
   }
-  *blockMap(map) {
-    const it = map.items[map.items.length - 1];
+  *blockMap(map2) {
+    const it = map2.items[map2.items.length - 1];
     switch (this.type) {
       case "newline":
         this.onKeyLine = false;
@@ -12581,7 +14682,7 @@ class Parser {
           if (last?.type === "comment")
             end?.push(this.sourceToken);
           else
-            map.items.push({ start: [this.sourceToken] });
+            map2.items.push({ start: [this.sourceToken] });
         } else if (it.sep) {
           it.sep.push(this.sourceToken);
         } else {
@@ -12591,17 +14692,17 @@ class Parser {
       case "space":
       case "comment":
         if (it.value) {
-          map.items.push({ start: [this.sourceToken] });
+          map2.items.push({ start: [this.sourceToken] });
         } else if (it.sep) {
           it.sep.push(this.sourceToken);
         } else {
-          if (this.atIndentedComment(it.start, map.indent)) {
-            const prev = map.items[map.items.length - 2];
+          if (this.atIndentedComment(it.start, map2.indent)) {
+            const prev = map2.items[map2.items.length - 2];
             const end = prev?.value?.end;
             if (Array.isArray(end)) {
               Array.prototype.push.apply(end, it.start);
               end.push(this.sourceToken);
-              map.items.pop();
+              map2.items.pop();
               return;
             }
           }
@@ -12609,8 +14710,8 @@ class Parser {
         }
         return;
     }
-    if (this.indent >= map.indent) {
-      const atMapIndent = !this.onKeyLine && this.indent === map.indent;
+    if (this.indent >= map2.indent) {
+      const atMapIndent = !this.onKeyLine && this.indent === map2.indent;
       const atNextItem = atMapIndent && (it.sep || it.explicitKey) && this.type !== "seq-item-ind";
       let start = [];
       if (atNextItem && it.sep && !it.value) {
@@ -12624,7 +14725,7 @@ class Parser {
             case "space":
               break;
             case "comment":
-              if (st.indent > map.indent)
+              if (st.indent > map2.indent)
                 nl.length = 0;
               break;
             default:
@@ -12639,7 +14740,7 @@ class Parser {
         case "tag":
           if (atNextItem || it.value) {
             start.push(this.sourceToken);
-            map.items.push({ start });
+            map2.items.push({ start });
             this.onKeyLine = true;
           } else if (it.sep) {
             it.sep.push(this.sourceToken);
@@ -12653,7 +14754,7 @@ class Parser {
             it.explicitKey = true;
           } else if (atNextItem || it.value) {
             start.push(this.sourceToken);
-            map.items.push({ start, explicitKey: true });
+            map2.items.push({ start, explicitKey: true });
           } else {
             this.stack.push({
               type: "block-map",
@@ -12670,16 +14771,16 @@ class Parser {
               if (includesToken(it.start, "newline")) {
                 Object.assign(it, { key: null, sep: [this.sourceToken] });
               } else {
-                const start = getFirstKeyStartProps(it.start);
+                const start2 = getFirstKeyStartProps(it.start);
                 this.stack.push({
                   type: "block-map",
                   offset: this.offset,
                   indent: this.indent,
-                  items: [{ start, key: null, sep: [this.sourceToken] }]
+                  items: [{ start: start2, key: null, sep: [this.sourceToken] }]
                 });
               }
             } else if (it.value) {
-              map.items.push({ start: [], key: null, sep: [this.sourceToken] });
+              map2.items.push({ start: [], key: null, sep: [this.sourceToken] });
             } else if (includesToken(it.sep, "map-value-ind")) {
               this.stack.push({
                 type: "block-map",
@@ -12688,7 +14789,7 @@ class Parser {
                 items: [{ start, key: null, sep: [this.sourceToken] }]
               });
             } else if (isFlowToken(it.key) && !includesToken(it.sep, "newline")) {
-              const start = getFirstKeyStartProps(it.start);
+              const start2 = getFirstKeyStartProps(it.start);
               const key = it.key;
               const sep = it.sep;
               sep.push(this.sourceToken);
@@ -12698,7 +14799,7 @@ class Parser {
                 type: "block-map",
                 offset: this.offset,
                 indent: this.indent,
-                items: [{ start, key, sep }]
+                items: [{ start: start2, key, sep }]
               });
             } else if (start.length > 0) {
               it.sep = it.sep.concat(start, this.sourceToken);
@@ -12709,7 +14810,7 @@ class Parser {
             if (!it.sep) {
               Object.assign(it, { key: null, sep: [this.sourceToken] });
             } else if (it.value || atNextItem) {
-              map.items.push({ start, key: null, sep: [this.sourceToken] });
+              map2.items.push({ start, key: null, sep: [this.sourceToken] });
             } else if (includesToken(it.sep, "map-value-ind")) {
               this.stack.push({
                 type: "block-map",
@@ -12729,7 +14830,7 @@ class Parser {
         case "double-quoted-scalar": {
           const fs = this.flowScalar(this.type);
           if (atNextItem || it.value) {
-            map.items.push({ start, key: fs, sep: [] });
+            map2.items.push({ start, key: fs, sep: [] });
             this.onKeyLine = true;
           } else if (it.sep) {
             this.stack.push(fs);
@@ -12740,7 +14841,7 @@ class Parser {
           return;
         }
         default: {
-          const bv = this.startBlockValue(map);
+          const bv = this.startBlockValue(map2);
           if (bv) {
             if (bv.type === "block-seq") {
               if (!it.explicitKey && it.sep && !includesToken(it.sep, "newline")) {
@@ -12753,7 +14854,7 @@ class Parser {
                 return;
               }
             } else if (atMapIndent) {
-              map.items.push({ start });
+              map2.items.push({ start });
             }
             this.stack.push(bv);
             return;
@@ -12764,8 +14865,8 @@ class Parser {
     yield* this.pop();
     yield* this.step();
   }
-  *blockSequence(seq) {
-    const it = seq.items[seq.items.length - 1];
+  *blockSequence(seq2) {
+    const it = seq2.items[seq2.items.length - 1];
     switch (this.type) {
       case "newline":
         if (it.value) {
@@ -12774,22 +14875,22 @@ class Parser {
           if (last?.type === "comment")
             end?.push(this.sourceToken);
           else
-            seq.items.push({ start: [this.sourceToken] });
+            seq2.items.push({ start: [this.sourceToken] });
         } else
           it.start.push(this.sourceToken);
         return;
       case "space":
       case "comment":
         if (it.value)
-          seq.items.push({ start: [this.sourceToken] });
+          seq2.items.push({ start: [this.sourceToken] });
         else {
-          if (this.atIndentedComment(it.start, seq.indent)) {
-            const prev = seq.items[seq.items.length - 2];
+          if (this.atIndentedComment(it.start, seq2.indent)) {
+            const prev = seq2.items[seq2.items.length - 2];
             const end = prev?.value?.end;
             if (Array.isArray(end)) {
               Array.prototype.push.apply(end, it.start);
               end.push(this.sourceToken);
-              seq.items.pop();
+              seq2.items.pop();
               return;
             }
           }
@@ -12798,21 +14899,21 @@ class Parser {
         return;
       case "anchor":
       case "tag":
-        if (it.value || this.indent <= seq.indent)
+        if (it.value || this.indent <= seq2.indent)
           break;
         it.start.push(this.sourceToken);
         return;
       case "seq-item-ind":
-        if (this.indent !== seq.indent)
+        if (this.indent !== seq2.indent)
           break;
         if (it.value || includesToken(it.start, "seq-item-ind"))
-          seq.items.push({ start: [this.sourceToken] });
+          seq2.items.push({ start: [this.sourceToken] });
         else
           it.start.push(this.sourceToken);
         return;
     }
-    if (this.indent > seq.indent) {
-      const bv = this.startBlockValue(seq);
+    if (this.indent > seq2.indent) {
+      const bv = this.startBlockValue(seq2);
       if (bv) {
         this.stack.push(bv);
         return;
@@ -12894,14 +14995,14 @@ class Parser {
         fixFlowSeqItems(fc);
         const sep = fc.end.splice(1, fc.end.length);
         sep.push(this.sourceToken);
-        const map = {
+        const map2 = {
           type: "block-map",
           offset: fc.offset,
           indent: fc.indent,
           items: [{ start, key: fc, sep }]
         };
         this.onKeyLine = true;
-        this.stack[this.stack.length - 1] = map;
+        this.stack[this.stack.length - 1] = map2;
       } else {
         yield* this.lineEnd(fc);
       }
@@ -13175,13 +15276,13 @@ function cleanLabel(description) {
 function classifyPatchableField(key, description) {
   const label = cleanLabel(description);
   const desc = description.toLowerCase();
-  const pairs = [];
+  const pairs2 = [];
   for (const match of description.matchAll(ENUM_PAIR_RE)) {
-    pairs.push([match[1], match[2].trim()]);
+    pairs2.push([match[1], match[2].trim()]);
   }
-  if (pairs.length >= 2) {
+  if (pairs2.length >= 2) {
     const options = {};
-    for (const [code, text] of pairs)
+    for (const [code, text] of pairs2)
       options[code] = text;
     return { kind: "enum", key, label: label || key, options };
   }
@@ -13322,7 +15423,7 @@ function applyFastLaneAnswers(previousPayload, directives, answers, confidenceFl
     const targets = [];
     const list = payload.characters;
     if (Array.isArray(list)) {
-      const entry = list.find((entry) => entry && typeof entry === "object" && typeof entry.name === "string" && entry.name.trim().toLowerCase() === name.toLowerCase());
+      const entry = list.find((entry2) => entry2 && typeof entry2 === "object" && typeof entry2.name === "string" && entry2.name.trim().toLowerCase() === name.toLowerCase());
       if (entry)
         targets.push(entry);
     }
@@ -14012,9 +16113,9 @@ async function checkConceptionTriggers(chatId, payload, narrative) {
     if (!isFemaleOrFuta(stats))
       continue;
     if (isAlreadyConceivedOrPregnant(stats)) {
-      const key = `${chatId}::${stats.name}`;
-      if (conceptionNotified.has(key))
-        conceptionNotified.delete(key);
+      const key2 = `${chatId}::${stats.name}`;
+      if (conceptionNotified.has(key2))
+        conceptionNotified.delete(key2);
       continue;
     }
     if (!isInFertileWindow(stats))
@@ -14174,15 +16275,15 @@ function formatTrackerForPrompt(raw) {
       lines.push(prefix);
       value.forEach((item, index) => {
         if (item && typeof item === "object" && !Array.isArray(item)) {
-          const entries = Object.entries(item);
-          if (entries.length === 0) {
+          const entries2 = Object.entries(item);
+          if (entries2.length === 0) {
             lines.push(`${indent(depth + 1)}- Item ${index + 1}: (empty)`);
             return;
           }
-          const preferredIndex = entries.findIndex(([entryKey, entryValue]) => entryKey === "name" && (entryValue === null || typeof entryValue !== "object"));
+          const preferredIndex = entries2.findIndex(([entryKey, entryValue]) => entryKey === "name" && (entryValue === null || typeof entryValue !== "object"));
           const firstIndex = preferredIndex >= 0 ? preferredIndex : 0;
-          const [firstKey, firstValue] = entries[firstIndex];
-          const remainingEntries = entries.filter((_, entryIndex) => entryIndex !== firstIndex);
+          const [firstKey, firstValue] = entries2[firstIndex];
+          const remainingEntries = entries2.filter((_, entryIndex) => entryIndex !== firstIndex);
           if (firstValue === null || typeof firstValue !== "object") {
             lines.push(`${indent(depth + 1)}- ${firstKey}: ${scalar(firstValue)}`);
           } else {
@@ -14199,13 +16300,13 @@ function formatTrackerForPrompt(raw) {
       return;
     }
     if (value && typeof value === "object") {
-      const entries = Object.entries(value);
-      if (entries.length === 0) {
+      const entries2 = Object.entries(value);
+      if (entries2.length === 0) {
         lines.push(`${prefix} (empty)`);
         return;
       }
       lines.push(prefix);
-      entries.forEach(([childKey, childValue]) => appendValue(childKey, childValue, depth + 1));
+      entries2.forEach(([childKey, childValue]) => appendValue(childKey, childValue, depth + 1));
       return;
     }
     lines.push(`${prefix} ${scalar(value)}`);
@@ -14419,10 +16520,10 @@ async function mutateChatForCommand(command, arg1, ctx) {
       };
     }
     const block = makeStarterTrackerBlock();
-    const updatedContent = `${target.content.trimEnd()}
+    const updatedContent2 = `${target.content.trimEnd()}
 
 ${block}`;
-    await spindle.chat.updateMessage(ctx.chatId, target.id, { content: updatedContent });
+    await spindle.chat.updateMessage(ctx.chatId, target.id, { content: updatedContent2 });
     await trackEvent("sst.command.add", { mode: "chat_mutation" }, { chatId: ctx.chatId });
     return {
       command: "sst-add",
@@ -14501,8 +16602,8 @@ async function handleSlashCommand(content, ctx) {
         mode: "fallback"
       });
     }
-    const parsed = parseTrackerPayload(lastSimStats);
-    if (!parsed) {
+    const parsed2 = parseTrackerPayload(lastSimStats);
+    if (!parsed2) {
       return buildCommandResponse({
         command: "sst-convert",
         ok: false,
@@ -14510,26 +16611,26 @@ async function handleSlashCommand(content, ctx) {
         mode: "fallback"
       });
     }
-    const block = formatTrackerPayload(parsed, target, config.codeBlockIdentifier);
-    lastSimStats = target === "yaml" ? stringify3(parsed) : JSON.stringify(parsed, null, 2);
+    const block2 = formatTrackerPayload(parsed2, target, config.codeBlockIdentifier);
+    lastSimStats = target === "yaml" ? stringify3(parsed2) : JSON.stringify(parsed2, null, 2);
     pushMacroValues();
     await trackEvent("sst.command.convert", { mode: "fallback", format: target }, ctx.chatId ? { chatId: ctx.chatId } : undefined);
     return buildCommandResponse({
       command: "sst-convert",
       ok: true,
       message: `Converted latest tracker to ${target.toUpperCase()}.`,
-      block,
+      block: block2,
       mode: "fallback"
     });
   }
   if (command === "/sst-add") {
-    const block = makeStarterTrackerBlock();
+    const block2 = makeStarterTrackerBlock();
     await trackEvent("sst.command.add", { mode: "fallback" }, ctx.chatId ? { chatId: ctx.chatId } : undefined);
     return buildCommandResponse({
       command: "sst-add",
       ok: true,
       message: "Generated a starter tracker tag.",
-      block,
+      block: block2,
       mode: "fallback"
     });
   }
@@ -15042,10 +17143,10 @@ async function generateTrackerWithSecondaryLLM(chatId, targetMessageId) {
               return;
             }
             if (gate === "fast") {
-              const result = applyFastLaneAnswers(previousPayload, plan.directives, answers, config.typeSafeConfidenceFloor);
-              if (result.changed.length > 0) {
-                await commitTrackerAppend(chatId, targetMessage, result.payload, "typesafe-fast-lane");
-                await trackEvent("sst.typesafe.fast_append", { changed: result.changed }, { chatId });
+              const result2 = applyFastLaneAnswers(previousPayload, plan.directives, answers, config.typeSafeConfidenceFloor);
+              if (result2.changed.length > 0) {
+                await commitTrackerAppend(chatId, targetMessage, result2.payload, "typesafe-fast-lane");
+                await trackEvent("sst.typesafe.fast_append", { changed: result2.changed }, { chatId });
                 return;
               }
               await trackEvent("sst.typesafe.fast_append_fallback", { reason: "no-confident-changes" }, { chatId });
@@ -15592,16 +17693,16 @@ function tryRegisterInterceptor() {
         }
       }
       if (lastAssistantIdx >= 0) {
-        const injected = promptMessages.slice();
-        const target = injected[lastAssistantIdx];
+        const injected2 = promptMessages.slice();
+        const target = injected2[lastAssistantIdx];
         const base = typeof target.content === "string" ? target.content.trimEnd() : "";
-        injected[lastAssistantIdx] = {
+        injected2[lastAssistantIdx] = {
           ...target,
           content: base ? `${base}
 
 ${block}` : block
         };
-        return withTrailingDirective(injected, conceptionDirective);
+        return withTrailingDirective(injected2, conceptionDirective);
       }
       const injected = promptMessages.slice();
       const insertAt = Math.max(0, injected.length - 1);
