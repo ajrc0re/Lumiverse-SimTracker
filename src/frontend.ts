@@ -96,8 +96,36 @@ type CompiledTemplateCacheEntry = {
 
 const TEMPLATE_CACHE = new Map<string, CompiledTemplateCacheEntry>();
 let helpersRegistered = false;
+let toggleAllControlsBound = false;
 let panelRoot: Element | null = null;
 const READY_MIN_VERSION = [1, 0, 6] as const;
+
+/**
+ * Master expand/collapse for templates that render native `<details>` panels
+ * (e.g. Internal States Board, Narrative Weave). A template opts in by
+ * tagging its root with `data-sst-toggle-scope` and a button with
+ * `data-sst-toggle-all`. Clicking flips every `<details>` in that scope:
+ * open all while every panel is compact, collapse all as soon as any panel
+ * is open. Document-level delegation means the handler survives message
+ * virtualization and innerHTML re-renders of any mount.
+ */
+function bindToggleAllControls(): void {
+  if (toggleAllControlsBound) return;
+  toggleAllControlsBound = true;
+  document.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!target || typeof (target as Element).closest !== "function") return;
+    const btn = (target as Element).closest<HTMLElement>("[data-sst-toggle-all]");
+    if (!btn) return;
+    const scope = btn.closest<HTMLElement>("[data-sst-toggle-scope]");
+    if (!scope) return;
+    const panels = Array.from(scope.querySelectorAll<HTMLDetailsElement>("details"));
+    if (panels.length === 0) return;
+    const expand = !panels.some((panel) => panel.open);
+    for (const panel of panels) panel.open = expand;
+    btn.setAttribute("aria-expanded", String(expand));
+  });
+}
 
 function parseVersionSegment(segment: string | undefined): number {
   if (!segment) return 0;
@@ -1547,6 +1575,7 @@ export function setup(ctx: SpindleFrontendContext) {
   // frontend has registered its handlers and issued its initial requests.
   const readyGate = createReadyGate(ctx);
   registerTemplateHelpers();
+  bindToggleAllControls();
   ctx.dom.cleanup();
 
   let config: TrackerConfig = { ...DEFAULT_CONFIG };

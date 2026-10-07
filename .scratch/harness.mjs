@@ -241,7 +241,24 @@ const page = (body, label) => `<!doctype html><html><head><meta charset="utf-8">
   :root { --lumiverse-bg: #17171c; --lumiverse-fill-subtle: #25262d; --lumiverse-fill: #30313a;
     --lumiverse-border: rgba(255,255,255,0.13); --lumiverse-border-hover: rgba(255,255,255,0.24);
     --lumiverse-text: #f4f4f6; --lumiverse-text-muted: #b4b5bd; --lumiverse-text-dim: #8a8c96; }
-</style></head><body>${body}</body></html>`;
+</style></head><body>${body}
+<script>
+// Mirrors bindToggleAllControls() in src/frontend.ts (the extension binds
+// this at the document level in production).
+document.addEventListener("click", (ev) => {
+  const target = ev.target;
+  if (!target || typeof target.closest !== "function") return;
+  const btn = target.closest("[data-sst-toggle-all]");
+  if (!btn) return;
+  const scope = btn.closest("[data-sst-toggle-scope]");
+  if (!scope) return;
+  const panels = Array.from(scope.querySelectorAll("details"));
+  if (panels.length === 0) return;
+  const expand = !panels.some((panel) => panel.open);
+  for (const panel of panels) panel.open = expand;
+  btn.setAttribute("aria-expanded", String(expand));
+});
+</script></body></html>`;
 
 writeFileSync(resolve(root, ".scratch/out/max.html"), page(render(MAX, "MAX"), "max"));
 writeFileSync(resolve(root, ".scratch/out/min.html"), page(render(MIN, "MIN"), "min"));

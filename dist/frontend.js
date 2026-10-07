@@ -13108,6 +13108,66 @@ var internal_states_simtracker_default = {
     border-color: color-mix(in srgb, var(--is-accent, #5cc8be) 80%, var(--is-border));
   }
 
+  /* ── Expand / collapse all ───────────────────────────────────────── */
+  .is-xa-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--is-gold) 50%, var(--is-border));
+    border-radius: 999px;
+    color: #f0d08d;
+    background: color-mix(in srgb, var(--is-gold) 14%, transparent);
+    cursor: pointer;
+    transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+  }
+
+  .is-xa-btn:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--is-gold) 80%, var(--is-border));
+    background: color-mix(in srgb, var(--is-gold) 22%, transparent);
+  }
+
+  .is-xa-btn:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--is-focus) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  .is-xa-arrow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .is-xa-arrow-up {
+    opacity: 0;
+    transform: rotate(225deg);
+  }
+
+  /* Any open panel (or a fresh expand-all) flips the button to its
+     collapse-all up arrow. */
+  .is-tracker:has(.is-panel[open]) .is-xa-arrow-down,
+  .is-tracker:has(.is-xa-btn[aria-expanded="true"]) .is-xa-arrow-down {
+    opacity: 0;
+  }
+
+  .is-tracker:has(.is-panel[open]) .is-xa-arrow-up,
+  .is-tracker:has(.is-xa-btn[aria-expanded="true"]) .is-xa-arrow-up {
+    opacity: 1;
+    transform: rotate(225deg);
+  }
+
   /* ── Panels ──────────────────────────────────────────────────────── */
   .is-panel {
     min-width: 0;
@@ -14031,7 +14091,7 @@ var internal_states_simtracker_default = {
   }
 </style>
 
-<section class="is-tracker" aria-label="Internal states module board">
+<section class="is-tracker" data-sst-toggle-scope aria-label="Internal states module board">
   {{#if worldData.internalStates}}
     {{#if worldData.internalStates.modules.length}}
       {{#with worldData.internalStates}}
@@ -14046,6 +14106,10 @@ var internal_states_simtracker_default = {
         <div class="is-hero-right">
           {{#if turn}}<span class="is-turn-chip">Turn {{turn}}</span>{{/if}}
           {{#each modules}}<span class="is-dot-chip" style="--is-accent: {{accent}};" title="{{title}}">{{icon}}</span>{{/each}}
+          <button type="button" class="is-xa-btn" data-sst-toggle-all aria-expanded="false" aria-label="Expand or collapse all modules">
+            <span class="is-xa-arrow is-xa-arrow-down" title="Expand all" aria-hidden="true"></span>
+            <span class="is-xa-arrow is-xa-arrow-up" title="Collapse all" aria-hidden="true"></span>
+          </button>
         </div>
       </header>
 
@@ -20933,8 +20997,32 @@ var BUILTIN_PRESETS = getTemplatePresets();
 var runtimeSeededPresets = [];
 var TEMPLATE_CACHE = new Map;
 var helpersRegistered = false;
+var toggleAllControlsBound = false;
 var panelRoot = null;
 var READY_MIN_VERSION = [1, 0, 6];
+function bindToggleAllControls() {
+  if (toggleAllControlsBound)
+    return;
+  toggleAllControlsBound = true;
+  document.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!target || typeof target.closest !== "function")
+      return;
+    const btn = target.closest("[data-sst-toggle-all]");
+    if (!btn)
+      return;
+    const scope = btn.closest("[data-sst-toggle-scope]");
+    if (!scope)
+      return;
+    const panels = Array.from(scope.querySelectorAll("details"));
+    if (panels.length === 0)
+      return;
+    const expand = !panels.some((panel) => panel.open);
+    for (const panel of panels)
+      panel.open = expand;
+    btn.setAttribute("aria-expanded", String(expand));
+  });
+}
 function parseVersionSegment(segment) {
   if (!segment)
     return 0;
@@ -22168,6 +22256,7 @@ function downloadJson(filename, content) {
 function setup(ctx) {
   const readyGate = createReadyGate(ctx);
   registerTemplateHelpers();
+  bindToggleAllControls();
   ctx.dom.cleanup();
   let config = { ...DEFAULT_CONFIG };
   let removeHideStyle = null;

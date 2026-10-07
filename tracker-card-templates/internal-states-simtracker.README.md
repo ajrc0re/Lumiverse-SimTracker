@@ -2,7 +2,7 @@
 
 Internal States Board is a Silly Sim Tracker preset that renders the **Freaky Frankenstein `<internal_states>` object** — the raw HTML block with nested `<details>` sections that FF 5.x already appends to every reply — as a polished module board in the Narrative Weave visual language. It requires **no JSON, no YAML, and no extra prompting**: the model keeps writing the exact same object it writes today.
 
-- One collapsible panel per internal states module, in the order the story emits them (not split by character).
+- One collapsible panel per internal states module, in the order the story emits them (not split by character), with a master expand-all / collapse-all toggle at the top right of the header (the arrow flips from down to up whenever any panel is open).
 - Mandatory modules (NPC AGENDAS, NPC LOCATIONS, FACTIONS, PHYSICS ENGINE & WORLD) plus every optional module — BONDS, QUESTS, INV & SKILLS, CHEKHOV'S GUN, INTERNAL THOUGHTS, GM'S NOTEBOOK, DND TASK SIM, WORLD SIM — render automatically when enabled, and the layout adapts from the 4-module minimum to the full 12-module maximum without grid holes.
 - Narrative Weave styling: theme-aware surfaces, colored module accents, pill chips, progress tracks, custom chevrons, tooltips on meter rows, reduced-motion support, and single-column layout under 720 px.
 - Purpose-built bodies per module: agenda step bars, dotted-leader location rows, bond meters (BOND −5…+20, Sparks, Grudge), quest banners with infinite-progress striping, Chekhov bullets with weight dots and fire-ready age badges (age ≥ 4 glows), thought quotes, color-coded GM notebook entries, dice/task grids, and world-sim event chips.
