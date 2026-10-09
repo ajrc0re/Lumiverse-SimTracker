@@ -53,7 +53,7 @@ The fork seeds `tracker-card-templates/internal-states-simtracker.json` into tem
 | 💚 BONDS | optional | Bond meters on FF's −5…+20 scale plus Sparks (0–7) and Grudge (0–5); grudge ≥ 3 flags halved gains |
 | 📜 QUESTS | optional | Main/side banners with status, reward chip, progress (0/∞ supported) |
 | 🎒 INV & SKILLS | optional | Field rows with per-item chips |
-| 🔫 CHEKHOV'S GUN | optional | Active/Locked/Fired columns; weight dots (1–3), age badges, ready glow at age ≥ 4, lock tags |
+| 🔫 CHEKHOV'S GUN | optional | Active/Locked/Fired groups stacked vertically at full width; weight dots (1–3), age badges, ready glow at age ≥ 4, lock tags |
 | 🧠 INTERNAL THOUGHTS | optional | Quote cards per NPC |
 | 📓 GM'S NOTEBOOK | optional | Full-width log with colored R/T/D badges |
 | 🎲 DND TASK SIM | optional | Task banner plus DC/Roll/Delta/Outcome grid |

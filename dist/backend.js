@@ -8370,9 +8370,11 @@ var internal_states_simtracker_default = {
   }
 
   /* \u2500\u2500 Chekhov's gun \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+  /* Groups stack vertically: bullet text gets the full panel width and a
+     heavy Active list no longer towers over two near-empty columns. */
   .is-chekhov-cols {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 
@@ -8387,7 +8389,6 @@ var internal_states_simtracker_default = {
   .is-chekhov-col-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 6px;
     margin-bottom: 7px;
     color: var(--is-dim);
@@ -8395,6 +8396,19 @@ var internal_states_simtracker_default = {
     font-weight: 800;
     letter-spacing: 0.07em;
     text-transform: uppercase;
+  }
+
+  .is-chekhov-col-head:last-child {
+    margin-bottom: 0;
+  }
+
+  .is-chekhov-none {
+    margin-left: auto;
+    color: var(--is-dim);
+    font-style: italic;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: none;
   }
 
   .is-chekhov-count {
@@ -8668,8 +8682,7 @@ var internal_states_simtracker_default = {
     }
 
     .is-grid,
-    .is-fieldgrid,
-    .is-chekhov-cols {
+    .is-fieldgrid {
       grid-template-columns: 1fr;
     }
 
@@ -8957,6 +8970,7 @@ var internal_states_simtracker_default = {
                       <div class="is-chekhov-col-head">
                         <span>{{label}}</span>
                         <span class="is-chekhov-count">{{items.length}}</span>
+                        {{#unless items.length}}<span class="is-chekhov-none">None</span>{{/unless}}
                       </div>
                       {{#if items.length}}
                         {{#each items}}
@@ -8969,8 +8983,6 @@ var internal_states_simtracker_default = {
                           </div>
                         </div>
                         {{/each}}
-                      {{else}}
-                        <div class="is-empty">None</div>
                       {{/if}}
                     </div>
                     {{/each}}

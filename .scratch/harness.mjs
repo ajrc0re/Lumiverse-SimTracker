@@ -264,6 +264,48 @@ writeFileSync(resolve(root, ".scratch/out/max.html"), page(render(MAX, "MAX"), "
 writeFileSync(resolve(root, ".scratch/out/min.html"), page(render(MIN, "MIN"), "min"));
 writeFileSync(resolve(root, ".scratch/out/partial.html"), page(render(PARTIAL, "PARTIAL"), "partial"));
 
+// Heavy Chekhov case: many active bullets, empty locked/fired (mirrors the
+// tall-column layout report).
+const CHEKHOV_HEAVY = `<tracker type="sim">
+<internal_states>
+<details>
+<summary>🎬 INTERNAL STATES (Turn: 31)</summary>
+
+<details>
+<summary>👤 NPC AGENDAS</summary>
+- <b>Miriam</b> | Agenda: Catalogue the archive basement | (Step 4/6) | Aware: none | Fibs: none | Circle: Hugo | Body: Determined
+</details>
+
+<details>
+<summary>👤 NPC LOCATIONS</summary>
+- <b>Miriam</b> | Location: Archive basement, east stacks
+- <b>Hugo</b> | Location: Courtyard, by the fountain
+</details>
+
+<details>
+<summary>🏳️ FACTIONS</summary>
+- None established.
+</details>
+
+<details>
+<summary>🔫 CHEKHOV'S GUN</summary>
+- <b>Active:</b> [BULLET: Rusted storm cellar padlock] (weight: 3, age: 5) | [BULLET: Hugo's radio picks up Collectors chatter nightly] (weight: 2, age: 2) | [BULLET: Unsent letter in Miriam's coat pocket] (weight: 1, age: 6) | [BULLET: Cracked support beam over the archive entrance] (weight: 2, age: 4) | [BULLET: Locked display case key missing from hook] (weight: 3, age: 1) | [BULLET: Fresh tire tracks behind the north wall] (weight: 1, age: 0) | [BULLET: Basement fuse box trips when the stacks lights run] (weight: 2, age: 7)
+- <b>Locked:</b> None
+- <b>Fired:</b> None
+</details>
+
+<details>
+<summary>🌌 PHYSICS, ENGINE & WORLD</summary>
+- <b>Env:</b> Dusty basement, single hanging bulb, dripping pipe in the corner.
+- <b>Physics:</b> Miriam at east stacks on a step stool. Hugo 40 m above ground level in the courtyard.
+</details>
+
+</details>
+</internal_states>
+</tracker>`;
+writeFileSync(resolve(root, ".scratch/out/chekhov-heavy.html"), page(render(CHEKHOV_HEAVY, "CHEKHOV-HEAVY"), "chekhov-heavy"));
+writeFileSync(resolve(root, ".scratch/out/chekhov-heavy-open.html"), page(render(CHEKHOV_HEAVY, "CHEKHOV-HEAVY").replace(/<details class="is-panel/g, '<details open class="is-panel'), "chekhov-heavy-open"));
+
 // JSON-schema sanity on logic output
 const prep = executeTemplateLogic(parseTrackerBlockFallback(MAX), logic);
 const is = prep.worldData.internalStates;
