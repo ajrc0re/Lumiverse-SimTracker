@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
-import type { SpindleFrontendContext, SpindleModelComboboxHandle } from "lumiverse-spindle-types";
+import type { SpindleFrontendContext, SpindleMessageTagIntercept, SpindleModelComboboxHandle } from "lumiverse-spindle-types";
 import { getTemplatePresets, mergeTemplatePresets, type TemplatePreset } from "./templatePresets";
-import { parseTrackerBlock, type TrackerData } from "./trackerData";
+import { INTERNAL_STATES_TYPE, parseTrackerBlock, type TrackerData } from "./trackerData";
 import { createInlineTemplateProcessor } from "./inlineTemplates";
 
 type FertilityCycleBias =
@@ -900,7 +900,9 @@ function extractTrackerBlock(content: string, identifier: string): string | null
     const attrsRaw = tagMatch[1] || "";
     const attrs = parseTagAttrs(attrsRaw);
     const foundType = sanitizeIdentifier(attrs.type || "");
-    if (foundType && foundType !== cleanIdentifier) continue;
+    // Absent, configured, or the reserved internal-states type — the FF
+    // raw-HTML board travels in <tracker type="internal_states">.
+    if (foundType && foundType !== cleanIdentifier && foundType !== INTERNAL_STATES_TYPE) continue;
     return tagMatch[2]?.trim() || null;
   }
 
@@ -1580,7 +1582,7 @@ export function setup(ctx: SpindleFrontendContext) {
 
   let config: TrackerConfig = { ...DEFAULT_CONFIG };
   let removeHideStyle: (() => void) | null = null;
-  let removeTagInterceptor: (() => void) | null = null;
+  let removeTagInterceptors: Array<() => void> = [];
   let tagInterceptorSignature: string | null = null;
   let previousTrackerData: TrackerData | null = null;
   let latestContent: string | null = null;
@@ -1740,66 +1742,76 @@ export function setup(ctx: SpindleFrontendContext) {
   };
 
   const applyTagInterceptor = () => {
+    // The reserved internal-states type is intercepted alongside the
+    // configured one so the FF raw-HTML board (<tracker
+    // type="internal_states">) is stripped and rendered too.
     const signature = JSON.stringify([
       config.trackerTagName,
       config.codeBlockIdentifier,
+      INTERNAL_STATES_TYPE,
       config.hideSimBlocks,
     ]);
-    if (removeTagInterceptor && tagInterceptorSignature === signature) return;
-    if (removeTagInterceptor) {
-      removeTagInterceptor();
-      removeTagInterceptor = null;
-    }
-    removeTagInterceptor = ctx.messages.registerTagInterceptor(
-      {
-        tagName: config.trackerTagName,
-        attrs: { type: config.codeBlockIdentifier },
-        removeFromMessage: config.hideSimBlocks,
-      },
-      (payload) => {
-        const payloadChatId = payload.chatId || null;
-        // Tag interception also runs for chats generating in the background.
-        // Removing the raw tag is global host behavior, but rendering it is
-        // only valid for the chat the user is actually viewing. In particular,
-        // a background payload must never be treated as navigation: doing so
-        // calls resetChatState() and uninjects the visible chat's tracker.
-        if (!isActivityForActiveChat(payloadChatId)) return;
-        if (typeof payload.content !== "string" || !payload.content.trim()) return;
-        const sourceContent = typeof payload.fullMatch === "string" ? payload.fullMatch : payload.content;
-        const messageId = payload.messageId || null;
-        // Initial chat hydration may mount dozens of historical tracker tags.
-        // They still get stripped, but only the backend-selected latest match
-        // is parsed/rendered and bridged back after rehydration.
-        if (!configReady || (!!payloadChatId && awaitingLatestTrackerChatId === payloadChatId)) {
-          // A late historical mount must not replace the backend-selected
-          // latest entry if that response won the race with full config.
-          if (!pendingTrackerPayload?.authoritative) {
-            pendingTrackerPayload = {
-              raw: payload.content,
-              sourceContent,
-              messageId,
-              chatId: payloadChatId || null,
-              authoritative: false,
-            };
-          }
-          return;
+    if (removeTagInterceptors.length > 0 && tagInterceptorSignature === signature) return;
+    for (const remove of removeTagInterceptors) remove();
+    removeTagInterceptors = [];
+
+    const onTagIntercept = (payload: SpindleMessageTagIntercept) => {
+      const payloadChatId = payload.chatId || null;
+      // Tag interception also runs for chats generating in the background.
+      // Removing the raw tag is global host behavior, but rendering it is
+      // only valid for the chat the user is actually viewing. In particular,
+      // a background payload must never be treated as navigation: doing so
+      // calls resetChatState() and uninjects the visible chat's tracker.
+      if (!isActivityForActiveChat(payloadChatId)) return;
+      if (typeof payload.content !== "string" || !payload.content.trim()) return;
+      const sourceContent = typeof payload.fullMatch === "string" ? payload.fullMatch : payload.content;
+      const messageId = payload.messageId || null;
+      // Initial chat hydration may mount dozens of historical tracker tags.
+      // They still get stripped, but only the backend-selected latest match
+      // is parsed/rendered and bridged back after rehydration.
+      if (!configReady || (!!payloadChatId && awaitingLatestTrackerChatId === payloadChatId)) {
+        // A late historical mount must not replace the backend-selected
+        // latest entry if that response won the race with full config.
+        if (!pendingTrackerPayload?.authoritative) {
+          pendingTrackerPayload = {
+            raw: payload.content,
+            sourceContent,
+            messageId,
+            chatId: payloadChatId || null,
+            authoritative: false,
+          };
         }
-        handleTrackerPayload(
-          payload.content,
-          sourceContent,
-          messageId,
-        );
-        ctx.sendToBackend({
-          type: "message_tag_intercepted",
-          tagName: payload.tagName,
-          attrs: payload.attrs,
-          content: payload.content,
-          messageId: payload.messageId,
-          chatId: payload.chatId,
-          isStreaming: payload.isStreaming,
-        });
-      },
-    );
+        return;
+      }
+      handleTrackerPayload(
+        payload.content,
+        sourceContent,
+        messageId,
+      );
+      ctx.sendToBackend({
+        type: "message_tag_intercepted",
+        tagName: payload.tagName,
+        attrs: payload.attrs,
+        content: payload.content,
+        messageId: payload.messageId,
+        chatId: payload.chatId,
+        isStreaming: payload.isStreaming,
+      });
+    };
+
+    const interceptorTypes = config.codeBlockIdentifier === INTERNAL_STATES_TYPE
+      ? [config.codeBlockIdentifier]
+      : [config.codeBlockIdentifier, INTERNAL_STATES_TYPE];
+    for (const tagType of interceptorTypes) {
+      removeTagInterceptors.push(ctx.messages.registerTagInterceptor(
+        {
+          tagName: config.trackerTagName,
+          attrs: { type: tagType },
+          removeFromMessage: config.hideSimBlocks,
+        },
+        onTagIntercept,
+      ));
+    }
     tagInterceptorSignature = signature;
   };
 
@@ -2916,7 +2928,8 @@ export function setup(ctx: SpindleFrontendContext) {
     stopInlineObserver();
     permissionUnsub();
     if (removeHideStyle) removeHideStyle();
-    if (removeTagInterceptor) removeTagInterceptor();
+    for (const remove of removeTagInterceptors) remove();
+    removeTagInterceptors = [];
     clearSideTrackerRender();
     for (const mount of trackerMessageMounts.values()) ctx.dom.uninject(mount);
     trackerMessageMounts.clear();

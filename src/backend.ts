@@ -1,4 +1,5 @@
 import { getTemplatePresetById, getTemplatePresets, mergeTemplatePresets, type TemplatePreset } from "./templatePresets";
+import { INTERNAL_STATES_TYPE } from "./trackerData";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   applyFastLaneAnswers,
@@ -233,6 +234,18 @@ function buildTrackerTagRegex(tagName: string, flags = "i"): RegExp {
   return new RegExp(String.raw`<${safeTag}\b([^>]*)>([\s\S]*?)<\/${safeTag}>`, flags);
 }
 
+/**
+ * A tracker tag belongs to this extension when its `type` attribute is
+ * absent, matches the configured code-block identifier, or is the reserved
+ * Freaky Frankenstein raw-HTML type. Filters that REBUILD payloads
+ * (replaceTrackerBlock) stay strict so commands never clobber an
+ * internal-states HTML board with a JSON rebuild.
+ */
+function isAcceptedTrackerType(typeAttr: string, identifier: string): boolean {
+  if (!typeAttr) return true;
+  return typeAttr === identifier || typeAttr === INTERNAL_STATES_TYPE;
+}
+
 function extractSimBlock(message: string, identifier: string): string | null {
   const re = buildTrackerFenceRegex(identifier, "i");
   const match = message.match(re);
@@ -247,7 +260,7 @@ function extractTrackerTag(message: string, tagName: string, identifier: string)
   while ((match = re.exec(message)) !== null) {
     const attrs = parseTagAttributes(match[1] || "");
     const typeAttr = sanitizeIdentifier(attrs.type || "");
-    if (typeAttr && typeAttr !== cleanIdentifier) continue;
+    if (!isAcceptedTrackerType(typeAttr, cleanIdentifier)) continue;
     return (match[2] || "").trim() || null;
   }
   return null;
@@ -1524,7 +1537,7 @@ function stripOldTrackerBlocks(content: string, identifier: string, keepNewest: 
     const attrs = parseTagAttributes(match[1] || "");
     const foundType = sanitizeIdentifier(attrs.type || "");
     const desiredType = sanitizeIdentifier(identifier);
-    if (foundType && foundType !== desiredType) continue;
+    if (!isAcceptedTrackerType(foundType, desiredType)) continue;
     const start = match.index ?? -1;
     if (start < 0 || !text) continue;
     blocks.push({ start, end: start + text.length, text });
@@ -1539,7 +1552,7 @@ function stripOldTrackerBlocks(content: string, identifier: string, keepNewest: 
         const attrs = parseTagAttributes(String(attrsRaw || ""));
         const foundType = sanitizeIdentifier(attrs.type || "");
         const desiredType = sanitizeIdentifier(identifier);
-        if (foundType && foundType !== desiredType) return full;
+        if (!isAcceptedTrackerType(foundType, desiredType)) return full;
         return "";
       });
       return wiped.replace(/\n\s*\n\s*\n/g, "\n\n").trim();
@@ -1849,7 +1862,7 @@ spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown, userId?: string) => {
 
     const attrs = obj.attrs && typeof obj.attrs === "object" ? (obj.attrs as Record<string, unknown>) : {};
     const tagType = sanitizeIdentifier(typeof attrs.type === "string" ? attrs.type : "");
-    if (tagType && tagType !== sanitizeIdentifier(config.codeBlockIdentifier)) return;
+    if (!isAcceptedTrackerType(tagType, sanitizeIdentifier(config.codeBlockIdentifier))) return;
 
     const content = typeof obj.content === "string" ? obj.content.trim() : "";
     if (!content) return;
@@ -2628,7 +2641,7 @@ function collectTrackerBlockRanges(content: string, identifier: string): BlockRa
     if (typeof start !== "number" || !text || seenStarts.has(start)) continue;
     const attrs = parseTagAttributes(match[1] || "");
     const foundType = sanitizeIdentifier(attrs.type || "");
-    if (foundType && foundType !== desiredType) continue;
+    if (!isAcceptedTrackerType(foundType, desiredType)) continue;
     seenStarts.add(start);
     ranges.push({ start, end: start + text.length });
   }
@@ -2686,7 +2699,7 @@ function stripAllTrackerBlocks(content: string, identifier: string): string {
   out = out.replace(buildTrackerTagRegex(config.trackerTagName, "gi"), (full, attrsRaw) => {
     const attrs = parseTagAttributes(String(attrsRaw || ""));
     const foundType = sanitizeIdentifier(attrs.type || "");
-    if (foundType && foundType !== desiredType) return full;
+    if (!isAcceptedTrackerType(foundType, desiredType)) return full;
     return "";
   });
   out = out.replace(/<div\b([^>]*)>([\s\S]*?)<\/div>/gi, (full, rawAttrs, rawInner) => {
@@ -2812,7 +2825,7 @@ function countMatchingTrackerBlocksInMessage(content: string): number {
   for (const match of content.matchAll(tagRe)) {
     const attrs = parseTagAttributes(match[1] || "");
     const typeAttr = sanitizeIdentifier(attrs.type || "");
-    if (typeAttr && typeAttr !== cleanIdentifier) continue;
+    if (!isAcceptedTrackerType(typeAttr, cleanIdentifier)) continue;
     if (match[0]) count++;
   }
 
