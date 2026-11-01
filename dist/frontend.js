@@ -20106,7 +20106,10 @@ function setup(ctx) {
   let pendingTrackerPayload = null;
   let awaitingLatestTrackerChatId = null;
   let initialTrackerRehydrateRequested = false;
-  const latestTrackerRequestsInFlight = new Set;
+  const latestTrackerRequestsInFlight = new Map;
+  let trackerSelectionRevision = 0;
+  let trackerRequestId = 0;
+  let trackerSelectionKey = JSON.stringify([config.trackerTagName, config.codeBlockIdentifier]);
   const trackerMessageIds = new Set;
   const trackerMessageMounts = new Map;
   const trackerMessageRenders = new Map;
@@ -20248,28 +20251,24 @@ function setup(ctx) {
         return;
       const sourceContent = typeof payload.fullMatch === "string" ? payload.fullMatch : payload.content;
       const messageId = payload.messageId || null;
-      if (!configReady || !!payloadChatId && awaitingLatestTrackerChatId === payloadChatId) {
-        if (!pendingTrackerPayload?.authoritative) {
-          pendingTrackerPayload = {
-            raw: payload.content,
-            sourceContent,
-            messageId,
-            chatId: payloadChatId || null,
-            authoritative: false
-          };
-        }
+      if (!configReady || awaitingLatestTrackerChatId)
+        return;
+      if (!messageId)
+        return;
+      const isSelected = messageId === latestTrackerMessageId;
+      const isNewest = messageId === ctx.messages.getLatestMessageId();
+      if (!isSelected && !isNewest)
+        return;
+      if (!isSelected && !payload.isStreaming) {
+        if (currentChatId)
+          requestLatestTracker(currentChatId, true);
+        return;
+      }
+      if (isSelected && payload.content === latestTrackerRaw) {
+        retryLatestMessageRenderIntent(messageId);
         return;
       }
       handleTrackerPayload(payload.content, sourceContent, messageId);
-      ctx.sendToBackend({
-        type: "message_tag_intercepted",
-        tagName: payload.tagName,
-        attrs: payload.attrs,
-        content: payload.content,
-        messageId: payload.messageId,
-        chatId: payload.chatId,
-        isStreaming: payload.isStreaming
-      });
     });
     tagInterceptorSignature = signature;
   };
@@ -20400,9 +20399,7 @@ function setup(ctx) {
     trackerMessageRenders.delete(messageId);
   };
   const pruneNonLatestMessageTrackers = () => {
-    const latestId = ctx.messages.getLatestMessageId();
-    if (!latestId)
-      return;
+    const latestId = latestTrackerMessageId;
     for (const [id, mount] of trackerMessageMounts) {
       if (id === latestId)
         continue;
@@ -20410,7 +20407,6 @@ function setup(ctx) {
       trackerMessageMounts.delete(id);
       trackerMessageRenders.delete(id);
     }
-    latestTrackerMessageId = latestId;
     updateRegenerateButton();
   };
   const clearLatestMessageRenderIntent = (messageId) => {
@@ -20634,7 +20630,7 @@ function setup(ctx) {
       comparisonData = trackerComparisonBaselines.get(messageId) || null;
       trackerMessageIds.add(messageId);
       latestTrackerMessageId = messageId;
-      updateRegenerateButton();
+      pruneNonLatestMessageTrackers();
     }
     const preset = getPresetById(config, config.templateId);
     const mountMode = resolveTrackerMountMode(preset);
@@ -20658,6 +20654,7 @@ function setup(ctx) {
     if (mountMode === "side_left" || mountMode === "side_right") {
       clearLatestMessageRenderIntent();
       renderTrackerInSidebar(parsed, preset, comparisonData, mountMode);
+      pruneNonLatestMessageTrackers();
       if (messageId)
         clearMessageTrackerRender(messageId);
     } else if (messageId) {
@@ -20675,7 +20672,6 @@ function setup(ctx) {
     previousTrackerData = parsed;
   };
   const handleContent = (content, messageId = null) => {
-    latestContent = content;
     const raw = extractTrackerBlock(content, config.codeBlockIdentifier);
     if (!raw) {
       let wasLatest = false;
@@ -20691,23 +20687,41 @@ function setup(ctx) {
       }
       if (wasLatest) {
         previousTrackerData = null;
+        latestTrackerRaw = null;
+        latestTrackerSourceContent = null;
+        latestContent = null;
+        clearSideTrackerRender();
         trackerComparisonBaselines.clear();
         setStatus("No tracker tag in active swipe/edit");
         renderEmpty("No tracker tag found in this message version.");
       }
       return;
     }
+    latestContent = content;
     handleTrackerPayload(raw, content, messageId);
   };
   const persistConfig = () => {
     ctx.sendToBackend({ type: "set_config", config });
   };
-  const requestLatestTracker = (chatId) => {
+  const requestLatestTracker = (chatId, refresh = false) => {
+    if (refresh)
+      trackerSelectionRevision += 1;
     if (latestTrackerRequestsInFlight.has(chatId))
       return;
-    latestTrackerRequestsInFlight.add(chatId);
+    const requestId = ++trackerRequestId;
+    latestTrackerRequestsInFlight.set(chatId, { requestId, revision: trackerSelectionRevision });
     awaitingLatestTrackerChatId = chatId;
-    ctx.sendToBackend({ type: "get_latest_tracker", chatId });
+    ctx.sendToBackend({ type: "get_latest_tracker", chatId, requestId, refresh });
+  };
+  const refreshSelectionAfterConfigChange = () => {
+    const nextKey = JSON.stringify([config.trackerTagName, config.codeBlockIdentifier]);
+    if (trackerSelectionKey === nextKey)
+      return;
+    trackerSelectionKey = nextKey;
+    pendingTrackerPayload = null;
+    resetChatState();
+    if (currentChatId)
+      requestLatestTracker(currentChatId, true);
   };
   const requestInitialTrackerRehydrate = () => {
     if (initialTrackerRehydrateRequested)
@@ -20743,6 +20757,7 @@ function setup(ctx) {
       configTrackerTagNameHint = config.trackerTagName;
       applyHideStyle();
       applyTagInterceptor();
+      refreshSelectionAfterConfigChange();
       requestInitialTrackerRehydrate();
       return;
     }
@@ -20829,27 +20844,33 @@ function setup(ctx) {
     }
     if (obj?.type === "tracker_history_latest") {
       const responseChatId = typeof obj.chatId === "string" ? obj.chatId : null;
-      if (responseChatId)
-        latestTrackerRequestsInFlight.delete(responseChatId);
-      if (responseChatId && currentChatId && responseChatId !== currentChatId)
+      if (!responseChatId)
         return;
-      if (!currentChatId && responseChatId)
-        currentChatId = responseChatId;
-      if (!responseChatId || awaitingLatestTrackerChatId === responseChatId) {
-        awaitingLatestTrackerChatId = null;
+      const request = latestTrackerRequestsInFlight.get(responseChatId);
+      if (!request || typeof obj.requestId === "number" && request.requestId !== obj.requestId)
+        return;
+      latestTrackerRequestsInFlight.delete(responseChatId);
+      if (responseChatId !== currentChatId)
+        return;
+      if (request.revision !== trackerSelectionRevision) {
+        requestLatestTracker(responseChatId, true);
+        return;
       }
+      awaitingLatestTrackerChatId = null;
+      pendingTrackerPayload = null;
       const entry = obj.entry;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
-        if (msgId && trackerMessageIds.has(msgId)) {
-          pendingTrackerPayload = null;
+        const previous = typeof entry.previousPayload === "string" ? parseTrackerBlock(entry.previousPayload) : null;
+        const unchanged = msgId === latestTrackerMessageId && entry.payload === latestTrackerRaw && JSON.stringify(trackerComparisonBaselines.get(msgId || "") ?? null) === JSON.stringify(previous);
+        if (unchanged) {
+          retryLatestMessageRenderIntent(msgId);
           return;
         }
-        if (msgId) {
-          const previous = typeof entry.previousPayload === "string" ? parseTrackerBlock(entry.previousPayload) : null;
-          trackerComparisonBaselines.clear();
+        latestContent = null;
+        trackerComparisonBaselines.clear();
+        if (msgId)
           trackerComparisonBaselines.set(msgId, previous);
-        }
         pendingTrackerPayload = {
           raw: entry.payload,
           sourceContent: entry.payload,
@@ -20857,8 +20878,11 @@ function setup(ctx) {
           chatId: responseChatId,
           authoritative: true
         };
+        flushPendingTrackerPayload();
+      } else {
+        resetChatState();
+        renderEmpty("No tracker tag found in this chat.");
       }
-      flushPendingTrackerPayload();
       return;
     }
     if (obj?.type === "permission_changed") {
@@ -20909,6 +20933,7 @@ function setup(ctx) {
     configTrackerTagNameHint = config.trackerTagName;
     applyHideStyle();
     applyTagInterceptor();
+    refreshSelectionAfterConfigChange();
     applyThemeClass(getPresetById(config, config.templateId));
     renderCapabilities(grantedPermissions, requestedPermissions, ephemeralPoolStatus);
     updatePermissionGatedControls();
@@ -20943,6 +20968,7 @@ function setup(ctx) {
   const handleChatSwitch = (chatId) => {
     if (!chatId || chatId === currentChatId)
       return;
+    trackerSelectionRevision += 1;
     currentChatId = chatId;
     awaitingLatestTrackerChatId = chatId;
     pendingTrackerPayload = null;
@@ -20977,38 +21003,33 @@ function setup(ctx) {
     if (!isActivityForActiveChat(extractChatId(payload)))
       return;
     const context = readMessageContext(payload);
-    if (!context)
+    if (!context || context.isUser === true)
       return;
-    if (context.isUser === true)
-      return;
-    if (context.content)
+    if (context.content !== null && context.messageId && (context.messageId === latestTrackerMessageId || context.messageId === ctx.messages.getLatestMessageId())) {
       handleContent(context.content, context.messageId);
+    }
+    if (currentChatId)
+      requestLatestTracker(currentChatId, true);
     runInlinePass(context.messageId);
   };
   const onSwipe = (payload) => {
     if (!isActivityForActiveChat(extractChatId(payload)))
       return;
     const context = readMessageContext(payload);
-    if (!context)
+    if (!context || context.isUser === true)
       return;
-    if (context.isUser === true)
-      return;
-    clearSideTrackerRender();
-    if (latestTrackerMessageId) {
-      clearMessageTrackerRender(latestTrackerMessageId);
-      inlineProcessor.clearMessage(latestTrackerMessageId);
-    }
     if (context.messageId)
       inlineProcessor.clearMessage(context.messageId);
-    previousTrackerData = null;
-    trackerComparisonBaselines.clear();
-    latestTrackerRaw = null;
-    latestTrackerSourceContent = null;
-    latestContent = null;
-    latestMessageRenderIntent = null;
-    if (context.content) {
-      handleContent(context.content, context.messageId);
+    if (context.messageId && context.messageId === latestTrackerMessageId) {
+      clearMessageTrackerRender(context.messageId);
+      clearSideTrackerRender();
+      clearLatestMessageRenderIntent();
+      latestTrackerRaw = null;
+      latestTrackerSourceContent = null;
+      latestContent = null;
     }
+    if (currentChatId)
+      requestLatestTracker(currentChatId, true);
     runInlinePass(context.messageId);
   };
   const onMessageRendered = (payload) => {
@@ -21019,11 +21040,6 @@ function setup(ctx) {
       return;
     retryLatestMessageRenderIntent(context.messageId);
     retryGeneratingIndicator(context.messageId);
-    const latestMountedId = ctx.messages.getLatestMessageId();
-    const needsLatestAttach = !!context.messageId && context.messageId === latestMountedId && latestMessageRenderIntent?.messageId !== context.messageId && !trackerMessageRenders.has(context.messageId);
-    if (needsLatestAttach && context.content) {
-      handleContent(context.content, context.messageId);
-    }
     runInlinePass(context.messageId);
   };
   const onMessageDeleted = (payload) => {
@@ -21050,6 +21066,8 @@ function setup(ctx) {
       clearSideTrackerRender();
       updateRegenerateButton();
     }
+    if (currentChatId)
+      requestLatestTracker(currentChatId, true);
   };
   const resetChatState = () => {
     previousTrackerData = null;

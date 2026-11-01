@@ -1568,7 +1568,10 @@ export function setup(ctx: SpindleFrontendContext) {
   } | null = null;
   let awaitingLatestTrackerChatId: string | null = null;
   let initialTrackerRehydrateRequested = false;
-  const latestTrackerRequestsInFlight = new Set<string>();
+  const latestTrackerRequestsInFlight = new Map<string, { requestId: number; revision: number }>();
+  let trackerSelectionRevision = 0;
+  let trackerRequestId = 0;
+  let trackerSelectionKey = JSON.stringify([config.trackerTagName, config.codeBlockIdentifier]);
   const trackerMessageIds = new Set<string>();
   const trackerMessageMounts = new Map<string, Element>();
   type TrackerRenderInputs = {
@@ -1738,37 +1741,22 @@ export function setup(ctx: SpindleFrontendContext) {
         if (typeof payload.content !== "string" || !payload.content.trim()) return;
         const sourceContent = typeof payload.fullMatch === "string" ? payload.fullMatch : payload.content;
         const messageId = payload.messageId || null;
-        // Initial chat hydration may mount dozens of historical tracker tags.
-        // They still get stripped, but only the backend-selected latest match
-        // is parsed/rendered and bridged back after rehydration.
-        if (!configReady || (!!payloadChatId && awaitingLatestTrackerChatId === payloadChatId)) {
-          // A late historical mount must not replace the backend-selected
-          // latest entry if that response won the race with full config.
-          if (!pendingTrackerPayload?.authoritative) {
-            pendingTrackerPayload = {
-              raw: payload.content,
-              sourceContent,
-              messageId,
-              chatId: payloadChatId || null,
-              authoritative: false,
-            };
-          }
+        // The host strips all matching tags regardless of this callback.
+        // Mounting history must not parse/render/report every old tracker.
+        if (!configReady || awaitingLatestTrackerChatId) return;
+        if (!messageId) return;
+        const isSelected = messageId === latestTrackerMessageId;
+        const isNewest = messageId === ctx.messages.getLatestMessageId();
+        if (!isSelected && !isNewest) return;
+        if (!isSelected && !payload.isStreaming) {
+          if (currentChatId) requestLatestTracker(currentChatId, true);
           return;
         }
-        handleTrackerPayload(
-          payload.content,
-          sourceContent,
-          messageId,
-        );
-        ctx.sendToBackend({
-          type: "message_tag_intercepted",
-          tagName: payload.tagName,
-          attrs: payload.attrs,
-          content: payload.content,
-          messageId: payload.messageId,
-          chatId: payload.chatId,
-          isStreaming: payload.isStreaming,
-        });
+        if (isSelected && payload.content === latestTrackerRaw) {
+          retryLatestMessageRenderIntent(messageId);
+          return;
+        }
+        handleTrackerPayload(payload.content, sourceContent, messageId);
       },
     );
     tagInterceptorSignature = signature;
@@ -1889,19 +1877,16 @@ export function setup(ctx: SpindleFrontendContext) {
     trackerMessageRenders.delete(messageId);
   };
 
-  // Source of truth is the host's chat-data store via getLatestMessageId(),
-  // not DOM order — DOM only reflects the virtualizer's current window, so
-  // the visually-last bubble can be a mid-chat message scrolled to bottom.
+  // Keep the latest tracker-bearing message, even when later messages contain
+  // only narrative or user text. DOM order only describes the mounted window.
   const pruneNonLatestMessageTrackers = () => {
-    const latestId = ctx.messages.getLatestMessageId();
-    if (!latestId) return;
+    const latestId = latestTrackerMessageId;
     for (const [id, mount] of trackerMessageMounts) {
       if (id === latestId) continue;
       ctx.dom.uninject(mount);
       trackerMessageMounts.delete(id);
       trackerMessageRenders.delete(id);
     }
-    latestTrackerMessageId = latestId;
     updateRegenerateButton();
   };
 
@@ -2173,7 +2158,7 @@ export function setup(ctx: SpindleFrontendContext) {
       comparisonData = trackerComparisonBaselines.get(messageId) || null;
       trackerMessageIds.add(messageId);
       latestTrackerMessageId = messageId;
-      updateRegenerateButton();
+      pruneNonLatestMessageTrackers();
     }
     const preset = getPresetById(config, config.templateId);
     const mountMode = resolveTrackerMountMode(preset);
@@ -2207,6 +2192,7 @@ export function setup(ctx: SpindleFrontendContext) {
     if (mountMode === "side_left" || mountMode === "side_right") {
       clearLatestMessageRenderIntent();
       renderTrackerInSidebar(parsed, preset, comparisonData, mountMode);
+      pruneNonLatestMessageTrackers();
       if (messageId) clearMessageTrackerRender(messageId);
     } else if (messageId) {
       latestMessageRenderIntent = {
@@ -2225,7 +2211,6 @@ export function setup(ctx: SpindleFrontendContext) {
   };
 
   const handleContent = (content: string, messageId: string | null = null) => {
-    latestContent = content;
     const raw = extractTrackerBlock(content, config.codeBlockIdentifier);
     if (!raw) {
       let wasLatest = false;
@@ -2241,12 +2226,17 @@ export function setup(ctx: SpindleFrontendContext) {
       }
       if (wasLatest) {
         previousTrackerData = null;
+        latestTrackerRaw = null;
+        latestTrackerSourceContent = null;
+        latestContent = null;
+        clearSideTrackerRender();
         trackerComparisonBaselines.clear();
         setStatus("No tracker tag in active swipe/edit");
         renderEmpty("No tracker tag found in this message version.");
       }
       return;
     }
+    latestContent = content;
     handleTrackerPayload(raw, content, messageId);
   };
 
@@ -2254,11 +2244,22 @@ export function setup(ctx: SpindleFrontendContext) {
     ctx.sendToBackend({ type: "set_config", config });
   };
 
-  const requestLatestTracker = (chatId: string) => {
+  const requestLatestTracker = (chatId: string, refresh = false) => {
+    if (refresh) trackerSelectionRevision += 1;
     if (latestTrackerRequestsInFlight.has(chatId)) return;
-    latestTrackerRequestsInFlight.add(chatId);
+    const requestId = ++trackerRequestId;
+    latestTrackerRequestsInFlight.set(chatId, { requestId, revision: trackerSelectionRevision });
     awaitingLatestTrackerChatId = chatId;
-    ctx.sendToBackend({ type: "get_latest_tracker", chatId });
+    ctx.sendToBackend({ type: "get_latest_tracker", chatId, requestId, refresh });
+  };
+
+  const refreshSelectionAfterConfigChange = () => {
+    const nextKey = JSON.stringify([config.trackerTagName, config.codeBlockIdentifier]);
+    if (trackerSelectionKey === nextKey) return;
+    trackerSelectionKey = nextKey;
+    pendingTrackerPayload = null;
+    resetChatState();
+    if (currentChatId) requestLatestTracker(currentChatId, true);
   };
 
   const requestInitialTrackerRehydrate = () => {
@@ -2300,6 +2301,7 @@ export function setup(ctx: SpindleFrontendContext) {
       configTrackerTagNameHint = config.trackerTagName;
       applyHideStyle();
       applyTagInterceptor();
+      refreshSelectionAfterConfigChange();
       requestInitialTrackerRehydrate();
       return;
     }
@@ -2377,31 +2379,34 @@ export function setup(ctx: SpindleFrontendContext) {
     }
     if (obj?.type === "tracker_history_latest") {
       const responseChatId = typeof obj.chatId === "string" ? obj.chatId : null;
-      if (responseChatId) latestTrackerRequestsInFlight.delete(responseChatId);
-      if (responseChatId && currentChatId && responseChatId !== currentChatId) return;
-      if (!currentChatId && responseChatId) currentChatId = responseChatId;
-      if (!responseChatId || awaitingLatestTrackerChatId === responseChatId) {
-        awaitingLatestTrackerChatId = null;
+      if (!responseChatId) return;
+      const request = latestTrackerRequestsInFlight.get(responseChatId);
+      if (!request || (typeof obj.requestId === "number" && request.requestId !== obj.requestId)) return;
+      latestTrackerRequestsInFlight.delete(responseChatId);
+      if (responseChatId !== currentChatId) return;
+      if (request.revision !== trackerSelectionRevision) {
+        // A live edit, swipe, or navigation superseded this snapshot. Coalesce
+        // any number of intervening changes into one fresh lookup.
+        requestLatestTracker(responseChatId, true);
+        return;
       }
+      awaitingLatestTrackerChatId = null;
+      pendingTrackerPayload = null;
       const entry = obj.entry as { messageId?: unknown; payload?: unknown; previousPayload?: unknown } | null;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
-        // Hydration safety net: only useful when the latest tracker-bearing
-        // message wasn't reprocessed through a live frontend event yet. If
-        // we already handled that messageId, skip — otherwise we'd flash the
-        // message-level render with `previousData` now equal to the latest
-        // data (no diffs).
-        if (msgId && trackerMessageIds.has(msgId)) {
-          pendingTrackerPayload = null;
+        const previous = typeof entry.previousPayload === "string"
+          ? parseTrackerBlock(entry.previousPayload)
+          : null;
+        const unchanged = msgId === latestTrackerMessageId && entry.payload === latestTrackerRaw
+          && JSON.stringify(trackerComparisonBaselines.get(msgId || "") ?? null) === JSON.stringify(previous);
+        if (unchanged) {
+          retryLatestMessageRenderIntent(msgId);
           return;
         }
-        if (msgId) {
-          const previous = typeof entry.previousPayload === "string"
-            ? parseTrackerBlock(entry.previousPayload)
-            : null;
-          trackerComparisonBaselines.clear();
-          trackerComparisonBaselines.set(msgId, previous);
-        }
+        latestContent = null;
+        trackerComparisonBaselines.clear();
+        if (msgId) trackerComparisonBaselines.set(msgId, previous);
         pendingTrackerPayload = {
           raw: entry.payload,
           sourceContent: entry.payload,
@@ -2409,8 +2414,13 @@ export function setup(ctx: SpindleFrontendContext) {
           chatId: responseChatId,
           authoritative: true,
         };
+        flushPendingTrackerPayload();
+      } else {
+        // An authoritative empty result must not flush a historical tag that
+        // happened to mount during startup.
+        resetChatState();
+        renderEmpty("No tracker tag found in this chat.");
       }
-      flushPendingTrackerPayload();
       return;
     }
     if (obj?.type === "permission_changed") {
@@ -2479,6 +2489,7 @@ export function setup(ctx: SpindleFrontendContext) {
     configTrackerTagNameHint = config.trackerTagName;
     applyHideStyle();
     applyTagInterceptor();
+    refreshSelectionAfterConfigChange();
     applyThemeClass(getPresetById(config, config.templateId));
     renderCapabilities(grantedPermissions, requestedPermissions, ephemeralPoolStatus);
     updatePermissionGatedControls();
@@ -2511,6 +2522,7 @@ export function setup(ctx: SpindleFrontendContext) {
 
   const handleChatSwitch = (chatId: string | null) => {
     if (!chatId || chatId === currentChatId) return;
+    trackerSelectionRevision += 1;
     currentChatId = chatId;
     awaitingLatestTrackerChatId = chatId;
     pendingTrackerPayload = null;
@@ -2555,38 +2567,34 @@ export function setup(ctx: SpindleFrontendContext) {
   const onEvent = (payload: unknown) => {
     if (!isActivityForActiveChat(extractChatId(payload))) return;
     const context = readMessageContext(payload);
-    if (!context) return;
-    if (context.isUser === true) return;
-    if (context.content) handleContent(context.content, context.messageId);
+    if (!context || context.isUser === true) return;
+    // Live updates may render immediately. Older edits use chat order from
+    // the backend rather than stealing selection from a newer tracker.
+    if (context.content !== null && context.messageId
+      && (context.messageId === latestTrackerMessageId || context.messageId === ctx.messages.getLatestMessageId())) {
+      handleContent(context.content, context.messageId);
+    }
+    if (currentChatId) requestLatestTracker(currentChatId, true);
     runInlinePass(context.messageId);
   };
 
   const onSwipe = (payload: unknown) => {
     if (!isActivityForActiveChat(extractChatId(payload))) return;
     const context = readMessageContext(payload);
-    if (!context) return;
-    if (context.isUser === true) return;
-
-    // Proactively clear all tracker renders on every swipe.
-    // Historical swipes (content has tracker data) will re-render immediately below.
-    // New-generation swipes (empty content) stay cleared until GENERATION_ENDED.
-    clearSideTrackerRender();
-    if (latestTrackerMessageId) {
-      clearMessageTrackerRender(latestTrackerMessageId);
-      inlineProcessor.clearMessage(latestTrackerMessageId);
-    }
+    if (!context || context.isUser === true) return;
     if (context.messageId) inlineProcessor.clearMessage(context.messageId);
-    previousTrackerData = null;
-    trackerComparisonBaselines.clear();
-    latestTrackerRaw = null;
-    latestTrackerSourceContent = null;
-    latestContent = null;
-    latestMessageRenderIntent = null;
-
-    // If the swiped-to message already has content (historical), process it now.
-    if (context.content) {
-      handleContent(context.content, context.messageId);
+    // A swipe on an older message should not tear down the visible tracker.
+    // The authoritative lookup also finds the previous tracker when the
+    // selected swipe is empty or no longer contains tracker data.
+    if (context.messageId && context.messageId === latestTrackerMessageId) {
+      clearMessageTrackerRender(context.messageId);
+      clearSideTrackerRender();
+      clearLatestMessageRenderIntent();
+      latestTrackerRaw = null;
+      latestTrackerSourceContent = null;
+      latestContent = null;
     }
+    if (currentChatId) requestLatestTracker(currentChatId, true);
     runInlinePass(context.messageId);
   };
 
@@ -2596,15 +2604,6 @@ export function setup(ctx: SpindleFrontendContext) {
     if (!context || context.isUser === true) return;
     retryLatestMessageRenderIntent(context.messageId);
     retryGeneratingIndicator(context.messageId);
-    const latestMountedId = ctx.messages.getLatestMessageId();
-    const needsLatestAttach =
-      !!context.messageId &&
-      context.messageId === latestMountedId &&
-      latestMessageRenderIntent?.messageId !== context.messageId &&
-      !trackerMessageRenders.has(context.messageId);
-    if (needsLatestAttach && context.content) {
-      handleContent(context.content, context.messageId);
-    }
     runInlinePass(context.messageId);
   };
 
@@ -2632,8 +2631,9 @@ export function setup(ctx: SpindleFrontendContext) {
       clearSideTrackerRender();
       updateRegenerateButton();
     }
-    // The backend has its own MESSAGE_DELETED subscription that drops the
-    // side-channel entry, so no frontend → backend bridge needed here.
+    // The backend drops the deleted entry and resolves the preceding tracker,
+    // including trackers outside the currently mounted virtualized window.
+    if (currentChatId) requestLatestTracker(currentChatId, true);
   };
 
   // Virtualization replay is handled host-side: the wrapper returned by

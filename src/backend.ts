@@ -123,20 +123,26 @@ let firstMessageFertilityHint = "";
  */
 let activeChatId: string | null = null;
 
-type TrackerHistoryEntry = { messageId: string; payload: string };
+type TrackerHistoryEntry = {
+  messageId: string;
+  payload: string;
+  index?: number;
+  // Canonical payload before any generation-only side-channel adjustment.
+  sourcePayload?: string;
+};
 
 /**
  * Per-chat ordered history of tracker payloads, keyed by chat id. The list is
  * ordered oldest → newest. Entries are appended when a tracker tag is first
  * seen in a message, and upserted when a message is edited. This is a
- * side-channel that survives `registerTagInterceptor`'s `removeFromMessage`
- * behaviour — the frontend asks Lumiverse to remove the tracker tag from the
- * displayed/canonical message so users don't see raw JSON, but by capturing
- * the content via `MESSAGE_TAG_INTERCEPTED` we retain a complete history that
- * can still be referenced by the main and secondary LLM generation flows.
+ * side-channel for the main and secondary LLM generation flows. Hiding tags
+ * with `removeFromMessage` only changes display; canonical text is retained.
  */
 const chatTrackerHistory = new Map<string, TrackerHistoryEntry[]>();
-const rehydratedChats = new Set<string>();
+const hydratedTrackerChats = new Map<string, { minimum: number; complete: boolean; revision: number }>();
+const trackerHydrations = new Map<string, Promise<void>>();
+const trackerHistoryRevisions = new Map<string, number>();
+let trackerHistoryScope = "";
 
 /**
  * Tracks which (chatId, characterName) pairs have already received a
@@ -163,6 +169,7 @@ type MessageContext = {
   chatId: string | null;
   messageId: string | null;
   content: string | null;
+  index?: number;
 };
 
 type CommandResultPayload = {
@@ -334,30 +341,6 @@ function extractTrackerPayloadFromMessage(message: string): string | null {
   );
 }
 
-function normalizeLegacyHiddenDivTrackers(message: string): { content: string; replacements: number } {
-  if (!message) return { content: message, replacements: 0 };
-
-  const tagName = sanitizeTagName(config.trackerTagName);
-  const identifier = sanitizeIdentifier(config.codeBlockIdentifier);
-  const divRe = /<div\b([^>]*)>([\s\S]*?)<\/div>/gi;
-  let replacements = 0;
-
-  const content = message.replace(divRe, (full, rawAttrs, rawInner) => {
-    const attrs = typeof rawAttrs === "string" ? rawAttrs : "";
-    const inner = typeof rawInner === "string" ? rawInner : "";
-    if (!/style\s*=\s*(?:"[^"]*display\s*:\s*none\s*;?[^"]*"|'[^']*display\s*:\s*none\s*;?[^']*')/i.test(attrs)) {
-      return full;
-    }
-
-    const payload = extractLegacyHiddenDivNormalizedPayload(inner, identifier);
-    if (!payload) return full;
-
-    replacements += 1;
-    return buildCanonicalTrackerTag(payload, identifier);
-  });
-
-  return { content, replacements };
-}
 
 function sanitizeTrackerFormat(value: unknown): "json" | "yaml" {
   return value === "yaml" ? "yaml" : "json";
@@ -533,9 +516,8 @@ function readMessageContext(payload: unknown): MessageContext {
   const chatIdCandidates = [obj.chatId, obj.chat_id, nestedMessage.chatId, nestedMessage.chat_id, nestedChat.id, obj.id];
   const messageIdCandidates = [obj.messageId, obj.message_id, nestedMessage.id, nestedMessage.messageId, obj.id];
 
-  const content =
-    (typeof nestedMessage.content === "string" ? nestedMessage.content : null) ||
-    (typeof obj.content === "string" ? obj.content : null);
+  const content = typeof nestedMessage.content === "string" ? nestedMessage.content
+    : typeof obj.content === "string" ? obj.content : null;
 
   const chatId = chatIdCandidates.find((value) => typeof value === "string" && value.trim().length > 0) as
     | string
@@ -548,6 +530,8 @@ function readMessageContext(payload: unknown): MessageContext {
     chatId: chatId || null,
     messageId: messageId || null,
     content,
+    index: typeof nestedMessage.index_in_chat === "number" ? nestedMessage.index_in_chat
+      : typeof obj.index_in_chat === "number" ? obj.index_in_chat : undefined,
   };
 }
 
@@ -555,16 +539,33 @@ function readMessageContext(payload: unknown): MessageContext {
 //
 // Maintains a backend-owned record of every tracker payload the extension
 // has seen in each chat, keyed by message id. Populated from:
-//   1. MESSAGE_TAG_INTERCEPTED — fires as soon as the frontend tag
-//      interceptor observes a tracker tag, BEFORE `removeFromMessage`
-//      has a chance to clear it from the canonical message content.
-//   2. MESSAGE_SENT / MESSAGE_EDITED — fallback for messages whose
-//      tracker blocks survived as code fences or tags in the content.
+//   1. MESSAGE_SENT / MESSAGE_EDITED / swipe events — canonical active text.
+//   2. MESSAGE_TAG_INTERCEPTED — updates to an already selected tracker.
 //   3. rehydrateChatTrackerHistory — initial scan of the current chat
 //      on demand, so history is populated even for chats the extension
 //      wasn't active in when the message was originally generated.
 
-function recordChatTracker(chatId: string | null, messageId: string | null, payload: string): void {
+function ensureTrackerHistoryScope(): string {
+  const scope = JSON.stringify([loadedConfigUserId, config.trackerTagName, config.codeBlockIdentifier]);
+  if (scope !== trackerHistoryScope) {
+    trackerHistoryScope = scope;
+    chatTrackerHistory.clear();
+    hydratedTrackerChats.clear();
+    trackerHydrations.clear();
+    trackerHistoryRevisions.clear();
+  }
+  return scope;
+}
+
+function invalidateTrackerHistory(chatId: string | null): void {
+  ensureTrackerHistoryScope();
+  if (!chatId) return;
+  trackerHistoryRevisions.set(chatId, (trackerHistoryRevisions.get(chatId) || 0) + 1);
+  hydratedTrackerChats.delete(chatId);
+}
+
+function recordChatTracker(chatId: string | null, messageId: string | null, payload: string, index?: number): void {
+  ensureTrackerHistoryScope();
   if (!chatId || !messageId) return;
   const trimmed = payload.trim();
   if (!trimmed) return;
@@ -574,14 +575,19 @@ function recordChatTracker(chatId: string | null, messageId: string | null, payl
     chatTrackerHistory.set(chatId, history);
   }
   const existingIdx = history.findIndex((entry) => entry.messageId === messageId);
+  const existing = history[existingIdx];
+  if (existing?.payload === trimmed && (index === undefined || existing.index === index)) return;
+  invalidateTrackerHistory(chatId);
   if (existingIdx >= 0) {
-    history[existingIdx] = { messageId, payload: trimmed };
+    history[existingIdx] = { messageId, payload: trimmed, index: index ?? existing.index, sourcePayload: trimmed };
   } else {
-    history.push({ messageId, payload: trimmed });
+    history.push({ messageId, payload: trimmed, index, sourcePayload: trimmed });
   }
+  history.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
 }
 
 function forgetChatTracker(chatId: string | null, messageId: string | null): void {
+  invalidateTrackerHistory(chatId);
   if (!chatId || !messageId) return;
   const history = chatTrackerHistory.get(chatId);
   if (!history) return;
@@ -590,130 +596,121 @@ function forgetChatTracker(chatId: string | null, messageId: string | null): voi
 }
 
 function getChatTrackerHistory(chatId: string | null): TrackerHistoryEntry[] {
+  ensureTrackerHistoryScope();
   if (!chatId) return [];
   return chatTrackerHistory.get(chatId) || [];
 }
 
-async function normalizeLegacyTrackersInChat(
-  chatId: string,
-  scanTail = Number.MAX_SAFE_INTEGER,
-): Promise<Array<{
-  id: string;
-  role: "system" | "user" | "assistant";
-  content: string;
-  extra: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-  swipe_id: number;
-  swipes: string[];
-  swipe_dates: number[];
-}>> {
-  const messages = await spindle.chat.getMessages(chatId);
-  if (!hasPermission("chat_mutation")) return messages;
+// Local compatibility adapter: older SDK typings do not expose lean reads.
+// Never send these options to a host that has not advertised support.
+type TrackerHistoryMessage = { id: string; content: string; index_in_chat?: number };
+type TrackerHistoryReadOptions = {
+  tail?: number;
+  light: true;
+  includeExtra: false;
+  ownMetadataOnly: true;
+};
 
-  // Legacy hidden-div trackers only matter for messages that could still
-  // influence current context. Scanning the whole history on every page
-  // reload is expensive, so we cap the normalization pass to the recent
-  // tail. Callers that need full-history migration can pass a larger tail.
-  const startIdx = Math.max(0, messages.length - Math.max(0, scanTail));
-  let repairedMessages = 0;
-  let repairedBlocks = 0;
-
-  for (let i = startIdx; i < messages.length; i += 1) {
-    const msg = messages[i];
-    const normalizedContent = normalizeLegacyHiddenDivTrackers(msg.content);
-    const normalizedSwipes = msg.swipes.map((swipe) => normalizeLegacyHiddenDivTrackers(swipe));
-    const swipesChanged = normalizedSwipes.some((entry, idx) => entry.content !== msg.swipes[idx]);
-    const replacements = normalizedContent.replacements
-      + normalizedSwipes.reduce((sum, entry) => sum + entry.replacements, 0);
-
-    if (replacements === 0) continue;
-
-    const nextSwipes = swipesChanged ? normalizedSwipes.map((entry) => entry.content) : msg.swipes;
-    await spindle.chat.updateMessage(chatId, msg.id, {
-      content: normalizedContent.content,
-      swipes: nextSwipes,
-      skipChunkRebuild: true,
-    } as {
-      content?: string;
-      swipes?: string[];
-      skipChunkRebuild?: boolean;
-    });
-
-    msg.content = normalizedContent.content;
-    msg.swipes = nextSwipes;
-    if (typeof nextSwipes[msg.swipe_id] === "string") {
-      msg.content = nextSwipes[msg.swipe_id] as string;
-    }
-
-    repairedMessages += 1;
-    repairedBlocks += replacements;
-  }
-
-  if (repairedBlocks > 0) {
-    spindle.log.info(
-      `Normalized ${repairedBlocks} legacy hidden tracker block(s) across ${repairedMessages} message(s) in chat ${chatId}`,
-    );
-  }
-
-  return messages;
+function trackerHistoryLimit(): number {
+  return Math.max(3, sanitizeRetainCount(config.retainTrackerCount) + 2);
 }
 
-async function rehydrateChatTrackerHistory(chatId: string | null): Promise<void> {
+async function rehydrateChatTrackerHistory(
+  chatId: string | null,
+  minimumEntries = trackerHistoryLimit(),
+): Promise<void> {
   if (!chatId) return;
-  // Once a chat has been hydrated, MESSAGE_* subscriptions keep this
-  // side-channel current. Avoid pulling and normalizing the entire chat again
-  // just to answer a lightweight "latest tracker" poll on navigation.
-  if (rehydratedChats.has(chatId)) return;
-  try {
-    // The side-channel only needs enough recent trackers to satisfy the
-    // user's retention setting plus a small buffer for the side panel and
-    // secondary LLM fallback. There is no need to scan the entire chat
-    // history on every page reload.
-    const retainSetting = Number.isFinite(config.retainTrackerCount)
-      ? config.retainTrackerCount
-      : DEFAULT_CONFIG.retainTrackerCount;
-    const historyLimit = Math.max(3, Math.min(20, retainSetting + 2));
-    const scanTail = Math.max(200, historyLimit * 5);
+  const scope = ensureTrackerHistoryScope();
+  while (scope === ensureTrackerHistoryScope()) {
+    const revision = trackerHistoryRevisions.get(chatId) || 0;
+    const cached = hydratedTrackerChats.get(chatId);
+    if (cached?.revision === revision && (cached.complete || cached.minimum >= minimumEntries)) return;
 
-    const messages = await normalizeLegacyTrackersInChat(chatId, scanTail);
-    rehydratedChats.add(chatId);
-
-    let history = chatTrackerHistory.get(chatId);
-    if (!history) {
-      history = [];
-      chatTrackerHistory.set(chatId, history);
+    // CHAT_SWITCHED, the frontend lookup, and generation can race. Share the
+    // same read, then only extend it if a caller needs more retained history.
+    const pending = trackerHydrations.get(chatId);
+    if (pending) {
+      try { await pending; } catch { return; }
+      continue;
     }
-    const known = new Set(history.map((entry) => entry.messageId));
+    const hydration = (async () => {
+      const lean = (spindle.host?.capabilities?.["chat-lean-messages-v1"] || 0) >= 1;
+      const options: TrackerHistoryReadOptions = {
+        light: true, includeExtra: false, ownMetadataOnly: true,
+      };
+      const read = (readOptions: TrackerHistoryReadOptions): Promise<TrackerHistoryMessage[]> =>
+        (spindle.chat.getMessages as unknown as (
+          id: string, options: TrackerHistoryReadOptions,
+        ) => Promise<TrackerHistoryMessage[]>)(chatId, readOptions);
+      let messages: TrackerHistoryMessage[] = lean
+        ? await read({ ...options, tail: 100 })
+        : await spindle.chat.getMessages(chatId);
+      if (scope !== ensureTrackerHistoryScope()) return;
 
-    // Scan newest → oldest, collecting only the trackers we actually need.
-    const found: TrackerHistoryEntry[] = [];
-    for (let i = messages.length - 1; i >= 0 && found.length < historyLimit; i -= 1) {
-      const msg = messages[i];
-      if (known.has(msg.id)) continue;
-      const payload = extractTrackerPayloadFromMessage(msg.content);
-      if (payload) {
-        found.unshift({ messageId: msg.id, payload: payload.trim() });
-        known.add(msg.id);
+      const scan = (rows: TrackerHistoryMessage[]): TrackerHistoryEntry[] => {
+        const entries: TrackerHistoryEntry[] = [];
+        for (let i = rows.length - 1; i >= 0 && entries.length < minimumEntries; i -= 1) {
+          const message = rows[i];
+          const payload = extractTrackerPayloadFromMessage(message.content);
+          if (payload) entries.unshift({
+            messageId: message.id, payload: payload.trim(), index: message.index_in_chat, sourcePayload: payload.trim(),
+          });
+        }
+        return entries;
+      };
+      let found = scan(messages);
+      let complete = !lean || messages.length < 100;
+      if (!complete && found.length < minimumEntries) {
+        // Sparse trackers may predate the last 100 messages. This uncommon
+        // fallback still omits inactive swipes/extras and never rewrites chat.
+        messages = await read(options);
+        if (scope !== ensureTrackerHistoryScope()) return;
+        found = scan(messages);
+        complete = true;
       }
+      // An edit/swipe/delete while the RPC was running wins over its snapshot.
+      if ((trackerHistoryRevisions.get(chatId) || 0) !== revision) return;
+      const existing = new Map(getChatTrackerHistory(chatId).map(entry => [entry.messageId, entry]));
+      const rowsById = new Map(messages.map(message => [message.id, message]));
+      const preserveAdjustment = (entry: TrackerHistoryEntry): TrackerHistoryEntry => {
+        const previous = existing.get(entry.messageId);
+        return previous && (previous.sourcePayload ?? previous.payload) === entry.payload
+          ? { ...entry, payload: previous.payload }
+          : entry;
+      };
+      // Keep retained entries beyond the two needed for display, but reconcile
+      // any fetched active swipe against canonical text. Missing/deleted rows
+      // can only be removed authoritatively after a full-history read.
+      const foundIds = new Set(found.map(entry => entry.messageId));
+      const history: TrackerHistoryEntry[] = [];
+      for (const entry of existing.values()) {
+        if (foundIds.has(entry.messageId)) continue;
+        const row = rowsById.get(entry.messageId);
+        if (!row) {
+          if (!complete) history.push(entry);
+          continue;
+        }
+        const payload = extractTrackerPayloadFromMessage(row.content)?.trim();
+        if (payload) history.push(preserveAdjustment({
+          messageId: row.id, payload, sourcePayload: payload, index: row.index_in_chat,
+        }));
+      }
+      history.push(...found.map(preserveAdjustment));
+      history.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
+      chatTrackerHistory.set(chatId, history);
+      hydratedTrackerChats.set(chatId, {
+        minimum: minimumEntries, complete: complete && found.length < minimumEntries, revision,
+      });
+    })();
+    trackerHydrations.set(chatId, hydration);
+    try {
+      await hydration;
+    } catch (error) {
+      spindle.log.warn(`Tracker history lookup failed: ${error instanceof Error ? error.message : String(error)}`);
+      return; // Leave uncached so the next request can retry.
+    } finally {
+      if (trackerHydrations.get(chatId) === hydration) trackerHydrations.delete(chatId);
     }
-
-    if (found.length > 0) {
-      history.push(...found);
-    }
-
-    // Re-sort entries to match current chat order where possible.
-    const order = new Map<string, number>();
-    messages.forEach((msg, idx) => order.set(msg.id, idx));
-    history.sort((a, b) => {
-      const ai = order.get(a.messageId);
-      const bi = order.get(b.messageId);
-      if (ai === undefined && bi === undefined) return 0;
-      if (ai === undefined) return 1;
-      if (bi === undefined) return -1;
-      return ai - bi;
-    });
-  } catch {
-    // Rehydration is best-effort.
   }
 }
 
@@ -1748,7 +1745,7 @@ spindle.on("MESSAGE_SENT", (payload: unknown, userId?: string) => {
     const sim = extractTrackerPayloadFromMessage(message);
     if (sim) {
       lastSimStats = sim;
-      recordChatTracker(ctx.chatId, ctx.messageId, sim);
+      recordChatTracker(ctx.chatId, ctx.messageId, sim, ctx.index);
       pushMacroValues();
       await trackEvent("sst.tracker.detected", { identifier: config.codeBlockIdentifier }, ctx.chatId ? { chatId: ctx.chatId } : undefined);
     }
@@ -1764,7 +1761,7 @@ spindle.on("MESSAGE_EDITED", (payload: unknown, userId?: string) => {
     const sim = extractTrackerPayloadFromMessage(ctx.content);
     if (sim) {
       lastSimStats = sim;
-      recordChatTracker(ctx.chatId, ctx.messageId, sim);
+      recordChatTracker(ctx.chatId, ctx.messageId, sim, ctx.index);
       pushMacroValues();
       await trackEvent("sst.tracker.detected", { identifier: config.codeBlockIdentifier, source: "message_edited" }, ctx.chatId ? { chatId: ctx.chatId } : undefined);
       return;
@@ -1775,7 +1772,7 @@ spindle.on("MESSAGE_EDITED", (payload: unknown, userId?: string) => {
   })();
 });
 
-spindle.on("MESSAGE_SWIPED", (payload: unknown, userId?: string) => {
+const onTrackerSwipe = (payload: unknown, userId?: string) => {
   void (async () => {
     await ensureConfigForUser(userId);
     if (!payload || typeof payload !== "object") return;
@@ -1818,7 +1815,7 @@ spindle.on("MESSAGE_SWIPED", (payload: unknown, userId?: string) => {
       // variants, subsequent generations (main or secondary) reference the
       // tracker data that actually matches the on-screen narrative rather
       // than whichever variant was last recorded.
-      recordChatTracker(chatId, messageId, payloadText);
+      recordChatTracker(chatId, messageId, payloadText, typeof message.index_in_chat === "number" ? message.index_in_chat : undefined);
       lastSimStats = payloadText;
       pushMacroValues();
     } else {
@@ -1837,7 +1834,9 @@ spindle.on("MESSAGE_SWIPED", (payload: unknown, userId?: string) => {
       { chatId },
     );
   })();
-});
+};
+spindle.on("MESSAGE_SWIPED", onTrackerSwipe);
+spindle.on("SWIPE_EDITED", onTrackerSwipe);
 
 spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown, userId?: string) => {
   void (async () => {
@@ -1863,10 +1862,15 @@ spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown, userId?: string) => {
 
     const chatId = typeof obj.chatId === "string" ? obj.chatId : null;
     const messageId = typeof obj.messageId === "string" ? obj.messageId : null;
+    // Historical mounts are display activity, not new tracker history.
+    // Canonical MESSAGE_* events and the read-only scan discover new entries.
+    const history = getChatTrackerHistory(chatId);
+    const latest = history[history.length - 1];
+    if (!latest || latest.messageId !== messageId || (latest.sourcePayload ?? latest.payload) === content) return;
     if (chatId) activeChatId = chatId;
 
     lastSimStats = content;
-    recordChatTracker(chatId, messageId, content);
+    recordChatTracker(chatId, messageId, content, latest.index);
     pushMacroValues();
     await trackEvent("sst.tracker.detected", { identifier: config.codeBlockIdentifier, source: "message_tag_intercepted" });
   })();
@@ -2096,7 +2100,7 @@ function describeRejectedModelGuidance(model: string): string {
  */
 async function commitTrackerAppend(
   chatId: string,
-  targetMessage: { id: string; content: string },
+  targetMessage: { id: string; content: string; index_in_chat?: number },
   parsed: Record<string, unknown>,
   via: string,
 ): Promise<void> {
@@ -2107,7 +2111,7 @@ async function commitTrackerAppend(
   lastSimStats = config.trackerFormat === "yaml"
     ? stringifyYaml(parsed)
     : JSON.stringify(parsed, null, 2);
-  recordChatTracker(chatId, targetMessage.id, lastSimStats);
+  recordChatTracker(chatId, targetMessage.id, lastSimStats, targetMessage.index_in_chat);
   pushMacroValues();
 
   spindle.log.info(`Tracker append complete via ${via}`);
@@ -2541,7 +2545,7 @@ spindle.on("CHAT_SWITCHED", (payload: unknown, userId?: string) => {
         : null;
     if (chatId) activeChatId = chatId;
     if (chatId) {
-      void rehydrateChatTrackerHistory(chatId);
+      void rehydrateChatTrackerHistory(chatId, 2);
     }
   })();
 });
@@ -2573,7 +2577,7 @@ spindle.on("GENERATION_ENDED", (payload: unknown, userId?: string) => {
     if (!hasPermission("generation") || !hasPermission("chat_mutation")) return;
     if (!ctx.chatId) return;
 
-    let chatMessages: Array<{ id: string; role: "system" | "user" | "assistant"; content: string }>;
+    let chatMessages: Array<{ id: string; role: "system" | "user" | "assistant"; content: string; index_in_chat?: number }>;
     try {
       chatMessages = await spindle.chat.getMessages(ctx.chatId);
     } catch {
@@ -2589,7 +2593,7 @@ spindle.on("GENERATION_ENDED", (payload: unknown, userId?: string) => {
     // strip the tag.
     const existingPayload = extractTrackerPayloadFromMessage(latestAssistant.content);
     if (existingPayload) {
-      recordChatTracker(ctx.chatId, latestAssistant.id, existingPayload);
+      recordChatTracker(ctx.chatId, latestAssistant.id, existingPayload, latestAssistant.index_in_chat);
       return;
     }
 
@@ -3366,14 +3370,17 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
       spindle.sendToFrontend({ type: "tracker_history_latest", chatId: null, entry: null }, userId);
       return;
     }
+    await ensureConfigForUser(userId);
     activeChatId = chatId;
-    await rehydrateChatTrackerHistory(chatId);
+    if (message.refresh === true) invalidateTrackerHistory(chatId);
+    await rehydrateChatTrackerHistory(chatId, 2);
     const history = getChatTrackerHistory(chatId);
     const entry = history.length > 0 ? history[history.length - 1] : null;
     const previousEntry = history.length > 1 ? history[history.length - 2] : null;
     spindle.sendToFrontend({
       type: "tracker_history_latest",
       chatId,
+      requestId: message.requestId,
       entry: entry
         ? {
             messageId: entry.messageId,
