@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import Handlebars from "handlebars";
+import { parseRoutedTracker } from "../src/trackerRoutes.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 let htmlTemplateRaw = readFileSync(resolve(root, "tracker-card-templates/internal-states-simtracker.json"), "utf8");
@@ -41,13 +42,13 @@ Handlebars.registerHelper("initials", (name) => (typeof name === "string" && nam
 Handlebars.registerHelper("or", function (...args) { return args.slice(0, -1).some((v) => !!v); });
 Handlebars.registerHelper("and", function (...args) { return args.slice(0, -1).every((v) => !!v); });
 
-// ── the new parseTrackerBlock fallback (mirrors src/trackerData.ts change) ──
+// ── tracker routing (uses the real src/trackerRoutes.ts) ────────────────
+// Mirrors the frontend: pick the <tracker> tag, take its sanitized `type`,
+// and parse the body along that route.
 function parseTrackerBlockFallback(raw) {
-  const trimmed = raw.trim();
-  if (/<internal_states\b[^>]*>[\s\S]*<\/internal_states>/i.test(trimmed)) {
-    return { worldData: { internal_states_html: trimmed }, characters: [] };
-  }
-  return null;
+  const m = raw.match(/<tracker\b([^>]*)>([\s\S]*?)<\/tracker>/i);
+  const type = (m?.[1].match(/\btype\s*=\s*["']?([\w-]+)/i)?.[1] || "").toLowerCase();
+  return parseRoutedTracker(m ? m[2] : raw, type);
 }
 
 const logic = extractTemplateLogic(htmlTemplate);
@@ -326,6 +327,17 @@ const checks = [
   ["physics wide", is.modules[11].wide === true && is.modules[11].fields.length === 2],
   ["notebook wide", is.modules[8].wide === true],
 ];
+// Routed form: <tracker type="internal_states"> with no inner wrapper must
+// render the same modules as the legacy <tracker type="sim"><internal_states>.
+const ROUTED = MAX.replace('<tracker type="sim">', '<tracker type="internal_states">')
+  .replace(/<\/?internal_states>\n?/g, "");
+const routed = executeTemplateLogic(parseTrackerBlockFallback(ROUTED), logic).worldData.internalStates;
+checks.push(
+  ["routed type: no wrapper", !/<internal_states>/.test(ROUTED)],
+  ["routed type: same modules", routed.modules.length === is.modules.length && routed.turn === is.turn],
+  ["routed type: bond +4", routed.modules[3].entries[0].bondDisplay === "+4"],
+  ["sim type without wrapper stays structured", parseTrackerBlockFallback(ROUTED.replace('type="internal_states"', 'type="sim"')) === null],
+);
 let failed = 0;
 for (const [name, ok] of checks) { if (!ok) { failed++; console.log("CHECK FAIL:", name); } }
 console.log(failed === 0 ? "\nAll logic checks passed ✓" : `\n${failed} logic checks FAILED`);

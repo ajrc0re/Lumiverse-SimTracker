@@ -27,9 +27,18 @@ Internal States Board is a Silly Sim Tracker preset that renders the **Freaky Fr
    ```
    Nothing inside the `<internal_states>` tags changes. In the FF `👾Internal States 💾🎮` block, replace the `<!-- GFX_START -->` line with `<tracker type="sim">` and the `<!-- GFX_END -->` line with `</tracker>` — that is the whole edit. (Keeping the GFX comments outside the tracker tags is also fine; they are inert in Lumiverse.)
 
+   The board can also travel in its own tracker type, with no `<internal_states>` wrapper at all:
+   ```
+   <tracker type="internal_states">
+   <details>
+   ...
+   </details>
+   </tracker>
+   ```
+
 2. SimTracker's interceptor recognizes the `<tracker type="sim">` wrapper, hides the raw block from the chat, and keeps feeding the previous object back to the model as "Previous tracker state" so state continuity works exactly as before.
 
-3. The payload parser in `src/trackerData.ts` detects that the payload is a raw `<internal_states>` HTML object (not JSON/YAML) and passes it through verbatim as `worldData.internal_states_html` — preserving signs like `BOND: +4` that the legacy `+`-cleanup would have stripped.
+3. Tracker routing in `src/trackerRoutes.ts` sends the payload to the internal-states route instead of the JSON/YAML parser — by the tag's `type="internal_states"`, or by the `<internal_states>` wrapper under the configured type — and passes it through verbatim as `worldData.internal_states_html`, preserving signs like `BOND: +4` that the legacy `+`-cleanup would have stripped.
 
 4. The preset ships a `<script type="text/x-handlebars-template-logic">` preprocessor that parses the HTML into structured modules (turn number, per-module entries, fields, meters, chips) before the Handlebars card template renders them.
 
