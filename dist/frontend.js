@@ -20662,20 +20662,10 @@ function parse(src, reviver, options) {
 function cleanupPlusSigns(input) {
   return input.replace(/([\s:[,{])\+(\d+(?:\.\d+)?)([\s,}\]\n\r]|$)/g, "$1$2$3");
 }
-var INTERNAL_STATES_TYPE = "internal_states";
-var INTERNAL_STATES_WRAPPER_RE = /<internal_states\b[^>]*>[\s\S]*<\/internal_states>/i;
-var INTERNAL_STATES_DETAILS_RE = /^\s*(?:<!--[\s\S]*?-->\s*)*<details\b/i;
-function isInternalStatesPayload(raw) {
-  return INTERNAL_STATES_WRAPPER_RE.test(raw) || INTERNAL_STATES_DETAILS_RE.test(raw) && /<summary\b/i.test(raw);
-}
 function parseTrackerBlock(raw) {
-  const trimmed = raw.trim();
-  if (!trimmed)
+  const cleaned = cleanupPlusSigns(raw.trim());
+  if (!cleaned)
     return null;
-  if (isInternalStatesPayload(trimmed)) {
-    return { worldData: { internal_states_html: trimmed }, characters: [] };
-  }
-  const cleaned = cleanupPlusSigns(trimmed);
   try {
     const json = JSON.parse(cleaned);
     if (json && typeof json === "object") {
@@ -20708,6 +20698,45 @@ function normalizeTrackerData(data) {
     ...data,
     characters
   };
+}
+
+// src/trackerRoutes.ts
+var TRACKER_ROUTES = [
+  {
+    type: "internal_states",
+    wrapperTag: "internal_states",
+    parse: (raw) => {
+      const html = raw.trim();
+      return html ? { worldData: { internal_states_html: html }, characters: [] } : null;
+    }
+  }
+];
+var WRAPPER_RES = new Map(TRACKER_ROUTES.filter((route) => route.wrapperTag).map((route) => [
+  route,
+  new RegExp(String.raw`<${route.wrapperTag}\b[^>]*>[\s\S]*<\/${route.wrapperTag}>`, "i")
+]));
+function getTrackerRoute(type) {
+  if (!type)
+    return null;
+  return TRACKER_ROUTES.find((route) => route.type === type) || null;
+}
+function isTrackerType(type, identifier) {
+  return !type || type === identifier || getTrackerRoute(type) !== null;
+}
+function getTrackerTypes(identifier) {
+  return Array.from(new Set([identifier, ...TRACKER_ROUTES.map((route) => route.type)]));
+}
+function parseRoutedTracker(raw, type = "") {
+  let route = getTrackerRoute(type);
+  if (!route) {
+    for (const [candidate, re] of WRAPPER_RES) {
+      if (re.test(raw)) {
+        route = candidate;
+        break;
+      }
+    }
+  }
+  return route ? route.parse(raw) : parseTrackerBlock(raw);
 }
 
 // src/inlineTemplates.ts
@@ -21726,15 +21755,17 @@ function extractTrackerBlock(content, identifier) {
     const attrsRaw = tagMatch[1] || "";
     const attrs = parseTagAttrs(attrsRaw);
     const foundType = sanitizeIdentifier(attrs.type || "");
-    if (foundType && foundType !== cleanIdentifier && foundType !== INTERNAL_STATES_TYPE)
+    if (!isTrackerType(foundType, cleanIdentifier))
       continue;
-    return tagMatch[2]?.trim() || null;
+    const raw = tagMatch[2]?.trim();
+    return raw ? { raw, type: getTrackerRoute(foundType)?.type || "" } : null;
   }
   if (!cleanIdentifier)
     return null;
   const id = escapeRegex(cleanIdentifier);
   const re = new RegExp(String.raw`(?:^|\n)\s*\`\`\`[ \t]*${id}(?=[ \t\r\n]|$)[^\n\r]*\r?\n([\s\S]*?)\r?\n?\s*\`\`\``, "i");
-  return content.match(re)?.[1]?.trim() || null;
+  const raw = content.match(re)?.[1]?.trim();
+  return raw ? { raw, type: "" } : null;
 }
 function parseTagAttrs(raw) {
   const out = {};
@@ -22307,13 +22338,14 @@ function setup(ctx) {
   ctx.dom.cleanup();
   let config = { ...DEFAULT_CONFIG };
   let removeHideStyle = null;
-  let removeTagInterceptors = [];
+  let removeTagInterceptor = null;
   let tagInterceptorSignature = null;
   let previousTrackerData = null;
   let latestContent = null;
   let latestTrackerMessageId = null;
   let latestTrackerRaw = null;
   let latestTrackerSourceContent = null;
+  let latestTrackerType = "";
   let configReady = false;
   let pendingTrackerPayload = null;
   let awaitingLatestTrackerChatId = null;
@@ -22443,15 +22475,19 @@ function setup(ctx) {
     const signature = JSON.stringify([
       config.trackerTagName,
       config.codeBlockIdentifier,
-      INTERNAL_STATES_TYPE,
       config.hideSimBlocks
     ]);
-    if (removeTagInterceptors.length > 0 && tagInterceptorSignature === signature)
+    if (removeTagInterceptor && tagInterceptorSignature === signature)
       return;
-    for (const remove of removeTagInterceptors)
-      remove();
-    removeTagInterceptors = [];
-    const onTagIntercept = (payload) => {
+    if (removeTagInterceptor) {
+      removeTagInterceptor();
+      removeTagInterceptor = null;
+    }
+    const register = (tagType) => ctx.messages.registerTagInterceptor({
+      tagName: config.trackerTagName,
+      attrs: { type: tagType },
+      removeFromMessage: config.hideSimBlocks
+    }, (payload) => {
       const payloadChatId = payload.chatId || null;
       if (!isActivityForActiveChat(payloadChatId))
         return;
@@ -22476,16 +22512,13 @@ function setup(ctx) {
         retryLatestMessageRenderIntent(messageId);
         return;
       }
-      handleTrackerPayload(payload.content, sourceContent, messageId);
+      handleTrackerPayload(payload.content, sourceContent, messageId, getTrackerRoute(tagType)?.type || "");
+    });
+    const removers = getTrackerTypes(config.codeBlockIdentifier).map(register);
+    removeTagInterceptor = () => {
+      for (const remove of removers)
+        remove();
     };
-    const interceptorTypes = config.codeBlockIdentifier === INTERNAL_STATES_TYPE ? [config.codeBlockIdentifier] : [config.codeBlockIdentifier, INTERNAL_STATES_TYPE];
-    for (const tagType of interceptorTypes) {
-      removeTagInterceptors.push(ctx.messages.registerTagInterceptor({
-        tagName: config.trackerTagName,
-        attrs: { type: tagType },
-        removeFromMessage: config.hideSimBlocks
-      }, onTagIntercept));
-    }
     tagInterceptorSignature = signature;
   };
   const syncControls = () => {
@@ -22824,12 +22857,13 @@ function setup(ctx) {
     trackerMessageRenders.set(messageId, { data, preset, previousData, mode });
     restoreFormControlState(mount);
   };
-  const handleTrackerPayload = (raw, sourceContent, messageId = null) => {
+  const handleTrackerPayload = (raw, sourceContent, messageId = null, trackerType = "") => {
     if (!configReady) {
       if (!pendingTrackerPayload?.authoritative) {
         pendingTrackerPayload = {
           raw,
           sourceContent,
+          trackerType,
           messageId,
           chatId: currentChatId,
           authoritative: false
@@ -22851,7 +22885,7 @@ function setup(ctx) {
     const preset = getPresetById(config, config.templateId);
     const mountMode = resolveTrackerMountMode(preset);
     applyThemeClass(preset);
-    const parsed = parseTrackerBlock(raw);
+    const parsed = parseRoutedTracker(raw, trackerType);
     if (!parsed) {
       setStatus("Tracker found (invalid JSON/YAML)");
       renderEmpty(raw);
@@ -22863,6 +22897,7 @@ function setup(ctx) {
     }
     latestTrackerRaw = raw;
     latestTrackerSourceContent = sourceContent;
+    latestTrackerType = trackerType;
     setStatus(`Tracker updated (${preset.templateName})`);
     renderTracker(parsed, raw, preset, comparisonData, (html) => {
       injectIntoPanelBody(html);
@@ -22888,8 +22923,8 @@ function setup(ctx) {
     previousTrackerData = parsed;
   };
   const handleContent = (content, messageId = null) => {
-    const raw = extractTrackerBlock(content, config.codeBlockIdentifier);
-    if (!raw) {
+    const block = extractTrackerBlock(content, config.codeBlockIdentifier);
+    if (!block) {
       let wasLatest = false;
       if (messageId && trackerMessageIds.has(messageId)) {
         trackerMessageIds.delete(messageId);
@@ -22914,7 +22949,7 @@ function setup(ctx) {
       return;
     }
     latestContent = content;
-    handleTrackerPayload(raw, content, messageId);
+    handleTrackerPayload(block.raw, content, messageId, block.type);
   };
   const persistConfig = () => {
     ctx.sendToBackend({ type: "set_config", config });
@@ -22959,7 +22994,7 @@ function setup(ctx) {
     pendingTrackerPayload = null;
     if (pending.chatId && currentChatId && pending.chatId !== currentChatId)
       return;
-    handleTrackerPayload(pending.raw, pending.sourceContent, pending.messageId);
+    handleTrackerPayload(pending.raw, pending.sourceContent, pending.messageId, pending.trackerType);
   };
   const backendUnsub = ctx.onBackendMessage((payload) => {
     const obj = payload;
@@ -23077,7 +23112,7 @@ function setup(ctx) {
       const entry = obj.entry;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
-        const previous = typeof entry.previousPayload === "string" ? parseTrackerBlock(entry.previousPayload) : null;
+        const previous = typeof entry.previousPayload === "string" ? parseRoutedTracker(entry.previousPayload, typeof entry.previousType === "string" ? entry.previousType : "") : null;
         const unchanged = msgId === latestTrackerMessageId && entry.payload === latestTrackerRaw && JSON.stringify(trackerComparisonBaselines.get(msgId || "") ?? null) === JSON.stringify(previous);
         if (unchanged) {
           retryLatestMessageRenderIntent(msgId);
@@ -23090,6 +23125,7 @@ function setup(ctx) {
         pendingTrackerPayload = {
           raw: entry.payload,
           sourceContent: entry.payload,
+          trackerType: typeof entry.type === "string" ? entry.type : "",
           messageId: msgId,
           chatId: responseChatId,
           authoritative: true
@@ -23156,7 +23192,7 @@ function setup(ctx) {
     if (latestContent) {
       handleContent(latestContent, latestTrackerMessageId);
     } else if (latestTrackerRaw) {
-      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId);
+      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId, latestTrackerType);
     }
     if (shouldResetStatusAfterConfigLoad()) {
       setStatus(DEFAULT_PANEL_STATUS);
@@ -23342,7 +23378,7 @@ function setup(ctx) {
     if (latestContent) {
       handleContent(latestContent, latestTrackerMessageId);
     } else if (latestTrackerRaw) {
-      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId);
+      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId, latestTrackerType);
     }
     inlineProcessor.processAll();
     setStatus(`Previewing template: ${preset.templateName}. Click Save Settings to keep it.`);
@@ -23500,9 +23536,8 @@ function setup(ctx) {
     permissionUnsub();
     if (removeHideStyle)
       removeHideStyle();
-    for (const remove of removeTagInterceptors)
-      remove();
-    removeTagInterceptors = [];
+    if (removeTagInterceptor)
+      removeTagInterceptor();
     clearSideTrackerRender();
     for (const mount of trackerMessageMounts.values())
       ctx.dom.uninject(mount);

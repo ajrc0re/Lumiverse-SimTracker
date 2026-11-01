@@ -1,7 +1,8 @@
 import Handlebars from "handlebars";
-import type { SpindleFrontendContext, SpindleMessageTagIntercept, SpindleModelComboboxHandle } from "lumiverse-spindle-types";
+import type { SpindleFrontendContext, SpindleModelComboboxHandle } from "lumiverse-spindle-types";
 import { getTemplatePresets, mergeTemplatePresets, type TemplatePreset } from "./templatePresets";
-import { INTERNAL_STATES_TYPE, parseTrackerBlock, type TrackerData } from "./trackerData";
+import type { TrackerData } from "./trackerData";
+import { getTrackerRoute, getTrackerTypes, isTrackerType, parseRoutedTracker } from "./trackerRoutes";
 import { createInlineTemplateProcessor } from "./inlineTemplates";
 
 type FertilityCycleBias =
@@ -891,7 +892,7 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function extractTrackerBlock(content: string, identifier: string): string | null {
+function extractTrackerBlock(content: string, identifier: string): { raw: string; type: string } | null {
   const tagName = sanitizeTagName(configTrackerTagNameHint || "tracker");
   const tagRe = new RegExp(String.raw`<${escapeRegex(tagName)}\b([^>]*)>([\s\S]*?)<\/${escapeRegex(tagName)}>` , "ig");
   const cleanIdentifier = sanitizeIdentifier(identifier);
@@ -900,16 +901,16 @@ function extractTrackerBlock(content: string, identifier: string): string | null
     const attrsRaw = tagMatch[1] || "";
     const attrs = parseTagAttrs(attrsRaw);
     const foundType = sanitizeIdentifier(attrs.type || "");
-    // Absent, configured, or the reserved internal-states type — the FF
-    // raw-HTML board travels in <tracker type="internal_states">.
-    if (foundType && foundType !== cleanIdentifier && foundType !== INTERNAL_STATES_TYPE) continue;
-    return tagMatch[2]?.trim() || null;
+    if (!isTrackerType(foundType, cleanIdentifier)) continue;
+    const raw = tagMatch[2]?.trim();
+    return raw ? { raw, type: getTrackerRoute(foundType)?.type || "" } : null;
   }
 
   if (!cleanIdentifier) return null;
   const id = escapeRegex(cleanIdentifier);
   const re = new RegExp(String.raw`(?:^|\n)\s*\`\`\`[ \t]*${id}(?=[ \t\r\n]|$)[^\n\r]*\r?\n([\s\S]*?)\r?\n?\s*\`\`\``, "i");
-  return content.match(re)?.[1]?.trim() || null;
+  const raw = content.match(re)?.[1]?.trim();
+  return raw ? { raw, type: "" } : null;
 }
 
 function parseTagAttrs(raw: string): Record<string, string> {
@@ -1582,17 +1583,19 @@ export function setup(ctx: SpindleFrontendContext) {
 
   let config: TrackerConfig = { ...DEFAULT_CONFIG };
   let removeHideStyle: (() => void) | null = null;
-  let removeTagInterceptors: Array<() => void> = [];
+  let removeTagInterceptor: (() => void) | null = null;
   let tagInterceptorSignature: string | null = null;
   let previousTrackerData: TrackerData | null = null;
   let latestContent: string | null = null;
   let latestTrackerMessageId: string | null = null;
   let latestTrackerRaw: string | null = null;
   let latestTrackerSourceContent: string | null = null;
+  let latestTrackerType = "";
   let configReady = false;
   let pendingTrackerPayload: {
     raw: string;
     sourceContent: string;
+    trackerType: string;
     messageId: string | null;
     chatId: string | null;
     authoritative: boolean;
@@ -1745,61 +1748,55 @@ export function setup(ctx: SpindleFrontendContext) {
   };
 
   const applyTagInterceptor = () => {
-    // The reserved internal-states type is intercepted alongside the
-    // configured one so the FF raw-HTML board (<tracker
-    // type="internal_states">) is stripped and rendered too.
     const signature = JSON.stringify([
       config.trackerTagName,
       config.codeBlockIdentifier,
-      INTERNAL_STATES_TYPE,
       config.hideSimBlocks,
     ]);
-    if (removeTagInterceptors.length > 0 && tagInterceptorSignature === signature) return;
-    for (const remove of removeTagInterceptors) remove();
-    removeTagInterceptors = [];
-
-    const onTagIntercept = (payload: SpindleMessageTagIntercept) => {
-      const payloadChatId = payload.chatId || null;
-      // Tag interception also runs for chats generating in the background.
-      // Removing the raw tag is global host behavior, but rendering it is
-      // only valid for the chat the user is actually viewing. In particular,
-      // a background payload must never be treated as navigation: doing so
-      // calls resetChatState() and uninjects the visible chat's tracker.
-      if (!isActivityForActiveChat(payloadChatId)) return;
-      if (typeof payload.content !== "string" || !payload.content.trim()) return;
-      const sourceContent = typeof payload.fullMatch === "string" ? payload.fullMatch : payload.content;
-      const messageId = payload.messageId || null;
-      // The host strips all matching tags regardless of this callback.
-      // Mounting history must not parse/render/report every old tracker.
-      if (!configReady || awaitingLatestTrackerChatId) return;
-      if (!messageId) return;
-      const isSelected = messageId === latestTrackerMessageId;
-      const isNewest = messageId === ctx.messages.getLatestMessageId();
-      if (!isSelected && !isNewest) return;
-      if (!isSelected && !payload.isStreaming) {
-        if (currentChatId) requestLatestTracker(currentChatId, true);
-        return;
-      }
-      if (isSelected && payload.content === latestTrackerRaw) {
-        retryLatestMessageRenderIntent(messageId);
-        return;
-      }
-      handleTrackerPayload(payload.content, sourceContent, messageId);
-    };
-
-    const interceptorTypes = config.codeBlockIdentifier === INTERNAL_STATES_TYPE
-      ? [config.codeBlockIdentifier]
-      : [config.codeBlockIdentifier, INTERNAL_STATES_TYPE];
-    for (const tagType of interceptorTypes) {
-      removeTagInterceptors.push(ctx.messages.registerTagInterceptor(
-        {
-          tagName: config.trackerTagName,
-          attrs: { type: tagType },
-          removeFromMessage: config.hideSimBlocks,
-        },
-        onTagIntercept,
-      ));
+    if (removeTagInterceptor && tagInterceptorSignature === signature) return;
+    if (removeTagInterceptor) {
+      removeTagInterceptor();
+      removeTagInterceptor = null;
     }
+    // One interceptor per tracker type: the configured identifier plus each
+    // routed type (trackerRoutes.ts). The handler carries its route along.
+    const register = (tagType: string) => ctx.messages.registerTagInterceptor(
+      {
+        tagName: config.trackerTagName,
+        attrs: { type: tagType },
+        removeFromMessage: config.hideSimBlocks,
+      },
+      (payload) => {
+        const payloadChatId = payload.chatId || null;
+        // Tag interception also runs for chats generating in the background.
+        // Removing the raw tag is global host behavior, but rendering it is
+        // only valid for the chat the user is actually viewing. In particular,
+        // a background payload must never be treated as navigation: doing so
+        // calls resetChatState() and uninjects the visible chat's tracker.
+        if (!isActivityForActiveChat(payloadChatId)) return;
+        if (typeof payload.content !== "string" || !payload.content.trim()) return;
+        const sourceContent = typeof payload.fullMatch === "string" ? payload.fullMatch : payload.content;
+        const messageId = payload.messageId || null;
+        // The host strips all matching tags regardless of this callback.
+        // Mounting history must not parse/render/report every old tracker.
+        if (!configReady || awaitingLatestTrackerChatId) return;
+        if (!messageId) return;
+        const isSelected = messageId === latestTrackerMessageId;
+        const isNewest = messageId === ctx.messages.getLatestMessageId();
+        if (!isSelected && !isNewest) return;
+        if (!isSelected && !payload.isStreaming) {
+          if (currentChatId) requestLatestTracker(currentChatId, true);
+          return;
+        }
+        if (isSelected && payload.content === latestTrackerRaw) {
+          retryLatestMessageRenderIntent(messageId);
+          return;
+        }
+        handleTrackerPayload(payload.content, sourceContent, messageId, getTrackerRoute(tagType)?.type || "");
+      },
+    );
+    const removers = getTrackerTypes(config.codeBlockIdentifier).map(register);
+    removeTagInterceptor = () => { for (const remove of removers) remove(); };
     tagInterceptorSignature = signature;
   };
 
@@ -2177,12 +2174,13 @@ export function setup(ctx: SpindleFrontendContext) {
     restoreFormControlState(mount);
   };
 
-  const handleTrackerPayload = (raw: string, sourceContent: string, messageId: string | null = null) => {
+  const handleTrackerPayload = (raw: string, sourceContent: string, messageId: string | null = null, trackerType = "") => {
     if (!configReady) {
       if (!pendingTrackerPayload?.authoritative) {
         pendingTrackerPayload = {
           raw,
           sourceContent,
+          trackerType,
           messageId,
           chatId: currentChatId,
           authoritative: false,
@@ -2204,7 +2202,7 @@ export function setup(ctx: SpindleFrontendContext) {
     const preset = getPresetById(config, config.templateId);
     const mountMode = resolveTrackerMountMode(preset);
     applyThemeClass(preset);
-    const parsed = parseTrackerBlock(raw);
+    const parsed = parseRoutedTracker(raw, trackerType);
     if (!parsed) {
       setStatus("Tracker found (invalid JSON/YAML)");
       renderEmpty(raw);
@@ -2216,6 +2214,7 @@ export function setup(ctx: SpindleFrontendContext) {
     }
     latestTrackerRaw = raw;
     latestTrackerSourceContent = sourceContent;
+    latestTrackerType = trackerType;
     setStatus(`Tracker updated (${preset.templateName})`);
     renderTracker(parsed, raw, preset, comparisonData, (html) => {
       injectIntoPanelBody(html);
@@ -2252,8 +2251,8 @@ export function setup(ctx: SpindleFrontendContext) {
   };
 
   const handleContent = (content: string, messageId: string | null = null) => {
-    const raw = extractTrackerBlock(content, config.codeBlockIdentifier);
-    if (!raw) {
+    const block = extractTrackerBlock(content, config.codeBlockIdentifier);
+    if (!block) {
       let wasLatest = false;
       if (messageId && trackerMessageIds.has(messageId)) {
         trackerMessageIds.delete(messageId);
@@ -2278,7 +2277,7 @@ export function setup(ctx: SpindleFrontendContext) {
       return;
     }
     latestContent = content;
-    handleTrackerPayload(raw, content, messageId);
+    handleTrackerPayload(block.raw, content, messageId, block.type);
   };
 
   const persistConfig = () => {
@@ -2321,7 +2320,7 @@ export function setup(ctx: SpindleFrontendContext) {
     const pending = pendingTrackerPayload;
     pendingTrackerPayload = null;
     if (pending.chatId && currentChatId && pending.chatId !== currentChatId) return;
-    handleTrackerPayload(pending.raw, pending.sourceContent, pending.messageId);
+    handleTrackerPayload(pending.raw, pending.sourceContent, pending.messageId, pending.trackerType);
   };
 
   const backendUnsub = ctx.onBackendMessage((payload: unknown) => {
@@ -2433,11 +2432,13 @@ export function setup(ctx: SpindleFrontendContext) {
       }
       awaitingLatestTrackerChatId = null;
       pendingTrackerPayload = null;
-      const entry = obj.entry as { messageId?: unknown; payload?: unknown; previousPayload?: unknown } | null;
+      const entry = obj.entry as {
+        messageId?: unknown; payload?: unknown; type?: unknown; previousPayload?: unknown; previousType?: unknown;
+      } | null;
       if (entry && typeof entry.payload === "string" && entry.payload.trim()) {
         const msgId = typeof entry.messageId === "string" ? entry.messageId : null;
         const previous = typeof entry.previousPayload === "string"
-          ? parseTrackerBlock(entry.previousPayload)
+          ? parseRoutedTracker(entry.previousPayload, typeof entry.previousType === "string" ? entry.previousType : "")
           : null;
         const unchanged = msgId === latestTrackerMessageId && entry.payload === latestTrackerRaw
           && JSON.stringify(trackerComparisonBaselines.get(msgId || "") ?? null) === JSON.stringify(previous);
@@ -2451,6 +2452,7 @@ export function setup(ctx: SpindleFrontendContext) {
         pendingTrackerPayload = {
           raw: entry.payload,
           sourceContent: entry.payload,
+          trackerType: typeof entry.type === "string" ? entry.type : "",
           messageId: msgId,
           chatId: responseChatId,
           authoritative: true,
@@ -2537,7 +2539,7 @@ export function setup(ctx: SpindleFrontendContext) {
     if (latestContent) {
       handleContent(latestContent, latestTrackerMessageId);
     } else if (latestTrackerRaw) {
-      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId);
+      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId, latestTrackerType);
     }
     if (shouldResetStatusAfterConfigLoad()) {
       setStatus(DEFAULT_PANEL_STATUS);
@@ -2752,7 +2754,7 @@ export function setup(ctx: SpindleFrontendContext) {
     if (latestContent) {
       handleContent(latestContent, latestTrackerMessageId);
     } else if (latestTrackerRaw) {
-      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId);
+      handleTrackerPayload(latestTrackerRaw, latestTrackerSourceContent || latestTrackerRaw, latestTrackerMessageId, latestTrackerType);
     }
     inlineProcessor.processAll();
     setStatus(`Previewing template: ${preset.templateName}. Click Save Settings to keep it.`);
@@ -2928,8 +2930,7 @@ export function setup(ctx: SpindleFrontendContext) {
     stopInlineObserver();
     permissionUnsub();
     if (removeHideStyle) removeHideStyle();
-    for (const remove of removeTagInterceptors) remove();
-    removeTagInterceptors = [];
+    if (removeTagInterceptor) removeTagInterceptor();
     clearSideTrackerRender();
     for (const mount of trackerMessageMounts.values()) ctx.dom.uninject(mount);
     trackerMessageMounts.clear();

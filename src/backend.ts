@@ -1,5 +1,5 @@
 import { getTemplatePresetById, getTemplatePresets, mergeTemplatePresets, type TemplatePreset } from "./templatePresets";
-import { INTERNAL_STATES_TYPE } from "./trackerData";
+import { getTrackerRoute, isTrackerType } from "./trackerRoutes";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   applyFastLaneAnswers,
@@ -130,6 +130,8 @@ type TrackerHistoryEntry = {
   index?: number;
   // Canonical payload before any generation-only side-channel adjustment.
   sourcePayload?: string;
+  // Routed tag `type` (see trackerRoutes.ts); absent for structured payloads.
+  type?: string;
 };
 
 /**
@@ -241,18 +243,6 @@ function buildTrackerTagRegex(tagName: string, flags = "i"): RegExp {
   return new RegExp(String.raw`<${safeTag}\b([^>]*)>([\s\S]*?)<\/${safeTag}>`, flags);
 }
 
-/**
- * A tracker tag belongs to this extension when its `type` attribute is
- * absent, matches the configured code-block identifier, or is the reserved
- * Freaky Frankenstein raw-HTML type. Filters that REBUILD payloads
- * (replaceTrackerBlock) stay strict so commands never clobber an
- * internal-states HTML board with a JSON rebuild.
- */
-function isAcceptedTrackerType(typeAttr: string, identifier: string): boolean {
-  if (!typeAttr) return true;
-  return typeAttr === identifier || typeAttr === INTERNAL_STATES_TYPE;
-}
-
 function extractSimBlock(message: string, identifier: string): string | null {
   const re = buildTrackerFenceRegex(identifier, "i");
   const match = message.match(re);
@@ -267,10 +257,26 @@ function extractTrackerTag(message: string, tagName: string, identifier: string)
   while ((match = re.exec(message)) !== null) {
     const attrs = parseTagAttributes(match[1] || "");
     const typeAttr = sanitizeIdentifier(attrs.type || "");
-    if (!isAcceptedTrackerType(typeAttr, cleanIdentifier)) continue;
+    if (!isTrackerType(typeAttr, cleanIdentifier)) continue;
     return (match[2] || "").trim() || null;
   }
   return null;
+}
+
+/**
+ * Routed `type` of the tag `extractTrackerPayloadFromMessage` would pick, or
+ * undefined when that payload takes the default structured route.
+ */
+function extractTrackerRouteType(message: string): string | undefined {
+  const re = buildTrackerTagRegex(config.trackerTagName, "ig");
+  const cleanIdentifier = sanitizeIdentifier(config.codeBlockIdentifier);
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(message)) !== null) {
+    const typeAttr = sanitizeIdentifier(parseTagAttributes(match[1] || "").type || "");
+    if (!isTrackerType(typeAttr, cleanIdentifier)) continue;
+    return (match[2] || "").trim() ? getTrackerRoute(typeAttr)?.type : undefined;
+  }
+  return undefined;
 }
 
 function extractTrackerTagLoose(message: string, tagName: string): string | null {
@@ -577,7 +583,7 @@ function invalidateTrackerHistory(chatId: string | null): void {
   hydratedTrackerChats.delete(chatId);
 }
 
-function recordChatTracker(chatId: string | null, messageId: string | null, payload: string, index?: number): void {
+function recordChatTracker(chatId: string | null, messageId: string | null, payload: string, index?: number, type?: string): void {
   ensureTrackerHistoryScope();
   if (!chatId || !messageId) return;
   const trimmed = payload.trim();
@@ -589,12 +595,12 @@ function recordChatTracker(chatId: string | null, messageId: string | null, payl
   }
   const existingIdx = history.findIndex((entry) => entry.messageId === messageId);
   const existing = history[existingIdx];
-  if (existing?.payload === trimmed && (index === undefined || existing.index === index)) return;
+  if (existing?.payload === trimmed && existing.type === type && (index === undefined || existing.index === index)) return;
   invalidateTrackerHistory(chatId);
   if (existingIdx >= 0) {
-    history[existingIdx] = { messageId, payload: trimmed, index: index ?? existing.index, sourcePayload: trimmed };
+    history[existingIdx] = { messageId, payload: trimmed, index: index ?? existing.index, sourcePayload: trimmed, type };
   } else {
-    history.push({ messageId, payload: trimmed, index, sourcePayload: trimmed });
+    history.push({ messageId, payload: trimmed, index, sourcePayload: trimmed, type });
   }
   history.sort((a, b) => (a.index ?? Infinity) - (b.index ?? Infinity));
 }
@@ -667,6 +673,7 @@ async function rehydrateChatTrackerHistory(
           const payload = extractTrackerPayloadFromMessage(message.content);
           if (payload) entries.unshift({
             messageId: message.id, payload: payload.trim(), index: message.index_in_chat, sourcePayload: payload.trim(),
+            type: extractTrackerRouteType(message.content),
           });
         }
         return entries;
@@ -706,6 +713,7 @@ async function rehydrateChatTrackerHistory(
         const payload = extractTrackerPayloadFromMessage(row.content)?.trim();
         if (payload) history.push(preserveAdjustment({
           messageId: row.id, payload, sourcePayload: payload, index: row.index_in_chat,
+          type: extractTrackerRouteType(row.content),
         }));
       }
       history.push(...found.map(preserveAdjustment));
@@ -1534,7 +1542,7 @@ function stripOldTrackerBlocks(content: string, identifier: string, keepNewest: 
     const attrs = parseTagAttributes(match[1] || "");
     const foundType = sanitizeIdentifier(attrs.type || "");
     const desiredType = sanitizeIdentifier(identifier);
-    if (!isAcceptedTrackerType(foundType, desiredType)) continue;
+    if (!isTrackerType(foundType, desiredType)) continue;
     const start = match.index ?? -1;
     if (start < 0 || !text) continue;
     blocks.push({ start, end: start + text.length, text });
@@ -1549,7 +1557,7 @@ function stripOldTrackerBlocks(content: string, identifier: string, keepNewest: 
         const attrs = parseTagAttributes(String(attrsRaw || ""));
         const foundType = sanitizeIdentifier(attrs.type || "");
         const desiredType = sanitizeIdentifier(identifier);
-        if (!isAcceptedTrackerType(foundType, desiredType)) return full;
+        if (!isTrackerType(foundType, desiredType)) return full;
         return "";
       });
       return wiped.replace(/\n\s*\n\s*\n/g, "\n\n").trim();
@@ -1758,7 +1766,7 @@ spindle.on("MESSAGE_SENT", (payload: unknown, userId?: string) => {
     const sim = extractTrackerPayloadFromMessage(message);
     if (sim) {
       lastSimStats = sim;
-      recordChatTracker(ctx.chatId, ctx.messageId, sim, ctx.index);
+      recordChatTracker(ctx.chatId, ctx.messageId, sim, ctx.index, extractTrackerRouteType(message));
       pushMacroValues();
       await trackEvent("sst.tracker.detected", { identifier: config.codeBlockIdentifier }, ctx.chatId ? { chatId: ctx.chatId } : undefined);
     }
@@ -1774,7 +1782,7 @@ spindle.on("MESSAGE_EDITED", (payload: unknown, userId?: string) => {
     const sim = extractTrackerPayloadFromMessage(ctx.content);
     if (sim) {
       lastSimStats = sim;
-      recordChatTracker(ctx.chatId, ctx.messageId, sim, ctx.index);
+      recordChatTracker(ctx.chatId, ctx.messageId, sim, ctx.index, extractTrackerRouteType(ctx.content));
       pushMacroValues();
       await trackEvent("sst.tracker.detected", { identifier: config.codeBlockIdentifier, source: "message_edited" }, ctx.chatId ? { chatId: ctx.chatId } : undefined);
       return;
@@ -1828,7 +1836,7 @@ const onTrackerSwipe = (payload: unknown, userId?: string) => {
       // variants, subsequent generations (main or secondary) reference the
       // tracker data that actually matches the on-screen narrative rather
       // than whichever variant was last recorded.
-      recordChatTracker(chatId, messageId, payloadText, typeof message.index_in_chat === "number" ? message.index_in_chat : undefined);
+      recordChatTracker(chatId, messageId, payloadText, typeof message.index_in_chat === "number" ? message.index_in_chat : undefined, extractTrackerRouteType(activeContent));
       lastSimStats = payloadText;
       pushMacroValues();
     } else {
@@ -1861,7 +1869,7 @@ spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown, userId?: string) => {
 
     const attrs = obj.attrs && typeof obj.attrs === "object" ? (obj.attrs as Record<string, unknown>) : {};
     const tagType = sanitizeIdentifier(typeof attrs.type === "string" ? attrs.type : "");
-    if (!isAcceptedTrackerType(tagType, sanitizeIdentifier(config.codeBlockIdentifier))) return;
+    if (!isTrackerType(tagType, sanitizeIdentifier(config.codeBlockIdentifier))) return;
 
     const content = typeof obj.content === "string" ? obj.content.trim() : "";
     if (!content) return;
@@ -1883,7 +1891,7 @@ spindle.on("MESSAGE_TAG_INTERCEPTED", (payload: unknown, userId?: string) => {
     if (chatId) activeChatId = chatId;
 
     lastSimStats = content;
-    recordChatTracker(chatId, messageId, content, latest.index);
+    recordChatTracker(chatId, messageId, content, latest.index, getTrackerRoute(tagType)?.type);
     pushMacroValues();
     await trackEvent("sst.tracker.detected", { identifier: config.codeBlockIdentifier, source: "message_tag_intercepted" });
   })();
@@ -2606,7 +2614,7 @@ spindle.on("GENERATION_ENDED", (payload: unknown, userId?: string) => {
     // strip the tag.
     const existingPayload = extractTrackerPayloadFromMessage(latestAssistant.content);
     if (existingPayload) {
-      recordChatTracker(ctx.chatId, latestAssistant.id, existingPayload, latestAssistant.index_in_chat);
+      recordChatTracker(ctx.chatId, latestAssistant.id, existingPayload, latestAssistant.index_in_chat, extractTrackerRouteType(latestAssistant.content));
       return;
     }
 
@@ -2645,7 +2653,7 @@ function collectTrackerBlockRanges(content: string, identifier: string): BlockRa
     if (typeof start !== "number" || !text || seenStarts.has(start)) continue;
     const attrs = parseTagAttributes(match[1] || "");
     const foundType = sanitizeIdentifier(attrs.type || "");
-    if (!isAcceptedTrackerType(foundType, desiredType)) continue;
+    if (!isTrackerType(foundType, desiredType)) continue;
     seenStarts.add(start);
     ranges.push({ start, end: start + text.length });
   }
@@ -2703,7 +2711,7 @@ function stripAllTrackerBlocks(content: string, identifier: string): string {
   out = out.replace(buildTrackerTagRegex(config.trackerTagName, "gi"), (full, attrsRaw) => {
     const attrs = parseTagAttributes(String(attrsRaw || ""));
     const foundType = sanitizeIdentifier(attrs.type || "");
-    if (!isAcceptedTrackerType(foundType, desiredType)) return full;
+    if (!isTrackerType(foundType, desiredType)) return full;
     return "";
   });
   out = out.replace(/<div\b([^>]*)>([\s\S]*?)<\/div>/gi, (full, rawAttrs, rawInner) => {
@@ -2829,7 +2837,7 @@ function countMatchingTrackerBlocksInMessage(content: string): number {
   for (const match of content.matchAll(tagRe)) {
     const attrs = parseTagAttributes(match[1] || "");
     const typeAttr = sanitizeIdentifier(attrs.type || "");
-    if (!isAcceptedTrackerType(typeAttr, cleanIdentifier)) continue;
+    if (!isTrackerType(typeAttr, cleanIdentifier)) continue;
     if (match[0]) count++;
   }
 
@@ -3398,7 +3406,9 @@ spindle.onFrontendMessage(async (payload: unknown, userId: string) => {
         ? {
             messageId: entry.messageId,
             payload: entry.payload,
+            type: entry.type || null,
             previousPayload: previousEntry?.payload || null,
+            previousType: previousEntry?.type || null,
           }
         : null,
     }, userId);
